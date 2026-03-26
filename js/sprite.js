@@ -1,21 +1,84 @@
 (() => {
   const sprite = document.getElementById('sprite');
-  const container = document.querySelector('.sprite-container');
-  if (!sprite || !container) return;
+  if (!sprite) return;
 
+  // Gather all vertical stops (intro + experience rows)
+  const stops = Array.from(document.querySelectorAll('.sprite-stop'));
+  let currentStop = 0;
+  let xOffset = 0;
   const speed = 4;
   const keys = {};
-  let x = 0;
   let moving = false;
 
-  // Center sprite initially
-  const containerRect = () => container.getBoundingClientRect();
-  const spriteW = 48;
+  // Create roaming sprite (fixed position, follows stops)
+  const roamer = document.createElement('div');
+  roamer.className = 'sprite-roaming idle';
+  document.body.appendChild(roamer);
+  roamer.style.display = 'none';
+
+  function positionAtStop(index, animate) {
+    const stop = stops[index];
+    if (!stop) return;
+
+    const rect = stop.getBoundingClientRect();
+
+    if (index === 0) {
+      // At intro: hide roamer, show container sprite
+      roamer.style.display = 'none';
+      sprite.classList.remove('hidden');
+      xOffset = 0;
+    } else {
+      // At experience row: show roamer, hide container sprite
+      sprite.classList.add('hidden');
+      roamer.style.display = 'block';
+
+      const y = rect.top + window.scrollY + (rect.height / 2) - 24;
+      const x = rect.left + 12 + xOffset;
+
+      if (animate) {
+        roamer.style.transition = 'top 0.25s ease-out, left 0.15s ease-out';
+      } else {
+        roamer.style.transition = 'none';
+      }
+
+      roamer.style.position = 'absolute';
+      roamer.style.top = y + 'px';
+      roamer.style.left = x + 'px';
+    }
+
+    // Highlight current experience row
+    stops.forEach((s, i) => {
+      if (s.classList.contains('experience-row')) {
+        s.classList.toggle('sprite-here', i === index);
+      }
+    });
+
+    // Scroll into view if needed
+    if (index > 0) {
+      stop.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
 
   document.addEventListener('keydown', (e) => {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
       e.preventDefault();
       keys[e.key] = true;
+
+      // Down/Up: hop between stops
+      if (e.key === 'ArrowDown' && !e.repeat) {
+        if (currentStop < stops.length - 1) {
+          currentStop++;
+          xOffset = 0;
+          positionAtStop(currentStop, true);
+        }
+      }
+      if (e.key === 'ArrowUp' && !e.repeat) {
+        if (currentStop > 0) {
+          currentStop--;
+          xOffset = 0;
+          positionAtStop(currentStop, true);
+        }
+      }
     }
   });
 
@@ -24,37 +87,54 @@
   });
 
   function update() {
-    const rect = containerRect();
-    const maxX = (rect.width / 2) - spriteW;
-
+    // Left/Right: move within current stop
     let dx = 0;
     if (keys['ArrowRight']) dx += speed;
     if (keys['ArrowLeft']) dx -= speed;
 
     if (dx !== 0) {
-      x += dx;
-      x = Math.max(-maxX, Math.min(x, maxX));
+      if (currentStop === 0) {
+        // Move within sprite container
+        const container = document.querySelector('.sprite-container');
+        const maxX = (container.offsetWidth / 2) - 24;
+        xOffset += dx;
+        xOffset = Math.max(-maxX, Math.min(xOffset, maxX));
+        sprite.style.left = `calc(50% + ${xOffset}px)`;
+      } else {
+        // Move roamer horizontally along the row
+        const stop = stops[currentStop];
+        const rect = stop.getBoundingClientRect();
+        const maxX = rect.width - 60;
+        xOffset += dx;
+        xOffset = Math.max(0, Math.min(xOffset, maxX));
+        roamer.style.left = (rect.left + 12 + xOffset) + 'px';
+      }
 
       if (!moving) {
         moving = true;
         sprite.classList.remove('idle');
         sprite.classList.add('walking');
+        roamer.classList.remove('idle');
       }
     } else {
       if (moving) {
         moving = false;
         sprite.classList.remove('walking');
         sprite.classList.add('idle');
+        roamer.classList.add('idle');
       }
     }
-
-    // Apply position — sprite is centered via CSS left:50% + translateX(-50%)
-    // We offset from center
-    const baseTranslate = moving ? '' : '';
-    sprite.style.left = `calc(50% + ${x}px)`;
 
     requestAnimationFrame(update);
   }
 
+  // Reposition on scroll/resize
+  window.addEventListener('scroll', () => {
+    if (currentStop > 0) positionAtStop(currentStop, false);
+  });
+  window.addEventListener('resize', () => positionAtStop(currentStop, false));
+
+  // Initialize
+  positionAtStop(0, false);
   requestAnimationFrame(update);
 })();

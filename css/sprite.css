@@ -1,80 +1,86 @@
-/* Sprite area */
-#hero {
+/* Sprite column: sits to the left of cover letter */
+.sprite-column {
+  flex-shrink: 0;
   display: flex;
-  justify-content: center;
-  padding: 3rem 1.5rem 1rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .sprite-container {
   position: relative;
-  width: 100%;
-  max-width: 800px;
-  height: 200px;
+  width: 80px;
+  height: 80px;
   background: var(--bg-section);
   border: 2px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
-/* Placeholder sprite — will be replaced with sprite sheet */
 .sprite {
   position: absolute;
   width: 48px;
   height: 48px;
-  bottom: 40px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--accent);
   border-radius: 4px;
   image-rendering: pixelated;
-  transition: none;
+  z-index: 10;
 }
 
-/* Idle animation placeholder — subtle bob */
+/* Idle: subtle bob */
 .sprite.idle {
   animation: sprite-idle 1.2s ease-in-out infinite;
 }
 
 @keyframes sprite-idle {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-4px); }
+  50% { transform: translateX(-50%) translateY(-3px); }
 }
 
-/* Walk state — no bob */
 .sprite.walking {
   animation: none;
 }
 
-/* Ground line hint */
-.sprite-container::after {
-  content: '';
-  position: absolute;
-  bottom: 36px;
-  left: 10%;
-  right: 10%;
-  height: 2px;
-  background: var(--border);
-  border-radius: 1px;
-}
-
 .sprite-hint {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
-  letter-spacing: 0.05em;
-  opacity: 0.6;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+  white-space: nowrap;
 }
 
-/* Mobile: hide hint since no arrow keys */
+/* When sprite leaves the intro, hide the container sprite and show the roaming one */
+.sprite-roaming {
+  position: fixed;
+  width: 48px;
+  height: 48px;
+  background: var(--accent);
+  border-radius: 4px;
+  image-rendering: pixelated;
+  z-index: 100;
+  pointer-events: none;
+  transition: top 0.25s ease-out, left 0.15s ease-out;
+}
+
+.sprite-roaming.idle {
+  animation: sprite-idle-roam 1.2s ease-in-out infinite;
+}
+
+@keyframes sprite-idle-roam {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Hide container sprite when roaming */
+.sprite.hidden {
+  visibility: hidden;
+}
+
 @media (max-width: 600px) {
   .sprite-hint {
     display: none;
-  }
-
-  .sprite-container {
-    height: 150px;
   }
 }

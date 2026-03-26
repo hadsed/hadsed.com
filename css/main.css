@@ -12,7 +12,6 @@
   --text-muted: #8a8a9a;
   --accent: #e94560;
   --accent-2: #0f3460;
-  --tile-bg: #0f3460;
   --border: #2a2a4a;
   --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
@@ -30,66 +29,82 @@ body {
   min-height: 100vh;
 }
 
+main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
 h2 {
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  margin-top: 0.5rem;
 }
 
-section {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem 1.5rem;
+.projects-heading {
+  margin-top: 2rem;
 }
 
-/* Cover Letter */
-#cover-letter {
-  padding-top: 1rem;
+/* Intro: sprite left + cover letter right */
+#intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+  padding: 3rem 0 2rem;
+  position: relative;
 }
 
-#cover-letter p {
-  font-size: 1.15rem;
+.intro-text p {
+  font-size: 1.1rem;
   line-height: 1.8;
   color: var(--text);
-  max-width: 680px;
+}
+
+/* Content section */
+#content {
+  padding: 0 0 2rem;
 }
 
 /* Experiences */
-#experiences {
-  padding-top: 2.5rem;
-}
-
 .experience-row {
   display: flex;
   align-items: center;
   gap: 1.2rem;
-  padding: 1rem 1.2rem;
-  margin-bottom: 0.5rem;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.25rem;
   border-radius: 8px;
   text-decoration: none;
   color: var(--text);
-  transition: background 0.2s, transform 0.15s;
+  transition: background 0.2s, border-color 0.2s;
   border: 1px solid transparent;
+  position: relative;
 }
 
 .experience-row:hover {
   background: var(--bg-section);
   border-color: var(--border);
-  transform: translateX(4px);
+}
+
+/* Highlight when sprite is on this row */
+.experience-row.sprite-here {
+  background: var(--bg-section);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(233, 69, 96, 0.1);
 }
 
 .exp-icon {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
 }
 
 .icon-placeholder {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   image-rendering: pixelated;
 }
@@ -106,20 +121,20 @@ section {
 
 .exp-title {
   font-weight: 600;
-  font-size: 1.05rem;
-  margin-bottom: 0.2rem;
+  font-size: 1rem;
+  margin-bottom: 0.15rem;
 }
 
 .exp-desc {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
 .exp-arrow {
   flex-shrink: 0;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   color: var(--text-muted);
-  transition: transform 0.2s;
+  transition: transform 0.2s, color 0.2s;
 }
 
 .experience-row:hover .exp-arrow {
@@ -127,43 +142,39 @@ section {
   color: var(--accent);
 }
 
-/* Projects */
-#projects {
-  padding-top: 2.5rem;
-  padding-bottom: 3rem;
-}
-
 /* Footer */
 footer {
+  max-width: 800px;
+  margin: 0 auto;
   text-align: center;
-  padding: 2rem;
+  padding: 1.5rem;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   border-top: 1px solid var(--border);
 }
 
 /* Responsive */
 @media (max-width: 600px) {
-  section {
-    padding: 1.5rem 1rem;
+  main {
+    padding: 0 1rem;
   }
 
-  #cover-letter p {
+  #intro {
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding-top: 2rem;
+  }
+
+  .intro-text p {
     font-size: 1rem;
   }
 
   .experience-row {
-    padding: 0.8rem;
+    padding: 0.7rem 0.8rem;
     gap: 0.8rem;
   }
 
-  .exp-icon {
-    width: 40px;
-    height: 40px;
-  }
-
-  .icon-placeholder {
-    width: 40px;
-    height: 40px;
-  }
+  .exp-icon { width: 36px; height: 36px; }
+  .icon-placeholder { width: 36px; height: 36px; }
 }

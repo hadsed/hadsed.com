@@ -10,111 +10,98 @@
 </head>
 <body>
 
-  <!-- Hero: Sprite Area -->
-  <section id="hero">
-    <div class="sprite-container">
-      <div class="sprite idle" id="sprite"></div>
-      <div class="sprite-hint">arrow keys to move</div>
-    </div>
-  </section>
-
-  <!-- Cover Letter -->
-  <section id="cover-letter">
-    <p>
-      I'm Had — an engineer who builds things at the intersection of hardware,
-      software, and whatever seems interesting at the time. I've worked on
-      satellite systems, robotics, machine learning pipelines, and more
-      side projects than I can count. I like hard problems, small teams,
-      and writing code that actually ships.
-    </p>
-  </section>
-
-  <!-- Experiences -->
-  <section id="experiences">
-    <h2>Experience</h2>
-
-    <a href="experience/company-1.html" class="experience-row">
-      <div class="exp-icon">
-        <div class="icon-placeholder rocket"></div>
-      </div>
-      <div class="exp-content">
-        <div class="exp-title">Rocket Lab — Senior Engineer</div>
-        <div class="exp-desc">Flight software and mission operations for small satellite launches.</div>
-      </div>
-      <div class="exp-arrow">&rarr;</div>
-    </a>
-
-    <a href="experience/company-2.html" class="experience-row">
-      <div class="exp-icon">
-        <div class="icon-placeholder satellite"></div>
-      </div>
-      <div class="exp-content">
-        <div class="exp-title">Planet Labs — Software Engineer</div>
-        <div class="exp-desc">Image processing pipelines for Earth-observation satellite constellation.</div>
-      </div>
-      <div class="exp-arrow">&rarr;</div>
-    </a>
-
-    <a href="experience/company-3.html" class="experience-row">
-      <div class="exp-icon">
-        <div class="icon-placeholder lab"></div>
-      </div>
-      <div class="exp-content">
-        <div class="exp-title">NASA Ames — Research Associate</div>
-        <div class="exp-desc">Robotics and autonomous systems research in the Intelligent Robotics Group.</div>
-      </div>
-      <div class="exp-arrow">&rarr;</div>
-    </a>
-
-    <a href="experience/company-4.html" class="experience-row">
-      <div class="exp-icon">
-        <div class="icon-placeholder chip"></div>
-      </div>
-      <div class="exp-content">
-        <div class="exp-title">D-Wave Systems — Applications Engineer</div>
-        <div class="exp-desc">Quantum computing applications and developer tools for optimization problems.</div>
-      </div>
-      <div class="exp-arrow">&rarr;</div>
-    </a>
-
-  </section>
-
-  <!-- Projects -->
-  <section id="projects">
-    <h2>Projects</h2>
-
-    <div class="tile-grid">
-
-      <a href="project/assemble-anything.html" class="project-tile">
-        <div class="tile-scene">
-          <div class="tile-placeholder lego"></div>
+  <main>
+    <!-- Intro: Sprite (left) + Cover Letter (right) -->
+    <section id="intro" class="sprite-stop" data-stop="0">
+      <div class="sprite-column">
+        <div class="sprite-container">
+          <div class="sprite idle" id="sprite"></div>
         </div>
-        <div class="tile-label">Assemble Anything</div>
+        <div class="sprite-hint">arrow keys to move</div>
+      </div>
+      <div class="intro-text">
+        <p>
+          I'm Had — an engineer who builds things at the intersection of hardware,
+          software, and whatever seems interesting at the time. I've worked on
+          satellite systems, robotics, machine learning pipelines, and more
+          side projects than I can count. I like hard problems, small teams,
+          and writing code that actually ships.
+        </p>
+      </div>
+    </section>
+
+    <!-- Experiences + Project Tiles -->
+    <section id="content">
+      <h2>Experience</h2>
+
+      <a href="experience/company-1.html" class="experience-row sprite-stop" data-stop="1">
+        <div class="exp-icon">
+          <div class="icon-placeholder rocket"></div>
+        </div>
+        <div class="exp-content">
+          <div class="exp-title">Rocket Lab — Senior Engineer</div>
+          <div class="exp-desc">Flight software and mission operations for small satellite launches.</div>
+        </div>
+        <div class="exp-arrow">&rarr;</div>
       </a>
 
-      <a href="vibe-games/nasa-ames.html" class="project-tile">
-        <div class="tile-scene">
-          <div class="tile-placeholder hangar"></div>
+      <a href="experience/company-2.html" class="experience-row sprite-stop" data-stop="2">
+        <div class="exp-icon">
+          <div class="icon-placeholder satellite"></div>
         </div>
-        <div class="tile-label">NASA Ames Blimp Hangars</div>
+        <div class="exp-content">
+          <div class="exp-title">Planet Labs — Software Engineer</div>
+          <div class="exp-desc">Image processing pipelines for Earth-observation satellite constellation.</div>
+        </div>
+        <div class="exp-arrow">&rarr;</div>
       </a>
 
-      <a href="project/squidward.html" class="project-tile">
-        <div class="tile-scene">
-          <div class="tile-placeholder wave"></div>
+      <a href="experience/company-3.html" class="experience-row sprite-stop" data-stop="3">
+        <div class="exp-icon">
+          <div class="icon-placeholder lab"></div>
         </div>
-        <div class="tile-label">Squidward</div>
+        <div class="exp-content">
+          <div class="exp-title">NASA Ames — Research Associate</div>
+          <div class="exp-desc">Robotics and autonomous systems research in the Intelligent Robotics Group.</div>
+        </div>
+        <div class="exp-arrow">&rarr;</div>
       </a>
 
-      <a href="project/quantum-ml.html" class="project-tile">
-        <div class="tile-scene">
-          <div class="tile-placeholder quantum"></div>
+      <a href="experience/company-4.html" class="experience-row sprite-stop" data-stop="4">
+        <div class="exp-icon">
+          <div class="icon-placeholder chip"></div>
         </div>
-        <div class="tile-label">Quantum ML</div>
+        <div class="exp-content">
+          <div class="exp-title">D-Wave Systems — Applications Engineer</div>
+          <div class="exp-desc">Quantum computing applications and developer tools for optimization problems.</div>
+        </div>
+        <div class="exp-arrow">&rarr;</div>
       </a>
 
-    </div>
-  </section>
+      <!-- Project tiles: small, tucked under experiences -->
+      <h2 class="projects-heading">Projects</h2>
+
+      <div class="tile-grid">
+        <a href="project/assemble-anything.html" class="project-tile">
+          <div class="tile-scene"><div class="tile-placeholder lego"></div></div>
+          <div class="tile-label">Assemble Anything</div>
+        </a>
+        <a href="vibe-games/nasa-ames.html" class="project-tile">
+          <div class="tile-scene"><div class="tile-placeholder hangar"></div></div>
+          <div class="tile-label">NASA Ames Hangars</div>
+        </a>
+        <a href="project/squidward.html" class="project-tile">
+          <div class="tile-scene"><div class="tile-placeholder wave"></div></div>
+          <div class="tile-label">Squidward</div>
+        </a>
+        <a href="project/quantum-ml.html" class="project-tile">
+          <div class="tile-scene"><div class="tile-placeholder quantum"></div></div>
+          <div class="tile-label">Quantum ML</div>
+        </a>
+      </div>
+
+    </section>
+  </main>
 
   <footer>
     <p>Had Seddiqi &middot; 2026</p>
