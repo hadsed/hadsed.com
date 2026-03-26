@@ -1,0 +1,80 @@
+/* Sprite area */
+#hero {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 1.5rem 1rem;
+}
+
+.sprite-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  height: 200px;
+  background: var(--bg-section);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Placeholder sprite — will be replaced with sprite sheet */
+.sprite {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  border-radius: 4px;
+  image-rendering: pixelated;
+  transition: none;
+}
+
+/* Idle animation placeholder — subtle bob */
+.sprite.idle {
+  animation: sprite-idle 1.2s ease-in-out infinite;
+}
+
+@keyframes sprite-idle {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-4px); }
+}
+
+/* Walk state — no bob */
+.sprite.walking {
+  animation: none;
+}
+
+/* Ground line hint */
+.sprite-container::after {
+  content: '';
+  position: absolute;
+  bottom: 36px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+}
+
+.sprite-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+/* Mobile: hide hint since no arrow keys */
+@media (max-width: 600px) {
+  .sprite-hint {
+    display: none;
+  }
+
+  .sprite-container {
+    height: 150px;
+  }
+}
