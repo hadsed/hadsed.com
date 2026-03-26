@@ -2,6 +2,16 @@
   const sprite = document.getElementById('sprite');
   if (!sprite) return;
 
+  // Sprite frames
+  const idleFrame = 'assets/sprites/had-idle.png';
+  const walkFrames = [
+    'assets/sprites/had-walk-1.png',
+    'assets/sprites/had-walk-2.png',
+    'assets/sprites/had-walk-3.png'
+  ];
+  let walkFrame = 0;
+  let walkInterval = null;
+
   // Gather all vertical stops (intro + experience rows)
   const stops = Array.from(document.querySelectorAll('.sprite-stop'));
   let currentStop = 0;
@@ -9,12 +19,42 @@
   const speed = 4;
   const keys = {};
   let moving = false;
+  let facingRight = true;
 
   // Create roaming sprite (fixed position, follows stops)
-  const roamer = document.createElement('div');
+  const roamer = document.createElement('img');
   roamer.className = 'sprite-roaming idle';
+  roamer.src = idleFrame;
+  roamer.alt = 'Had sprite';
   document.body.appendChild(roamer);
   roamer.style.display = 'none';
+
+  function startWalking() {
+    if (walkInterval) return;
+    walkInterval = setInterval(() => {
+      walkFrame = (walkFrame + 1) % walkFrames.length;
+      sprite.src = walkFrames[walkFrame];
+      roamer.src = walkFrames[walkFrame];
+    }, 133); // ~7.5 fps for walk cycle
+  }
+
+  function stopWalking() {
+    if (walkInterval) {
+      clearInterval(walkInterval);
+      walkInterval = null;
+    }
+    sprite.src = idleFrame;
+    roamer.src = idleFrame;
+  }
+
+  function updateFacing(right) {
+    if (facingRight !== right) {
+      facingRight = right;
+      const scaleX = right ? 1 : -1;
+      sprite.style.transform = `translateX(-50%) scaleX(${scaleX})`;
+      roamer.style.transform = `scaleX(${scaleX})`;
+    }
+  }
 
   function positionAtStop(index, animate) {
     const stop = stops[index];
@@ -37,8 +77,8 @@
       const iconRect = icon ? icon.getBoundingClientRect() : rect;
 
       // Position: to the left of the entire row, bottom-aligned to icon bottom
-      const spriteH = 36;
-      const spriteW = 36;
+      const spriteH = 60;
+      const spriteW = 60;
       const gap = 24;
       const y = iconRect.bottom + window.scrollY - spriteH;
       const x = rect.left - spriteW - gap + xOffset;
@@ -97,8 +137,14 @@
   function update() {
     // Left/Right: move within current stop
     let dx = 0;
-    if (keys['ArrowRight']) dx += speed;
-    if (keys['ArrowLeft']) dx -= speed;
+    if (keys['ArrowRight']) {
+      dx += speed;
+      updateFacing(true);
+    }
+    if (keys['ArrowLeft']) {
+      dx -= speed;
+      updateFacing(false);
+    }
 
     if (dx !== 0) {
       if (currentStop === 0) {
@@ -123,6 +169,7 @@
         sprite.classList.remove('idle');
         sprite.classList.add('walking');
         roamer.classList.remove('idle');
+        startWalking();
       }
     } else {
       if (moving) {
@@ -130,6 +177,7 @@
         sprite.classList.remove('walking');
         sprite.classList.add('idle');
         roamer.classList.add('idle');
+        stopWalking();
       }
     }
 
