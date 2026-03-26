@@ -39,7 +39,7 @@
       // Position: to the left of the entire row, bottom-aligned to icon bottom
       const spriteH = 36;
       const spriteW = 36;
-      const gap = 14;
+      const gap = 24;
       const y = iconRect.bottom + window.scrollY - spriteH;
       const x = rect.left - spriteW - gap + xOffset;
 
