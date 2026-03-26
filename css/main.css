@@ -76,6 +76,7 @@ h2 {
   gap: 1.2rem;
   padding: 0.8rem 1rem;
   margin-bottom: 0.25rem;
+  margin-left: 56px; /* room for sprite to sit left of tile */
   border-radius: 8px;
   text-decoration: none;
   color: var(--text);
@@ -98,14 +99,14 @@ h2 {
 
 .exp-icon {
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
+  width: 88px;
+  height: 88px;
 }
 
 .icon-placeholder {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
   image-rendering: pixelated;
 }
 
@@ -175,6 +176,7 @@ footer {
     gap: 0.8rem;
   }
 
-  .exp-icon { width: 36px; height: 36px; }
-  .icon-placeholder { width: 36px; height: 36px; }
+  .experience-row { margin-left: 0; }
+  .exp-icon { width: 64px; height: 64px; }
+  .icon-placeholder { width: 64px; height: 64px; }
 }

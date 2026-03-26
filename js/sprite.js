@@ -28,12 +28,17 @@
       sprite.classList.remove('hidden');
       xOffset = 0;
     } else {
-      // At experience row: show roamer, hide container sprite
+      // At experience row: show roamer left of the icon, bottom-aligned
       sprite.classList.add('hidden');
       roamer.style.display = 'block';
 
-      const y = rect.top + window.scrollY + (rect.height / 2) - 24;
-      const x = rect.left + 12 + xOffset;
+      // Find the icon element within the row to align against
+      const icon = stop.querySelector('.exp-icon');
+      const iconRect = icon ? icon.getBoundingClientRect() : rect;
+
+      // Position: left of the icon, bottom-aligned to icon bottom
+      const y = iconRect.bottom + window.scrollY - 48; // 48 = sprite height
+      const x = iconRect.left - 52 + xOffset; // 52 = sprite width + small gap
 
       if (animate) {
         roamer.style.transition = 'top 0.25s ease-out, left 0.15s ease-out';
