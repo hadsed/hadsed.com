@@ -4,89 +4,64 @@
 
 ```
 hadsed.com/
+│
 ├── Home (/)
-│   ├── Had sprite (navigable with arrow keys)
-│   ├── Cover letter (intro paragraph)
-│   ├── Experiences (timeline with icons)
-│   │   └── /experience/[company] (detail pages)
-│   └── Projects (explorable map tiles)
-│       └── /project/[slug] (detail pages)
+│   ├── Had sprite (arrow-key navigable)
+│   ├── Cover letter paragraph
+│   ├── Experiences section
+│   │   └── Each links to /experience/[company]
+│   └── Projects section (explorable tiles)
+│       └── Each links to /project/[slug] or /vibe-games/[game]
+│
+├── Experience Pages (/experience/[company])
+│   └── Deep-dive on what you did at each role
+│
+├── Project Pages (/project/[slug])
+│   └── Project write-ups, demos, links
 │
 ├── Blog (/blog)
-│   ├── Blog index
-│   └── /blog/[slug]
+│   ├── Index (post list)
+│   └── /blog/[slug] (individual posts)
 │
 ├── Bookshelf (/bookshelf)
-│   └── Books read, recommendations, notes?
+│   └── Books read, recommendations, notes
 │
 └── Vibe Games (/vibe-games)
-    ├── Games index/gallery
-    └── /vibe-games/[game] (playable worlds)
+    ├── Gallery/index of worlds
+    └── /vibe-games/[game] (playable scenes)
+        └── Examples: NASA Ames blimp hangars, etc.
 ```
 
-## Page Breakdown
+## Tech Stack
 
-### Home (`/`)
+**No game engine.** Pure CSS + vanilla JS.
 
-**Hero area:**
-- Pixel sprite of Had at top
-- Sprite is navigable (arrow keys) — could walk into the explorable worlds below
-
-**Cover letter:**
-- Single paragraph intro — who you are, what you're about
-
-**Experiences:**
-- Timeline/list of roles
-- Each has an **icon on the left** (company logo? pixel art scene?)
-- Short description inline
-- Clicking expands or links to `/experience/[company]` with deeper write-ups of what you did there
-
-**Projects:**
-- Below experiences
-- Displayed as **explorable map tiles** — little pixel worlds/landscapes
-- Each tile links to a project detail page or is itself a mini vibe game
-- Example vibe: NASA Ames blimp hangars as a navigable scene
-
-**Interaction concept:**
-- The Had sprite at top could potentially "walk into" these project worlds
-- Or each tile is a standalone explorable that opens on click
-
-### Blog (`/blog`)
-- Index page with post previews
-- Individual post pages
-- Categories/tags (optional)
-- RSS feed (optional)
-
-### Bookshelf (`/bookshelf`)
-- Books you've read
-- Recommendations
-- Maybe notes/highlights?
-
-### Vibe Games (`/vibe-games`)
-- Gallery of explorable pixel worlds
-- Each is a small interactive scene (walk around, discover things)
-- Examples: NASA Ames blimp hangars, others TBD
+- Static site (HTML/CSS/JS) or lightweight framework (Astro, 11ty, etc.)
+- Sprite animation via CSS (`@keyframes`, `steps()`, sprite sheets)
+- Arrow key movement via vanilla JS (`keydown` listeners, transform/translate)
+- No canvas required for basic sprite movement — DOM elements work fine
+- Canvas optional for more complex vibe game scenes later
 
 ---
 
-## Design Direction
+## Page Summaries
 
-**Aesthetic:** Pixel art / retro game feel
-- Navigable sprite character
-- Explorable tile-based worlds
-- Landscapes representing experiences/projects
-
-**Interaction:**
-- Arrow key navigation for sprite
-- Click to enter worlds/pages
-- Seamless blend of portfolio and playful exploration
+| Page | Purpose |
+|------|---------|
+| `/` | Homepage: sprite, cover letter, experiences, project tiles |
+| `/experience/[company]` | Detail page for each job/role |
+| `/project/[slug]` | Detail page for each project |
+| `/blog` | Blog index |
+| `/blog/[slug]` | Individual blog post |
+| `/bookshelf` | Books read, recommendations |
+| `/vibe-games` | Gallery of explorable pixel worlds |
+| `/vibe-games/[game]` | Individual playable scene |
 
 ---
 
 ## Open Questions
 
-- [ ] Tech stack? (Phaser? PixiJS? Plain canvas? Static + JS?)
-- [ ] How deep does sprite navigation go? (Just homepage? Into each world?)
-- [ ] Bookshelf format? (Grid of covers? List with notes? Goodreads-like?)
-- [ ] Blog style? (Matches pixel aesthetic or more readable/minimal?)
-- [ ] Experience detail pages — narrative? bullet points? mini-games?
+- [ ] Bookshelf format? (Grid of covers? List with notes?)
+- [ ] Blog style? (Pixel aesthetic or more readable/minimal?)
+- [ ] Experience detail pages — narrative? bullets? both?
+- [ ] How many vibe games to start with?
