@@ -36,9 +36,12 @@
       const icon = stop.querySelector('.exp-icon');
       const iconRect = icon ? icon.getBoundingClientRect() : rect;
 
-      // Position: left of the icon, bottom-aligned to icon bottom
-      const y = iconRect.bottom + window.scrollY - 48; // 48 = sprite height
-      const x = iconRect.left - 52 + xOffset; // 52 = sprite width + small gap
+      // Position: to the left of the entire row, bottom-aligned to icon bottom
+      const spriteH = 36;
+      const spriteW = 36;
+      const gap = 14;
+      const y = iconRect.bottom + window.scrollY - spriteH;
+      const x = rect.left - spriteW - gap + xOffset;
 
       if (animate) {
         roamer.style.transition = 'top 0.25s ease-out, left 0.15s ease-out';

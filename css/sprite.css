@@ -55,8 +55,8 @@
 /* When sprite leaves the intro, hide the container sprite and show the roaming one */
 .sprite-roaming {
   position: fixed;
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   background: var(--accent);
   border-radius: 4px;
   image-rendering: pixelated;
