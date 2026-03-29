@@ -1,0 +1,3 @@
+# D1 User Management CLI dependencies
+click>=8.0.0
+requests>=2.25.0
