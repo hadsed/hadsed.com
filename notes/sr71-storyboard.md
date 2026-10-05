@@ -2,7 +2,7 @@
 
 October 4, 2026. Two alternative routes, blocked with original, simple aircraft geometry in Blender. These are camera/composition studies, not an accurate production SR-71 model or a finished environment. Read each sheet left to right, then down; the fifth frame is centered at the bottom. There are no captions inside the frames.
 
-Current scope: storyboarding first. Choose the shot sequence before spending time on a detailed aircraft, a final horizon, or continuous animation.
+Route B was selected on October 4, 2026. The next experiment is an AI-generated motion prototype using the revised storyboard and original poster. Keep detailed modeling and a final environment deferred while judging the shot.
 
 ## Route A: follow, climb, settle behind, depart
 
@@ -20,13 +20,13 @@ This ending emphasizes speed, distance, and release. It needs a decision about w
 
 ![Route B storyboard](storyboards/route-b.png)
 
-1. **Distant nose.** A small, nearly symmetrical shape hangs against the storm. Generous empty sky and water give it scale; the aircraft is an object to discover.
-2. **Approach.** The aircraft grows toward the camera, remaining close to the center. Its identity becomes clear gradually.
+1. **Distant nose.** A small, nearly symmetrical shape sits low in the frame beneath a vast dark storm ceiling. Tilt the camera upward: roughly 80% sky, a narrow indistinct water band, and the aircraft about 75–80% down from the top. The atmosphere is quiet, looming, and overcast; the aircraft is an object to discover.
+2. **Approach.** The aircraft grows toward the camera while remaining low enough to preserve the sky's scale. Its identity becomes clear gradually. Begin smoothly accelerating the camera backward to match the approaching aircraft.
 3. **Retreat and rise.** As it closes the gap, the camera accelerates backward and moves above and slightly to one side. The overhead view in this frame is a spatial waypoint; the speed match and continuity still need an animation pass.
 4. **Side reveal.** Arc onto the side while easing the camera's relative motion. The reflection helps the viewer stay oriented through the rotation.
 5. **Poster composition.** Settle into a restrained profile with the nose pointing left, water/reflection below, and storm above. Hold here rather than sending the aircraft away.
 
-Working preference: start by refining Route B. It turns the poster into a destination and provides a composed resting state for a site. Route A remains an alternative; combining both would add another ending and is not yet a decision.
+Selected direction: refine Route B. It turns the poster into a destination and provides a composed resting state for a site. Route A is retained as an archived alternative. See [the Seedance prototype setup](seedance-prototype.md) for the timed prompt, reference roles, and generation status.
 
 ## Horizon and atmosphere still to explore
 

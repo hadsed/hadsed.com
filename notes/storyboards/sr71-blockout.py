@@ -34,9 +34,9 @@ noise.inputs['Roughness'].default_value = .7
 tex = nodes.new('ShaderNodeTexCoord')
 ramp = nodes.new('ShaderNodeValToRGB')
 ramp.color_ramp.elements[0].position = .22
-ramp.color_ramp.elements[0].color = (.055,.078,.087,1)
+ramp.color_ramp.elements[0].color = (.018,.027,.035,1)
 ramp.color_ramp.elements[1].position = .78
-ramp.color_ramp.elements[1].color = (.32,.42,.46,1)
+ramp.color_ramp.elements[1].color = (.12,.17,.20,1)
 links = scene.world.node_tree.links
 links.new(tex.outputs['Normal'], noise.inputs['Vector'])
 links.new(noise.outputs['Fac'], ramp.inputs['Fac'])
@@ -119,8 +119,8 @@ def area(name,location,power,size):
     data=bpy.data.lights.new(name,'AREA');data.energy=power;data.shape='DISK';data.size=size
     obj=bpy.data.objects.new(name,data);scene.collection.objects.link(obj);obj.location=location
     obj.rotation_euler=(Vector((0,0,3.8))-obj.location).to_track_quat('-Z','Y').to_euler()
-area('Cloud opening',(-25,-25,40),65000,45)
-area('Soft sky fill',(20,12,35),30000,40)
+area('Cloud opening',(-25,-25,40),20000,45)
+area('Soft sky fill',(20,12,35),9000,40)
 
 # A gentle volume gives a low-contrast horizon. Clouds are deliberately unresolved.
 bpy.ops.mesh.primitive_cube_add(size=2,location=(0,0,15))
@@ -139,8 +139,8 @@ shots_a=[
     ('a5-departure',(0,27,7),(0,-55,3.8),46,-100),
 ]
 shots_b=[
-    ('b1-distant-nose',(0,-105,7),(0,0,3.8),44,0),
-    ('b2-nose-approach',(0,-43,7),(0,-3,3.8),44,0),
+    ('b1-distant-nose',(0,-130,6),(0,0,23),44,0),
+    ('b2-nose-approach',(0,-55,6),(0,-3,10),44,0),
     ('b3-retreat-and-rise',(9,-31,19),(0,-2,3.8),40,0),
     ('b4-side-reveal',(48,-16,12),(0,-1,3.8),40,0),
     ('b5-poster-profile',(70,0,8),(0,0,2.8),45,0),
