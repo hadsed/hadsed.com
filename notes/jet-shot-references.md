@@ -169,3 +169,53 @@ These two are useful shot-design comparisons but **do not provide a verified dis
 The strongest references suggest a sequence worth testing, rather than a settled design: hold a tiny aircraft below center in a large sky (#1/#3), let it become recognizable before accelerating the camera (#5), reveal the silhouette through a slight bank or upward viewpoint (#9/#14), then settle into a clean level profile (#10/#12/the bonus F-22). Keep the water horizon as a scale cue rather than giving it half the screen. The Mach Loop examples demonstrate why foreground/background separation helps apparent speed, but the SR-71 scene can obtain that separation through cloud layers and reflection instead of literal mountains.
 
 For the next board, compare two timings using the same composition: a long approach followed by one abrupt near pass, and a shorter approach with a smoother retreat/rise. These are proposals derived from the references; the videos do not demonstrate the exact continuous nose-to-overhead-to-poster camera move we want.
+
+## Cinematic references: composed movie and game sequences
+
+Added after the request for cinematic clips. These supplement the 20 real-world references above. Five focused sources were visually sampled, including the previously checked Darkstar clip. Official studio/publisher and licensed Movieclips sources are identified separately from a fan upload. The same timing limits apply: approximate player times, selected frames inspected, not frame-accurate edit points. These are deliberately composed/edited scenes; no claim is made that every range is a continuous shot or the exact distant nose-on approach.
+
+**Start with C1 for the cloud reveal, C3 for scale and camera handoff, and C4 for clouds surrounding a virtual camera.** C2 and C5 are adjacent aircraft-detail/rear-camera references. The quieter opening we want can borrow their spatial composition without adopting rapid cuts, combat, missiles, or spectacle.
+
+### C1. Stealth — The Ring of Fire
+
+[Watch the opening, approximately 0:00–0:12](https://www.youtube.com/watch?v=mpr3XG5Tzmk&t=0s)
+
+**Provenance:** verified Movieclips channel; licensed movie scene, credited to Sony. **Match:** distant aircraft / cloud reveal into close aircraft detail.
+
+**Observed:** at roughly 0:04, a small dark aircraft silhouette is suspended inside a broad field of soft layered clouds. At 0:09, the image is an extreme close view of canopy and fuselage against sky, before cockpit coverage at 0:14. **Study:** how little aircraft is necessary for a compelling cloud frame, and how large the jump to close detail can feel. **Borrow:** begin with the cloud scale from the first image, then reveal the SR-71 canopy as the camera rises. The sampled frames establish distant-to-close framing; they do not prove a single uninterrupted camera path between the two views. High confidence in both compositions.
+
+### C2. Stealth — EDI Dogfight
+
+[Watch aircraft detail, approximately 0:00–0:08](https://www.youtube.com/watch?v=nP-P4IYLJWY&t=0s); [compare the cloud crossing near 0:54](https://www.youtube.com/watch?v=nP-P4IYLJWY&t=54s)
+
+**Provenance:** verified Movieclips channel; licensed Sony movie scene. **Match:** adjacent close aircraft and moving-camera reference; no verified distant approach in these selected frames.
+
+**Observed:** the opening is an extreme close view along the upper fuselage toward the canopy, with an expansive cloud field beyond. Around 0:04, an underside and weapons fill the upper frame. Around 0:54, a blurred banking aircraft is at the edge of a large cloud mass. **Study:** the relationship between very close aircraft surfaces and distant soft clouds, plus when an aircraft is allowed to leave the composition. **Borrow:** a camera skimming over the nose can briefly make the fuselage a foreground landscape before the full silhouette becomes visible. Avoid the scene's aggressive combat cutting for the website. High confidence in sampled frames; camera continuity not verified.
+
+### C3. Top Gun: Maverick — Official Trailer
+
+[Watch opening scale reveal, approximately 0:04–0:12](https://www.youtube.com/watch?v=qSqVVswa420&t=4s); [compare cockpit speed near 1:45](https://www.youtube.com/watch?v=qSqVVswa420&t=105s)
+
+**Provenance:** verified Paramount Pictures studio upload. **Match:** adjacent low-flight scale / camera handoff; the selected opening reveals a shadow rather than a verified nose-on aircraft approach.
+
+**Observed:** around 0:05, a very wide desert, distant mountains, haze, and layered sky establish immense space. At 0:10, a large readable jet shadow dominates the ground beneath the camera. At 1:45, cockpit framing puts rapidly blurred snowy canyon terrain alongside a stable aircraft/pilot foreground. **Study:** establish scale before the aircraft takes over, and let an indirect cue announce its proximity. **Borrow:** a reflection or moving water shadow could precede the plane itself; cloud/water motion can provide acceleration while the SR-71 remains stable. These are separate edited passages, not one observed continuous move. High confidence in sampled compositions.
+
+### C4. Ace Combat 7 — Announcement Trailer
+
+[Watch cloud/aircraft passage, approximately 0:30–0:46](https://www.youtube.com/watch?v=_zuBSUJfpBk&t=30s)
+
+**Provenance:** verified Bandai Namco Entertainment America publisher upload. **Match:** cinematic game jet framing with small and large aircraft among clouds; continuity between sampled views is not established.
+
+**Observed:** at roughly 0:34, a small aircraft sits toward the upper right of an enormous cloud field, with another aircraft-like shape partly swallowed by foreground cloud near the middle. At 0:44, a close underside/three-quarter jet passes across the upper edge against a bright cloud backdrop. **Study:** cloud occlusion and the changing scale of the aircraft relative to cloud layers. **Borrow:** clouds can be spatial foreground rather than a flat wallpaper; a partial cloud veil can hide a camera transition until the close silhouette emerges. This is useful for a rendered scene's camera design, but the sampled passage does not verify the exact retreat/rise/orbit we want. High confidence in visible framing.
+
+### C5. Top Gun: Maverick — Darkstar takeoff
+
+[Watch rear views, approximately 0:16–0:30](https://www.youtube.com/watch?v=K1Otd-8n0WA&t=16s)
+
+**Provenance:** King Clips Cinema fan upload, a vertical edit of movie footage; also listed in the bonus references above. **Match:** adjacent exhaust close-up and elevated rear tracking, not a distant approach.
+
+**Observed:** the selected edit shows a close rear view with glowing exhaust around 0:16, then an elevated rear-tracking view above the runway around 0:26. **Study:** how high the camera needs to be to retain both aircraft shape and exhaust, and how the perspective changes when the runway begins to recede. **Borrow:** use those two camera heights as alternatives for the booster-facing departure concept. This clip supplies two compositional endpoints, not proof of a continuous move between them. High confidence in sampled views; fan crop and overlays are incidental.
+
+### What to carry into the SR-71 camera test
+
+Combine C1's small silhouette inside clouds with #20's actual distant-to-overhead progression; use C3's delayed scale cue if a reflection helps the plane's arrival feel discovered. C4 is useful for giving cloud layers genuine depth around the camera. C2/C5 support close flyover and rear departure alternatives. Keep the poster's quiet mood: the scene should earn one rapid camera transition through a long, looming opening, rather than import an entire action montage.
