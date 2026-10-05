@@ -63,7 +63,11 @@ The browser study tests a gentle response to pointer movement and an acceleratin
 
 Had proposed two camera moves: follow alongside the aircraft, climb over it, settle behind its afterburners, then watch it accelerate into the horizon; or begin head-on with a small aircraft against the storm, approach, retreat/rise as it closes, move to the side, and finish in the poster composition.
 
-See [the two five-shot storyboards and editable Blender blockouts](sr71-storyboard.md). Had selected Route B, with the aircraft lower in the opening frame and a much larger, darker storm sky. The scene should feel epic in scale but quiet in activity: restrained cloud movement, minimal water, and no lightning spectacle. The next test is [a reference-driven Seedance prototype](seedance-prototype.md), before further model or environment detail.
+See [the two five-shot storyboards and editable Blender blockouts](sr71-storyboard.md). Had selected Route B, with the aircraft lower in the opening frame and a much larger, darker storm sky. The scene should feel epic in scale but quiet in activity: restrained cloud movement, minimal water, and no lightning spectacle. [The first Seedance camera draft and review](seedance-prototype.md) are saved; it follows the broad camera progression but copies the crude proxy too strongly.
+
+### Shot research
+
+[Jet approach references](jet-shot-references.md) collect YouTube clips, approximate review timestamps, observed framing, and suggested elements to borrow. The purpose is camera composition and sequence rather than matching the poster's style. Compare a patient distance-to-close approach with a sudden pass before revising the storyboard. Further paid generation is on hold after reviewing the first draft's cost.
 
 ### Moody desktop and landscape references
 
