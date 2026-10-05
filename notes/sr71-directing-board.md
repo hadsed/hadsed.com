@@ -1,14 +1,14 @@
 # SR-71 directing board — twilight climb
 
-October 4, 2026. Working proposal, not a locked sequence. The racing-style generated video is rejected: sideways-looking flight and incoherent movement do not represent the intended shot. No new video generation is authorized or submitted. The latest stills are composition studies; the schematic below is our discussion tool.
+October 4, 2026. Working proposal, not a locked sequence. The racing-style generated video is rejected: sideways-looking flight and incoherent movement do not represent the intended shot. No new video generation is authorized or submitted. The latest stills are composition studies; the interactive 3D blockout is our discussion tool.
 
 ## Shared language and working method
 
 **Camera blocking** plans where the camera and aircraft are and how they move relative to each other. **Camera path / trajectory** describes the route through space. **Timing and easing** describe when movement starts, accelerates, slows, and settles. **Framing** describes where the aircraft sits in the image and how large it appears. **Previs** is a rough visualization of the proposed shot; an **animatic** plays storyboard frames over time to test pacing. These are related artifacts, not interchangeable terms. [StudioBinder's camera-blocking workflow](https://www.studiobinder.com/storyboard-blocking/), [storyboard movement and arrows](https://www.studiobinder.com/blog/storyboard-arrows-meaning/), and [Adobe's storyboarding overview](https://www.adobe.com/uk/creativecloud/animation/discover/animation-storyboarding.html) support borrowing this approach.
 
-Use three views together: the picture we want, a top/side blocking diagram showing the aircraft and camera separately, and a simple timing preview. The [interactive directing sketch](storyboards/sr71-directing.html) combines these. It is a 2D schematic, not a 3D render, physically validated flight path, or final projected camera view.
+Use the [3D directing room](storyboards/sr71-directing.html) to review the actual projected shot, then switch to Scene / paths to orbit around the camera and aircraft trajectories. The Storyboard tab collects all six generated stills, the original Blender blockouts, and browser-saved captures. This is a basic original SR-71 proxy, not a flight-accurate aircraft or a final environment render.
 
-Review one variable at a time: camera height first, then distance/aircraft size, then the side-track hold, then lag during the climb, then rear catch-up, finally the light transition. Say “Beat 2: camera higher; same lens and aircraft path” rather than just “more epic.” Save selected control values as a JSON download alongside the notes if a setting feels promising.
+Review one variable at a time: camera height first, then distance/aircraft size, then the side-track hold, then lag during the climb, then rear catch-up, finally the light transition. Say “Beat 2: camera higher; same lens and aircraft path” rather than just “more epic.” Capture selected frames, add a shot note, and export the PNG plus its settings JSON alongside the notes if a setting feels promising. Captures retain their exact progress and settings and can restore the shot from the gallery.
 
 ## Visual direction
 
@@ -78,3 +78,19 @@ No exact shot duration is chosen. The sketch uses a **12-second illustrative tim
 ## Sources and provenance
 
 Original supplied [poster](inspo/sr71-metal-print-reference.png) and [blue-hour screenshot](inspo/sr71-blue-hour-afterburners.png); [earlier stills](storyboards/stills/README.md); [film/flight research](jet-shot-references.md). The three new stills use the built-in GPT Image tool; [exact edit prompts](prompts/sr71-elevated-twilight-stills.md). They preserve earlier files as separate versions. No Blender reference was used. A single AI generation per composition does not validate aircraft geometry or motion continuity, and the image tool returned no billing receipt.
+
+## 3D directing room — controls and persistence
+
+The supplied [Had camera preset](storyboards/presets/had-camera-settings.json) is versioned unchanged: height 28, side hold 2.5 seconds, softness 0.6, duration 8 seconds, progress 0. The old schematic used a different spatial scale; these values now seed an original 3D blockout with new lens and distance defaults, rather than promising an exact match to the old 2D diagram.
+
+- **Shot**: actual perspective camera; scroll over the picture to scrub, drag the progress slider, use arrow keys, jump to beats, or play once.
+- **Sidebar**: starting height; field of view; vertical aim bias; front, side, and rear distances; side height; above-aircraft clearance; flight altitude/speed/climb; hold, duration, softness and easing; grid, clay, and light controls. Each has a numeric field as well as a slider where applicable.
+- **Scene / paths**: drag to orbit, wheel to zoom. Peach is aircraft path, lavender is camera path; the camera frustum is drawn only 90 relative units deep for readability. Use the timeline here to inspect the move in space.
+- **Capture this frame**: records a clean 1600 × 900 shot with progress, settings, and camera/aircraft pose. Planning labels and the sidebar are excluded. Even from the scene view, capture records the shot camera.
+- **Storyboard**: browse reference studies and captures; open a capture to restore its configuration, edit its note, or download its PNG and JSON.
+
+Current controls are saved in localStorage and captured frames in IndexedDB on this browser origin. They survive a reload but are not automatically committed to Git. Download selected captures and put them under `notes/storyboards/` to version them. Opening the tool at another host/port or clearing browser storage creates a separate or empty capture library. The repo-backed reference studies and imported preset remain available.
+
+Softness filters camera offsets in seconds with a deterministic time step, so scrubbing backward produces the same pose as moving forward. The aircraft travels nose-forward along −Z, with pitch derived from its rising flight path. A minimum clearance keeps the camera above the aircraft; this can override requested absolute camera height during the climb. The side hold timing is exact, but softness can make the camera continue settling at its beginning. All distances and speeds are relative blocking units, not meters or real SR-71 performance. The light transition is an overlay; the environment uses a simple twilight gradient and grid, not a cloud/water simulation.
+
+The renderer is pinned to [Three.js](https://threejs.org/docs/) 0.186.1, vendored locally with its MIT license. There is no build step or runtime CDN dependency. Start from the repo root with `python3 -m http.server 8766 --bind 127.0.0.1` and open `http://127.0.0.1:8766/notes/storyboards/sr71-directing.html`. Validate the camera path with `node notes/storyboards/sr71-path.test.mjs`.
