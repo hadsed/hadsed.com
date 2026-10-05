@@ -73,7 +73,9 @@ See [the two five-shot storyboards and editable Blender blockouts](sr71-storyboa
 
 ### Racing-style flyby exploration
 
-After the poster-only draft, Had requested removing the tightly scripted sequence and letting the model propose the shot. Take inspiration from car-racing cinematography: anticipation followed by the sudden rush of a vehicle zooming past the camera. Translate that feeling to an SR-71 over water under a quiet, looming storm sky. Keep the original poster as the only visual reference. Leave camera position, framing, timing, and movement open rather than requiring the Route B overhead arc or poster-profile finish. [The looser prompt](prompts/sr71-racing-flyby.txt) is prepared for review; no generation has been submitted for it.
+After the poster-only draft, Had requested removing the tightly scripted sequence and letting the model propose the shot. Take inspiration from car-racing cinematography: anticipation followed by the sudden rush of a vehicle zooming past the camera. Translate that feeling to an SR-71 over water under a quiet, looming storm sky. Keep the original poster as the only visual reference. Leave camera position, framing, timing, and movement open rather than requiring the Route B overhead arc or poster-profile finish. [The looser prompt](prompts/sr71-racing-flyby.txt) was reviewed and explicitly approved; [the completed third video](seedance-prototype.md#racing-style-flyby-exploration) is saved for review.
+
+Had subsequently clarified: move the camera over the plane, not under it. [Three GPT Image still studies](storyboards/stills/README.md) explore the distant approach, a close upper-nose view before the camera rise, and a wider blue-influenced ending angle. The ending combines the original poster's storm atmosphere with the blue screenshot's angle and white-blue exhaust. Use these as composition studies before another video; any further generation needs approval.
 
 ### Blue-hour aircraft styling reference
 
