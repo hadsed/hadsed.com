@@ -13,6 +13,7 @@ Cold desaturated blue-gray, matte metal, heavy diffuse cloud, subtle haze, and r
 - [ByteDance's Seedance 2.5 announcement](https://seed.bytedance.com/en/blog/one-take-creation-flexible-referencing-introducing-seedance-2-5) is the latest official release found. It explicitly demonstrates timed camera descriptions and separately assigned references for blocking versus materials/atmosphere. It also supports clay-render references. This supports using a written storyboard together with our simple board and the poster; it does not guarantee exact camera reproduction.
 - [Runway's Seedance 2.5 documentation](https://help.runwayml.com/hc/en-us/articles/53542207042323-Creating-with-Seedance-2-5) distinguishes Reference mode from Keyframe mode. Reference mode assigns each input a role; Keyframe mode fixes first/last frames. The first prototype uses references, rather than forcing the crude proxy render to be the opening image.
 - The connected Runway workspace exposes Seedance 2.5. Its tool accepts ordered reference images, text, ratio, resolution, and an audio toggle.
+- [OpenRouter's video API](https://openrouter.ai/docs/guides/overview/multimodal/video-generation) exposes asynchronous submission, polling, and download. Its [reference-image recipe](https://openrouter.ai/docs/cookbook/video-generation/reference-to-video) uses ordered `input_references` for guidance rather than exact frame anchors. The live catalog confirmed `bytedance/seedance-2.5` with 480p, 16:9, and 10-second support. The user selected OpenRouter for this experiment.
 
 ## Reference roles
 
@@ -32,11 +33,19 @@ The exact timed text is in [the reusable generation prompt](prompts/sr71-seedanc
 
 Runway lists 480p at 20 credits per output second, so this draft is approximately 200 credits. Higher resolution is deferred until the camera move is worth keeping.
 
-## Submission status
+## Submission history
 
-Both reference files were uploaded successfully. The generation tool rejected the request for insufficient workspace credits. No video task or output was created. A credit/top-up card was shown in the chat. Resume submission after funding; do not silently substitute another model or compress the whole camera sequence into an excessively short clip.
+The first attempt used Runway. Both reference files were uploaded successfully, but generation was rejected for insufficient workspace credits. No Runway video task or output was created.
+
+The user then authorized using `OPENROUTER_API_KEY` from the Vision Agents repository's `.env`. It is read in memory; neither the key nor the environment file is copied here. A single OpenRouter Seedance 2.5 job was submitted with the same prompt, two ordered references, explicit 10-second duration, 480p, 16:9, and audio disabled. The sanitized [job receipt](storyboards/sr71-openrouter-job.json) records status and returned usage. [The submission script](storyboards/openrouter-video.py) resumes an existing receipt rather than submitting a duplicate job.
 
 Hosted reference URLs are temporary, signed URLs and are deliberately not stored in Git. Re-upload the versioned local files when resuming if necessary.
+
+## OpenRouter draft result
+
+The job completed successfully. [View the generated video](storyboards/sr71-seedance-route-b.mp4). Returned cost: **$1.0322825**. File validation: H.264, 854 × 480, 10.04 seconds, no audio stream. The [sampled frame strip](storyboards/sr71-seedance-route-b-review.png) shows the approach, rising camera move, and side-profile resolution.
+
+Initial visual review from sampled frames: the opening keeps the aircraft low with substantial sky, and the requested camera progression is broadly present. However, the output follows the crude storyboard aircraft/materials too strongly despite the reference-role instructions. Exhaust cones are oversized and bright; the water reflection reads like another solid aircraft. Cloud treatment remains flat and lacks the poster's photographic storm depth. This is a camera-blocking draft, not an approved visual treatment. Compare the researched shot references before paying for further iterations. A future attempt could use the text storyboard and poster without the crude contact sheet, or replace the sheet with better silhouette-only camera references.
 
 ## Possible next iteration
 
