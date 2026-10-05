@@ -69,6 +69,12 @@ See [the two five-shot storyboards and editable Blender blockouts](sr71-storyboa
 
 [Jet approach references](jet-shot-references.md) collect YouTube clips, approximate review timestamps, observed framing, and suggested elements to borrow. The purpose is camera composition and sequence rather than matching the poster's style. Compare a patient distance-to-close approach with a sudden pass before revising the storyboard. Further paid generation is on hold after reviewing the first draft's cost.
 
+### Blue-hour aircraft styling reference
+
+Had added [this blue-hour SR-71 image](inspo/sr71-blue-hour-afterburners.png) on October 4, 2026 for the later styling pass. Preserve the deep cobalt/indigo atmosphere, nearly black aircraft silhouette, faint cool edge light, and luminous white-blue afterburners with visible exhaust pulses. The long nose and paired tails remain readable through silhouette rather than surface detail. This is a palette, lighting, and exhaust reference; the shot sequence remains under exploration. The image's source beyond the supplied screenshot is unconfirmed.
+
+![Blue-hour SR-71 with cold afterburners](inspo/sr71-blue-hour-afterburners.png)
+
 ### Moody desktop and landscape references
 
 Had added these three screenshots on October 4, 2026 as a closer match for the SR-71 concept's mood:
