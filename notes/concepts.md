@@ -71,6 +71,10 @@ See [the two five-shot storyboards and editable Blender blockouts](sr71-storyboa
 
 [Aviation website references](aviation-website-references.md) explore browser presentation and camera/scroll transitions. The user then requested a poster-only Seedance comparison: [the second draft and its review](seedance-prototype.md#poster-only-comparison) use the original poster plus the written camera sequence, with no Blender reference. Its sampled frames are much closer to the poster's mood; further generation waits for review.
 
+### Racing-style flyby exploration
+
+After the poster-only draft, Had requested removing the tightly scripted sequence and letting the model propose the shot. Take inspiration from car-racing cinematography: anticipation followed by the sudden rush of a vehicle zooming past the camera. Translate that feeling to an SR-71 over water under a quiet, looming storm sky. Keep the original poster as the only visual reference. Leave camera position, framing, timing, and movement open rather than requiring the Route B overhead arc or poster-profile finish. [The looser prompt](prompts/sr71-racing-flyby.txt) is prepared for review; no generation has been submitted for it.
+
 ### Blue-hour aircraft styling reference
 
 Had added [this blue-hour SR-71 image](inspo/sr71-blue-hour-afterburners.png) on October 4, 2026 for the later styling pass. Preserve the deep cobalt/indigo atmosphere, nearly black aircraft silhouette, faint cool edge light, and luminous white-blue afterburners with visible exhaust pulses. The long nose and paired tails remain readable through silhouette rather than surface detail. This is a palette, lighting, and exhaust reference; the shot sequence remains under exploration. The image's source beyond the supplied screenshot is unconfirmed.
