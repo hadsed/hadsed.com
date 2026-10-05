@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SR-71 — Camera blocking sketch</title>
+<style>
+:root{color-scheme:dark;--bg:#10121b;--fg:#e3e4ee;--muted:#a8adc5;--camera:#b8a8ff;--plane:#edae7b;--line:#3a3e52}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:32px 24px 70px}h1{font-size:clamp(26px,4vw,42px);line-height:1.1;margin:8px 0 12px}h2{font-size:21px}h3{font-size:16px;margin:12px 0 4px}p{max-width:850px}.muted,small{color:var(--muted)}a{color:var(--camera)}button{font:inherit;background:#242737;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px 14px;cursor:pointer}button[aria-pressed=true]{background:#3e365a;border-color:var(--camera)}.controls{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:20px;margin:20px 0}label{display:block;font-size:14px}input[type=range]{width:100%;accent-color:var(--camera)}.actions{display:flex;gap:12px;flex-wrap:wrap}.maps{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px}svg{width:100%;height:auto;background:#161925;border-radius:8px}.maptext{fill:var(--muted);font:14px system-ui}.path{fill:none;stroke-width:2.5}.camera{stroke:var(--camera);fill:var(--camera)}.plane{stroke:var(--plane);fill:var(--plane)}.path.plane,.path.camera{fill:none}.gaze{stroke:var(--camera);stroke-dasharray:4 5;opacity:.6}.legend{display:flex;gap:24px;font-size:14px;margin:10px 0}.legend span:first-child{color:var(--plane)}.legend span:last-child{color:var(--camera)}.beats{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0}.beats button{padding:7px 10px;font-size:13px}.current{min-height:86px;padding:12px 0}.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.strip img{width:100%;border-radius:4px}.sketches{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin:20px 0}.sketches svg{aspect-ratio:16/9}.sketch-label{font-size:14px}.swatch{height:125px;background:radial-gradient(ellipse at center,#f2f0ff 0%,#c9c4ee 32%,#6c638e 62%,#dea17f 100%);border-radius:6px}.readout{font-variant-numeric:tabular-nums}hr{border:0;border-top:1px solid var(--line);margin:30px 0}@media(max-width:750px){.controls{grid-template-columns:1fr 1fr}.maps{grid-template-columns:1fr}.strip{grid-template-columns:1fr}.sketches{grid-template-columns:1fr 1fr}}
+</style>
+<main>
+<small>WORKING PREVIS · 2D SCHEMATIC · NO NEW VIDEO GENERATION</small>
+<h1>Low flight → side hold → climb → light</h1>
+<p>Separate the aircraft’s flight path from the camera’s position and gaze. These diagrams show blocking, not the projected picture. Forward is always to the right; the aircraft never slides sideways.</p>
+<div class="actions"><button id="play" type="button">Play once</button><button id="reset" type="button">Reset</button><button id="save" type="button">Save settings</button></div>
+<div class="controls">
+<label>Progress <output id="progress-value">0%</output><input id="progress" aria-label="Progress" type="range" min="0" max="100" step=".1" value="0"></label>
+<label>Starting camera height <output id="height-value">18</output> <small>relative units</small><input id="height" aria-label="Starting camera height" type="range" min="10" max="35" step="1" value="18"></label>
+<label>Side-track hold <output id="hold-value">2.5s</output><input id="hold" aria-label="Side-track hold" type="range" min=".5" max="4" step=".1" value="2.5"></label>
+<label>Tracking softness <output id="soft-value">0.25</output><input id="soft" aria-label="Tracking softness" type="range" min="0" max=".8" step=".05" value=".25"></label>
+<label>Preview duration <output id="duration-value">12s</output><input id="duration" aria-label="Preview duration" type="range" min="8" max="20" step="1" value="12"></label>
+</div>
+<small>The hold is exact in this sketch; other beats share the remaining preview time. Softness is a schematic delay, not a calibrated production damping value. Height changes the diagram, not the fixed reference photos.</small>
+<div class="beats" id="beats" aria-label="Storyboard beats"></div>
+<div class="current"><h2 id="beat-title"></h2><p id="beat-note"></p></div>
+<div class="legend"><span>▲ Aircraft · flight path</span><span>■ Camera · path / dashed gaze</span></div>
+<div class="maps">
+<section><h3>Top view — sideways separation</h3><svg id="top" viewBox="0 0 600 220" role="img" aria-label="Top view of aircraft and camera trajectories"><text class="maptext" x="20" y="25">Forward →</text><line x1="30" y1="130" x2="565" y2="130" stroke="var(--line)"/><path id="top-plane-path" class="plane path"/><path id="top-camera-path" class="camera path"/><line id="top-gaze" class="gaze"/><path id="top-plane" class="plane" d="M14 0 L-9 -7 L-5 0 L-9 7 Z"/><rect id="top-camera" class="camera" width="10" height="10" x="-5" y="-5"/><text class="maptext" x="20" y="202">Straight aircraft heading; camera makes the lateral arc</text></svg></section>
+<section><h3>Side view — height and climb</h3><svg id="side" viewBox="0 0 600 220" role="img" aria-label="Side view of aircraft climb and camera height"><text class="maptext" x="20" y="25">Up ↑ · Forward →</text><line x1="30" y1="188" x2="565" y2="188" stroke="var(--line)"/><text class="maptext" x="485" y="210">Water level</text><path id="side-plane-path" class="plane path"/><path id="side-camera-path" class="camera path"/><line id="side-gaze" class="gaze"/><path id="side-plane" class="plane" d="M14 0 L-9 -5 L-5 0 L-9 5 Z"/><rect id="side-camera" class="camera" width="10" height="10" x="-5" y="-5"/></svg></section>
+</div>
+<p class="readout" id="positions"></p>
+<hr><h2>Composition anchors</h2>
+<div class="strip">
+<section><img src="stills/04-distant-elevated-twilight.png" alt="Small aircraft low beneath blue-purple twilight clouds"><h3>1 · Elevated distance</h3><p class="muted">Tiny aircraft, near-level aim, sky dominant.</p></section>
+<section><img src="stills/05-nose-elevated-twilight.png" alt="Approaching upper nose seen from an elevated viewpoint"><h3>2 · Nose becomes legible</h3><p class="muted">Above the flight path. Current image looks down more strongly than the near-level target.</p></section>
+<section><img src="stills/06-side-twilight.png" alt="Side three-quarter aircraft with blue-white exhaust at dusk"><h3>3 · Side-track hold</h3><p class="muted">Preferred angle; smooth clouds, blue-purple, subtle warm seam.</p></section>
+</div>
+<h2>Quick continuation sketches</h2>
+<div class="sketches">
+<section><svg viewBox="0 0 240 135" role="img" aria-label="Plane pitches upward as camera lags"><path d="M20 112H220" stroke="var(--line)"/><path d="M30 95L125 95Q165 95 205 36" class="plane path"/><path d="M30 65H140" class="camera path"/><path d="M203 31l-4 18-7-8z" class="plane"/><rect x="130" y="59" width="11" height="11" class="camera"/><text x="14" y="22" class="maptext">Pitch + climb</text></svg><p class="sketch-label">4 · Camera lets it rise away</p></section>
+<section><svg viewBox="0 0 240 135" role="img" aria-label="Camera arcs behind the forward-moving plane"><path d="M22 76H213" class="plane path"/><path d="M50 28Q158 15 170 58Q170 76 150 76" class="camera path"/><path d="M210 76l-17-7v14z" class="plane"/><rect x="140" y="71" width="11" height="11" class="camera"/><text x="14" y="22" class="maptext">Rear acquisition</text></svg><p class="sketch-label">5 · Arc behind, remain above</p></section>
+<section><svg viewBox="0 0 240 135" role="img" aria-label="Rear camera closes gap to the two exhausts"><path d="M65 87Q120 32 175 87L150 98H90Z" fill="var(--line)"/><circle cx="89" cy="88" r="15" fill="#b9b3ec"/><circle cx="151" cy="88" r="15" fill="#b9b3ec"/><path d="M99 116L94 106M141 116L146 106" class="camera path"/><text x="14" y="22" class="maptext">Close the gap</text></svg><p class="sketch-label">6 · Exhausts grow toward frame</p></section>
+<section><div class="swatch" role="img" aria-label="Soft white lavender peach transition gradient"></div><p class="sketch-label">7 · Light overtakes the image</p></section>
+</div>
+<p>Catch-up is a proposed stylized camera move: after lagging, the camera must gain on the aircraft to make the exhausts larger. A lens push or bloom is an alternative. The fade swatch proposes a palette; it does not simulate the final effect.</p>
+<p><a href="../sr71-directing-board.md">Full directing notes and shot decisions</a> · <a href="../prompts/sr71-elevated-twilight-stills.md">Exact still prompts</a></p>
+</main>
+<script>
+(()=>{
+const $=id=>document.getElementById(id),names=['Distant approach','Nose grows','Side-track hold','Pitch into climb','Arc behind','Rear catch-up','Light transition'];
+const notes=['High camera ahead of a low-flying aircraft; patient anticipation.','Camera retreats and moves over the upper nose toward the side.','Match forward speed; give the preferred composition breathing room.','Plane pitches and its flight path climbs; camera briefly keeps its previous pace.','Camera accelerates through a lateral arc to acquire the rear, looking toward the aircraft.','Camera closes the gap from above/behind; paired exhausts become larger.','Light fills the view; the following site-content handoff remains open.'];
+let playing=false,last=0;
+const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)},lerp=(a,b,t)=>a+(b-a)*t;
+function schedule(){const total=+$('duration').value,hold=+$('hold').value,weights=[2,1.5,0,1.5,1.4,1.4,1.2],sum=weights.reduce((a,b)=>a+b,0);let s=0;return weights.map((w,i)=>{const d=i===2?hold:(total-hold)*w/sum,part={start:s/total,end:(s+d)/total};s+=d;return part})}
+function state(u){const cuts=schedule();let i=cuts.findIndex(b=>u<=b.end);if(i<0)i=6;const b=cuts[i],q=smooth((u-b.start)/(b.end-b.start)),h=+$('height').value;
+const x=18+105*u+24*Math.pow(Math.max(0,u-cuts[3].start),2),z=3+49*smooth((u-cuts[3].start)/(1-cuts[3].start));
+const gaps=[30,13,0,-2,-14,-10,-3,-2],offsets=[0,0,13,13,10,0,0,0];let cz=h;
+if(i>=4)cz=lerp(h,z+7,smooth((u-cuts[4].start)/(cuts[4].end-cuts[4].start)));
+return {p:{x,y:0,z},c:{x:x+lerp(gaps[i],gaps[i+1],q),y:lerp(offsets[i],offsets[i+1],q),z:cz},i};}
+function filtered(u){let c=state(0).c;const steps=Math.max(1,Math.ceil(u*160)),soft=+$('soft').value,alpha=soft===0?1:1-Math.exp(-1/(160*soft*.13));for(let n=1;n<=steps;n++){const target=state(u*n/steps).c;for(const k of ['x','y','z'])c[k]=lerp(c[k],target[k],alpha)}const s=state(u);s.c=c;return s}
+function point(v,view){return [32+v.x*3.7,view==='top'?130-v.y*5:188-v.z*2.6]}
+function render(){const u=+$('progress').value/100,s=filtered(u),cuts=schedule();for(const view of ['top','side']){const pp=point(s.p,view),cc=point(s.c,view);$(view+'-plane').setAttribute('transform',`translate(${pp})`);if(view==='side'){const n=state(Math.min(1,u+.001)),pitch=-Math.atan2(n.p.z-s.p.z,n.p.x-s.p.x)*180/Math.PI;$(view+'-plane').setAttribute('transform',`translate(${pp}) rotate(${pitch})`)}$(view+'-camera').setAttribute('transform',`translate(${cc})`);for(const [name,v]of [['x1',cc[0]],['y1',cc[1]],['x2',pp[0]],['y2',pp[1]]])$(view+'-gaze').setAttribute(name,v);for(const kind of ['plane','camera']){const points=[];for(let k=0;k<=80;k++){const st=filtered(k/80),v=point(kind==='plane'?st.p:st.c,view);points.push((k?'L':'M')+v.join(','))}$(view+'-'+kind+'-path').setAttribute('d',points.join(' '))}}
+$('beat-title').textContent=(s.i+1)+' · '+names[s.i];$('beat-note').textContent=notes[s.i];$('progress-value').textContent=Math.round(u*100)+'%';$('height-value').textContent=$('height').value;$('hold-value').textContent=$('hold').value+'s';$('soft-value').textContent=$('soft').value;$('duration-value').textContent=$('duration').value+'s';$('positions').textContent=`Aircraft height ${s.p.z.toFixed(1)} · Camera height ${s.c.z.toFixed(1)} · Forward separation ${(s.c.x-s.p.x).toFixed(1)} (positive = ahead)`;[...$('beats').children].forEach((btn,i)=>btn.setAttribute('aria-pressed',i===s.i));}
+names.forEach((name,i)=>{const btn=document.createElement('button');btn.type='button';btn.textContent=(i+1)+' '+name;btn.onclick=()=>{playing=false;$('play').textContent='Play once';$('progress').value=(schedule()[i].start+.001)*100;render()};$('beats').append(btn)});
+for(const id of ['progress','height','hold','soft','duration'])$(id).addEventListener('input',()=>{if(id==='progress'){playing=false;$('play').textContent='Play once'}render()});
+$('play').onclick=()=>{playing=!playing;if(playing&&+$('progress').value>=100)$('progress').value=0;last=0;$('play').textContent=playing?'Pause':'Play once';if(playing)requestAnimationFrame(tick)};
+function tick(t){if(!playing)return;if(last)$('progress').value=Math.min(100,+$('progress').value+(t-last)/(+$('duration').value*10));last=t;render();if(+$('progress').value>=100){playing=false;$('play').textContent='Play once'}else requestAnimationFrame(tick)}
+$('reset').onclick=()=>{playing=false;for(const [id,value]of Object.entries({progress:0,height:18,hold:2.5,soft:.25,duration:12}))$(id).value=value;$('play').textContent='Play once';render()};
+$('save').onclick=()=>{const settings={kind:'sr71-camera-blocking-proposal',units:'normalized-not-meters',...Object.fromEntries(['progress','height','hold','soft','duration'].map(id=>[id,+$(id).value]))};const url=URL.createObjectURL(new Blob([JSON.stringify(settings,null,2)+'\n'],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='sr71-camera-settings.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+render();
+})();
+</script>
+</html>

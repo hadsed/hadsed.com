@@ -71,6 +71,8 @@ A single Seedance 2.5 job was submitted through OpenRouter at 480p, 16:9, 10 sec
 
 Sampled-frame review: the model chose a side-profile arrival/passage and receding departure, rather than the prior nose-on/overhead route. It introduces strong trailing streaks and surface disturbance after the pass. Judge this as the model's free interpretation of racing-like speed; it does not establish the requested above-aircraft camera move.
 
+**User review: rejected.** The apparent sideways travel and incoherent motion are not acceptable. The next work is the [twilight climb directing board](sr71-directing-board.md): agree on camera/aircraft blocking, height, framing, and easing before generating another video.
+
 ## Above-aircraft still studies
 
 While the approved video was rendering, Had clarified that the camera should move **over** the aircraft, rather than under it, and requested three GPT Image stills: a distant approach, a significant close nose just before the camera changes position, and a wider possible ending combining the poster's atmosphere with the blue screenshot's angle and color influence.

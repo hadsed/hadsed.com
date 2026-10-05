@@ -77,6 +77,10 @@ After the poster-only draft, Had requested removing the tightly scripted sequenc
 
 Had subsequently clarified: move the camera over the plane, not under it. [Three GPT Image still studies](storyboards/stills/README.md) explore the distant approach, a close upper-nose view before the camera rise, and a wider blue-influenced ending angle. The ending combines the original poster's storm atmosphere with the blue screenshot's angle and white-blue exhaust. Use these as composition studies before another video; any further generation needs approval.
 
+### Twilight climb directing board
+
+Had rejected the racing-style video as incoherent/sideways-looking flight. The opening camera should be substantially higher above the water, the approaching aircraft smaller and lower in frame, with a near-level gaze rather than a steep top-down view. Keep blue-purple dominant, add restrained orange afterglow, and smooth the cloud masses. The new proposed sequence tracks the low-flying plane from the side, lets it pitch and climb away as the camera lags, arcs behind, then closes toward the exhausts until palette-matched light fills the image. [The directing board](sr71-directing-board.md) collects revised stills, seven beats, film vocabulary, and open decisions; [the interactive sketch](storyboards/sr71-directing.html) separates camera and aircraft paths with controls for height, side hold, tracking softness, and timing. No new video was generated.
+
 ### Blue-hour aircraft styling reference
 
 Had added [this blue-hour SR-71 image](inspo/sr71-blue-hour-afterburners.png) on October 4, 2026 for the later styling pass. Preserve the deep cobalt/indigo atmosphere, nearly black aircraft silhouette, faint cool edge light, and luminous white-blue afterburners with visible exhaust pulses. The long nose and paired tails remain readable through silhouette rather than surface detail. This is a palette, lighting, and exhaust reference; the shot sequence remains under exploration. The image's source beyond the supplied screenshot is unconfirmed.
