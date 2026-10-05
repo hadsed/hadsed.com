@@ -59,6 +59,12 @@ The browser study tests a gentle response to pointer movement and an acceleratin
 - How does this scene transition into the reading page?
 - Use the poster image as an atmospheric reference for a Blender scene, or retain a photographic treatment?
 
+### Camera routes and storyboard
+
+Had proposed two camera moves: follow alongside the aircraft, climb over it, settle behind its afterburners, then watch it accelerate into the horizon; or begin head-on with a small aircraft against the storm, approach, retreat/rise as it closes, move to the side, and finish in the poster composition.
+
+See [the two five-shot storyboards and editable Blender blockouts](sr71-storyboard.md). The immediate goal is to choose the shot before detailing the model or committing to a horizon. Neither route is final.
+
 ### Moody desktop and landscape references
 
 Had added these three screenshots on October 4, 2026 as a closer match for the SR-71 concept's mood:
