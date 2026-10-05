@@ -15,6 +15,7 @@ parser.add_argument("--env", required=True, type=pathlib.Path)
 parser.add_argument("--reference-urls", type=pathlib.Path)
 parser.add_argument("--receipt", required=True, type=pathlib.Path)
 parser.add_argument("--output", required=True, type=pathlib.Path)
+parser.add_argument("--prompt", type=pathlib.Path, default=ROOT / "notes/prompts/sr71-seedance-route-b.txt")
 args = parser.parse_args()
 
 key = None
@@ -61,11 +62,11 @@ else:
     if args.reference_urls is None:
         raise SystemExit("--reference-urls is required for a new submission")
     urls = json.loads(args.reference_urls.read_text())
-    if len(urls) != 2:
-        raise SystemExit("Expected poster, then storyboard reference URLs")
+    if not 1 <= len(urls) <= 2:
+        raise SystemExit("Expected one poster, or poster then storyboard reference URLs")
     payload = {
         "model": "bytedance/seedance-2.5",
-        "prompt": (ROOT / "notes/prompts/sr71-seedance-route-b.txt").read_text(),
+        "prompt": args.prompt.read_text(),
         "duration": 10,
         "resolution": "480p",
         "aspect_ratio": "16:9",

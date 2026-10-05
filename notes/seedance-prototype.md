@@ -50,3 +50,13 @@ Initial visual review from sampled frames: the opening keeps the aircraft low wi
 ## Possible next iteration
 
 If the reference-based draft has the right mood but loses the shot, try a short clay-render camera reference or clean opening/final stills. Decide from the first output rather than preparing those additional assets now.
+
+## Poster-only comparison
+
+The user requested removing the Blender/storyboard image and seeing what Seedance produces from the poster alone. A second OpenRouter job used only the original poster image, with the same timed Route B text and generation settings. The only prompt change was removing the `@Image2` reference instructions; neither the new blue-hour screenshot nor any model/blockout was supplied. [Exact poster-only prompt](prompts/sr71-seedance-poster-only.txt).
+
+[View poster-only video](storyboards/sr71-seedance-poster-only.mp4) · [sampled frame strip](storyboards/sr71-seedance-poster-only-review.png) · [job receipt](storyboards/sr71-poster-only-job.json).
+
+Completed: H.264, 854 × 480, 10.04 seconds, no audio. Returned cost **$1.0322825**, bringing these two completed OpenRouter drafts to **$2.064565**. No additional generation was submitted.
+
+Sampled-frame review: substantially closer to the poster's storm depth, dark matte aircraft, lighting, and restrained exhaust. The small head-on opening grows toward a close crossing, then resolves into a left-facing profile and reflection. The close aircraft crosses the frame rather than proving the exact smooth overhead arc; geometry and spatial continuity through that passage still need full-motion review. The final reflection remains unusually crisp. The comparison suggests the crude storyboard image strongly influenced the first result, though a single pair of stochastic generations does not establish causality. This second draft is a more useful visual direction to review before spending again.

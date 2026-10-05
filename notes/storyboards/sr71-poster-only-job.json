@@ -1,0 +1,14 @@
+{
+  "id": "gen-vid-1791174647-2wTaPqSQU3TsR0AOdOdO",
+  "status": "completed",
+  "generation_id": "gen-vid-1791174647-2wTaPqSQU3TsR0AOdOdO",
+  "usage": {
+    "cost": 1.0322825,
+    "is_byok": false
+  },
+  "model": "bytedance/seedance-2.5",
+  "duration": 10,
+  "resolution": "480p",
+  "aspect_ratio": "16:9",
+  "generate_audio": false
+}
