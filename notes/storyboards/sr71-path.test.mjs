@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {defaults,pose,schedule,cleanSettings} from './sr71-path.mjs';
+import {defaults,pose,schedule,cleanSettings,approachMotion} from './sr71-path.mjs';
 
 for (const s of [defaults,
   {...defaults,soft:0,climb:180,clearance:30},
@@ -7,7 +7,7 @@ for (const s of [defaults,
   {...defaults,duration:30,speed:150,height:8}]) {
   const cuts=schedule(s);
   assert.ok(Math.abs(cuts.at(-1).end-1)<1e-9, 'clip ends at 100%');
-  assert.ok(Math.abs(cuts[2].duration-s.hold)<1e-9, 'side hold lasts requested seconds');
+  assert.ok(Math.abs(cuts[3].duration-s.hold)<1e-9, 'side hold lasts requested seconds');
   let previous=pose(0,s);
   for (let i=0;i<=1000;i++) {
     const p=pose(i/1000,s);
@@ -26,3 +26,13 @@ assert.equal(cleanSettings({height:Infinity}).height,28);
 assert.equal(cleanSettings({height:28,hold:2.5,soft:.6,duration:8}).height,28);
 assert.equal(cleanSettings({settings:{height:65,progress:22}}).height,65);
 console.log('Camera path invariants passed.');
+
+const rush=approachMotion(defaults),openingEnd=schedule(defaults)[0].end;
+const first=pose(0,defaults),early=pose(openingEnd*.25,defaults),last=pose(openingEnd,defaults);
+assert.ok(first.camera.z<early.camera.z,'camera initially travels toward aircraft');
+assert.ok(early.aircraft.z<first.aircraft.z,'aircraft independently travels toward camera');
+assert.ok(Math.abs(last.camera.z-last.aircraft.z)<Math.abs(first.camera.z-first.aircraft.z),'opening closes distance');
+assert.ok(Math.abs(Math.abs(last.camera.z-last.aircraft.z)-rush.endGap)<.01,'opening reaches computed gap');
+for(let i=1;i<=100;i++){const u=openingEnd*i/100;const p=pose(u,defaults);assert.ok(p.aircraft.z-p.camera.z>=Math.max(defaults.nose+40,80)-1e-6,'opening never crosses through plane')}
+for(const cut of schedule(defaults).slice(0,-1)){const a=pose(cut.end-1e-8,defaults),b=pose(cut.end+1e-8,defaults);assert.ok(Math.hypot(a.camera.x-b.camera.x,a.camera.y-b.camera.y,a.camera.z-b.camera.z)<.1,'phase boundary stays continuous')}
+console.log('Opening approach motion and phase continuity passed.');

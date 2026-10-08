@@ -10,17 +10,17 @@
 <header><div><strong>SR-71</strong><span class="muted"> / directing room</span></div><nav aria-label="Workspace"><button id="directing-tab" aria-selected="true">Directing</button><button id="storyboard-tab" aria-selected="false">Storyboard <span id="capture-count"></span></button></nav><a href="../sr71-directing-board.md">Shot notes ↗</a></header>
 <main id="directing">
 <aside>
-<div class="aside-title"><strong>Shot configuration</strong><small>Had’s imported preset · relative units</small></div>
-<div id="controls"></div>
+<div class="aside-title"><strong id="phase-controls-title">Closing approach</strong><small id="phase-controls-time">Current phase controls · relative units</small></div>
+<div id="controls"></div><details id="global-settings"><summary>Whole clip & display</summary><div id="global-controls"></div></details>
 <section class="files"><h2>Settings & frames</h2><button id="capture">Capture this frame</button><button id="save">Export settings JSON</button><label class="file-button">Import settings JSON<input id="import" type="file" accept="application/json,.json"></label><button id="reset">Reset to Had’s preset</button><p>Captures stay in this browser’s storyboard gallery. Download a frame and its settings there to keep them with the repo.</p><p id="status" role="status" aria-live="polite"></p></section>
 </aside>
 <div class="workspace">
 <div class="toolbar"><div><span class="dot"></span> LIVE 3D BLOCKOUT <span class="muted">· original proxy geometry</span></div><div><button id="shot-view" aria-pressed="true">Shot</button><button id="scene-view" aria-pressed="false">Scene / paths</button></div></div>
 <div id="viewport" tabindex="0" aria-label="3D shot viewport. Scroll to scrub, arrow keys to step through time."><div id="loading">Loading local 3D renderer…</div><canvas id="canvas"></canvas><div id="light"></div><div id="view-label">SHOT CAMERA</div><div id="viewport-hint">Scroll to scrub · ← → step</div></div>
 <div class="transport"><button id="play">Play</button><button id="start" aria-label="Return to start">↤</button><input id="progress" type="range" min="0" max="100" step="0.1" value="0" aria-label="Clip progress"><output id="time">0.00 / 8.00s</output></div>
-<div id="beats" class="beats" aria-label="Shot beats"></div>
+<div class="phase-timeline"><div id="beats" class="beats" aria-label="Timeline phases"></div><div id="phase-playhead" aria-hidden="true"></div></div>
 <div class="beat-info"><h1 id="beat-title"></h1><p id="beat-note"></p><div id="readout" class="muted"></div></div>
-<footer>Height moves the camera. Aim changes composition. Lens changes perspective. <span class="muted">This is camera previs; clouds, water, exhaust and aircraft details are placeholders.</span></footer>
+<footer>Controls follow the current phase. Lens, aim and easing are shared wherever shown. <span class="muted">This is camera previs; clouds, water, exhaust and aircraft details are placeholders.</span></footer>
 </div>
 </main>
 <section id="storyboard" hidden><div class="gallery-head"><div><h1>Storyboard</h1><p>Composition studies, original blockouts, and frames captured from your shot. Open a capture to restore its camera settings.</p></div><select id="gallery-filter" aria-label="Filter storyboard"><option value="all">Everything</option><option value="capture">My captures</option><option value="latest">Latest stills</option><option value="earlier">Earlier studies</option><option value="blockout">Original blockouts</option></select></div><div id="gallery"></div></section>

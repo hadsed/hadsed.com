@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp} from './sr71-path.mjs';
+import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs';
 const $=id=>document.getElementById(id);
 const descriptions=[
- 'High above the water, ahead of the approaching nose. Aim and lens keep the aircraft small and low in a sky-heavy frame.',
+ 'Barely visible at the far end of the sky. Camera rushes toward the aircraft while it races toward us; the closing move brakes into the reveal.',
+ 'The aircraft becomes readable as the last front-on distance closes. Keep the elevated viewpoint and sky-heavy framing.',
  'The nose grows. Move above the upper fuselage and ease out to the side; never pass under the aircraft.',
  'Match the aircraft’s forward speed in an elevated three-quarter profile. Hold this composition while the water travels underneath.',
  'The flight path curves upward and the nose follows that path. The camera falls behind in forward distance.',
@@ -12,35 +13,79 @@ const descriptions=[
  'A palette-matched light overlay takes over. Disable it in the sidebar to inspect the final camera position.'
 ];
 let settings={...defaults},progress=0,playing=false,sceneView=false,lastTime=0,captures=[];
-try{const saved=JSON.parse(localStorage.getItem('sr71-directing-3d-v1'));if(saved){settings=cleanSettings(saved);progress=settings.progress/100}}catch{}
-const groups=[
- ['Camera · framing',true,[['height','Starting height','Initial camera altitude above water.'],['fov','Lens / field of view','Degrees; lower values give a longer lens.'],['framing','Vertical aim bias','Positive places the aircraft lower in frame.']]],
- ['Camera · path',true,[['distant','Starting distance','Ahead of the nose; increase for a smaller aircraft.'],['nose','Nose approach gap','Distance before the camera moves to the side.'],['side','Side separation','Lateral distance during the tracking hold.'],['lead','Side forward lead','Positive = ahead of aircraft; negative = behind.'],['sideHeight','Side camera height','Altitude before climbing; above-aircraft clearance takes priority.'],['rear','Rear acquisition gap','Distance behind the plane before catch-up.'],['endGap','Final rear gap','Distance behind the plane at the light transition.'],['clearance','Minimum height above plane','Keeps the entire camera path above the aircraft.']]],
- ['Aircraft · flight',false,[['flightHeight','Low flight altitude','Relative units above the water.'],['speed','Forward speed','Relative units per second, not calibrated airspeed.'],['climb','Climb gain','Height gained over the second half of the sequence.']]],
- ['Timing · easing',true,[['duration','Clip duration','Seconds; side hold keeps its exact duration.'],['hold','Side-track hold','Seconds; remaining beats share the rest.'],['soft','Tracking softness','Seconds of lag in camera offsets. Zero follows the path exactly.'],['ease','Path easing','Zero = linear beat motion; one = smooth starts and stops.']]],
- ['Scene · transition',false,[['grid','Water grid','Depth and speed cues for blocking.'],['clay','Neutral clay view','Review geometry without the twilight palette.'],['fade','Light transition','Preview overlay only, not a physical exhaust simulation.'],['fadeStart','Light begins at','Percentage of the full clip.']]]
+try{const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v2'));const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v1'));if(current){settings=cleanSettings(current);progress=settings.progress/100}else if(previous){settings=cleanSettings({...previous,distant:defaults.distant,duration:previous.duration+defaults.approachDuration});progress=0}}catch{}
+const phaseFields=[
+ ['distant','approachDuration','cameraRush','planeRush','height','framing','fov','ease'],
+ ['nose','height','framing','fov','soft','ease'],
+ ['side','lead','sideHeight','clearance','framing','fov','soft','ease'],
+ ['hold','side','lead','sideHeight','framing','fov','speed','soft'],
+ ['climb','speed','sideHeight','clearance','framing','fov','soft','ease'],
+ ['rear','clearance','framing','fov','soft','ease'],
+ ['endGap','clearance','framing','fov','soft','ease'],
+ ['fade','fadeStart','endGap','framing','fov']
 ];
-const inputs=new Map();
-for(const [title,open,fields] of groups){
- const details=document.createElement('details');details.open=open;const summary=document.createElement('summary');summary.textContent=title;details.append(summary);
- for(const [key,label,hint] of fields){
-  const node=document.createElement('label');const [min,max,step]=ranges[key];
-  if(['grid','clay','fade'].includes(key)){
-   node.className='toggle';const input=document.createElement('input');input.type='checkbox';input.id=key;input.checked=!!settings[key];node.append(input,document.createTextNode(label));inputs.set(key,[input]);input.onchange=()=>{settings[key]=+input.checked;configurationChanged()};
-  }else{
-   node.className='control';const top=document.createElement('span');top.className='control-top';const text=document.createElement('span');text.textContent=label;top.append(text);
-   const number=document.createElement('input');number.type='number';number.min=min;number.max=max;number.step=step;number.value=settings[key];number.setAttribute('aria-label',label+' value');top.append(number);
-   const slider=document.createElement('input');slider.type='range';slider.id=key;slider.min=min;slider.max=max;slider.step=step;slider.value=settings[key];slider.setAttribute('aria-label',label);
-   const small=document.createElement('small');small.textContent=hint;node.append(top,slider,small);inputs.set(key,[slider,number]);
-   for(const input of [slider,number])input.oninput=()=>{if(input.value===''||!Number.isFinite(+input.value))return;settings[key]=clamp(+input.value,min,max);for(const other of [slider,number])if(other!==input)other.value=settings[key];configurationChanged()};
-  }
-  details.append(node);
+const fieldInfo={
+ distant:['Starting distance','Almost invisible at 1,800 units; increase for a smaller speck.'],
+ approachDuration:['Approach duration','Seconds for the opening rush.'],
+ cameraRush:['Camera rush speed','Average forward rush before braking; relative units/s.'],
+ planeRush:['Aircraft approach speed','Nose-forward speed during the opening; relative units/s.'],
+ height:['Camera height','Altitude above water for the head-on phases.'],
+ fov:['Lens / field of view','Degrees; lower values give a longer lens.'],
+ framing:['Vertical aim bias','Positive places the aircraft lower in frame.'],
+ nose:['Nose reveal gap','Front distance before the overhead move.'],
+ side:['Side separation','Lateral distance at the side hold.'],
+ lead:['Side forward lead','Positive = ahead; negative = behind.'],
+ sideHeight:['Side camera height','Altitude before climbing; minimum clearance takes priority.'],
+ rear:['Rear acquisition gap','Behind the aircraft before catch-up.'],
+ endGap:['Final rear gap','Behind the aircraft at the light transition.'],
+ clearance:['Minimum height above plane','Keeps the camera above the aircraft.'],
+ flightHeight:['Low flight altitude','Relative units above the water.'],
+ speed:['Tracking flight speed','Nose-forward speed after the opening.'],
+ climb:['Climb gain','Altitude gained after the side hold.'],
+ duration:['Clip duration','Seconds including the new approach.'],
+ hold:['Side-track hold','Seconds; other phases share the remaining time.'],
+ soft:['Tracking softness','Seconds of lag after the opening; zero follows exactly.'],
+ ease:['Motion easing','Opening: brake the closing rush. Other phases: smooth start/stop.'],
+ grid:['Water grid','Depth and speed cues.'],clay:['Neutral clay view','Geometry without twilight styling.'],
+ fade:['Light transition','Palette overlay; not a physical exhaust simulation.'],fadeStart:['Light begins at','Percentage of the full clip.']
+};
+const inputs=new Map(),controlNodes=new Map();let activePhase=-1;
+for(const [key,[label,hint]] of Object.entries(fieldInfo)){
+ const node=document.createElement('label');const [min,max,step]=ranges[key];
+ if(['grid','clay','fade'].includes(key)){
+  node.className='toggle';const input=document.createElement('input');input.type='checkbox';input.id=key;input.checked=!!settings[key];node.append(input,document.createTextNode(label));inputs.set(key,[input]);input.onchange=()=>{settings[key]=+input.checked;configurationChanged()};
+ }else{
+  node.className='control';const top=document.createElement('span');top.className='control-top';const text=document.createElement('span');text.textContent=label;top.append(text);
+  const number=document.createElement('input');number.type='number';number.min=min;number.max=max;number.step=step;number.value=settings[key];number.setAttribute('aria-label',label+' value');top.append(number);
+  const slider=document.createElement('input');slider.type='range';slider.id=key;slider.min=min;slider.max=max;slider.step=step;slider.value=settings[key];slider.setAttribute('aria-label',label);
+  const small=document.createElement('small');small.textContent=hint;node.append(top,slider,small);inputs.set(key,[slider,number]);
+  for(const input of [slider,number])input.oninput=()=>{if(input.value===''||!Number.isFinite(+input.value))return;settings[key]=clamp(+input.value,min,max);for(const other of [slider,number])if(other!==input)other.value=settings[key];configurationChanged()};
  }
- $('controls').append(details);
+ controlNodes.set(key,node);
+ if(['duration','flightHeight','grid','clay'].includes(key))$('global-controls').append(node);
+ else $('controls').append(node);
+}
+function phaseControls(index,cuts){
+ if(activePhase!==index){activePhase=index;const keys=phaseFields[index];
+  for(const [key,node] of controlNodes)if(!['duration','flightHeight','grid','clay'].includes(key))node.hidden=!keys.includes(key);
+  // Reorder only when changing phases, so dragging a control keeps focus.
+  for(const key of keys)$('controls').append(controlNodes.get(key));
+  $('controls').closest('aside').scrollTop=0;
+ }
+ $('phase-controls-title').textContent=`${index+1} · ${beats[index]}`;
+ $('phase-controls-time').textContent=`${(cuts[index].start*settings.duration).toFixed(2)}–${(cuts[index].end*settings.duration).toFixed(2)}s · current phase`;
+}
+function annotateTimeline(cuts){
+ $('beats').style.gridTemplateColumns=cuts.map(b=>`${b.duration}fr`).join(' ');
+ [...$('beats').children].forEach((button,i)=>{
+  const start=(cuts[i].start*settings.duration).toFixed(2),end=(cuts[i].end*settings.duration).toFixed(2);
+  button.title=`${beats[i]} · ${start}–${end}s`;button.setAttribute('aria-label',button.title);
+  button.querySelector('small').textContent=`${start}–${end}s`;
+ });
 }
 function syncControls(){for(const [key,list] of inputs)for(const input of list){if(input.type==='checkbox')input.checked=!!settings[key];else input.value=settings[key]}}
-function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v1',JSON.stringify(settings))}catch{}}
-function configurationChanged(){persist();rebuildPaths();render()}
+function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v2',JSON.stringify(settings))}catch{}}
+function configurationChanged(){persist();annotateTimeline(schedule(settings));rebuildPaths();render()}
 function setProgress(value){progress=clamp(value);$('progress').value=(progress*100).toFixed(1);persist();render()}
 function stop(){playing=false;$('play').textContent='Play'}
 const scene=new THREE.Scene();
@@ -94,7 +139,7 @@ function rebuildPaths(){
 }
 let overviewInitialized=false;
 function updateScene(){
- const p=pose(progress,settings);plane.position.set(p.aircraft.x,p.aircraft.y,p.aircraft.z);plane.rotation.x=p.pitch;
+ const p=pose(progress,settings);phaseControls(p.beat,schedule(settings));$('phase-playhead').style.left=`${progress*100}%`;plane.position.set(p.aircraft.x,p.aircraft.y,p.aircraft.z);plane.rotation.x=p.pitch;
  shotCamera.position.set(p.camera.x,p.camera.y,p.camera.z);shotCamera.fov=settings.fov;shotCamera.lookAt(p.aim.x,p.aim.y,p.aim.z);shotCamera.updateProjectionMatrix();shotCamera.updateMatrixWorld();
  cameraMarker.position.copy(shotCamera.position);cameraMarker.quaternion.copy(shotCamera.quaternion);
  aimLine.geometry.dispose();aimLine.geometry=new THREE.BufferGeometry().setFromPoints([shotCamera.position,new THREE.Vector3(p.aircraft.x,p.aircraft.y,p.aircraft.z)]);aimLine.computeLineDistances();frustumCamera.position.copy(shotCamera.position);frustumCamera.quaternion.copy(shotCamera.quaternion);frustumCamera.fov=shotCamera.fov;frustumCamera.aspect=shotCamera.aspect;frustumCamera.updateProjectionMatrix();frustumCamera.updateMatrixWorld();cameraHelper.update();
@@ -106,7 +151,7 @@ function updateScene(){
  $('light').style.opacity=sceneView?'0':p.fade;
  $('time').textContent=`${p.time.toFixed(2)} / ${settings.duration.toFixed(2)}s`;
  $('beat-title').textContent=`${p.beat+1} · ${beats[p.beat]}`;$('beat-note').textContent=descriptions[p.beat];
- $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%`;
+ $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%` + (p.beat===0 ? ` · Rush ${approachMotion(settings).limited?'limited to keep a safe gap':'active'} · ends at ${approachMotion(settings).endGap.toFixed(0)} units` : '');
  [...$('beats').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===p.beat));
  return p;
 }
@@ -123,9 +168,9 @@ $('viewport').onkeydown=e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.prev
 $('progress').oninput=()=>{stop();setProgress(+$('progress').value/100)};
 $('play').onclick=()=>{playing=!playing;if(playing&&progress>=1)setProgress(0);lastTime=0;$('play').textContent=playing?'Pause':'Play'};
 $('start').onclick=()=>{stop();setProgress(0)};
-beats.forEach((label,i)=>{const b=document.createElement('button');b.textContent=`${i+1} ${label}`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
+beats.forEach((label,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${i+1} ${label}</span><small></small>`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
 function animate(t){requestAnimationFrame(animate);if(playing){if(lastTime)setProgress(progress+Math.min(t-lastTime,100)/(settings.duration*1000));lastTime=t;if(progress>=1)stop()}else lastTime=0;if(sceneView){orbit.update();render()}}
-function exportObject(){return {kind:'sr71-3d-camera-blocking',version:1,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
+function exportObject(){return {kind:'sr71-3d-camera-blocking',version:2,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
 function download(data,name,type){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('save').onclick=()=>download(JSON.stringify(exportObject(),null,2)+'\n','sr71-camera-settings.json','application/json');
 $('reset').onclick=()=>{stop();settings={...defaults};syncControls();progress=0;configurationChanged();setProgress(0);$('status').textContent='Restored your imported preset and initial 3D defaults.'};
@@ -175,4 +220,4 @@ function openEntry(entry){$('dialog-image').src=entry.src;$('dialog-image').alt=
 }
 $('gallery-filter').onchange=renderGallery;$('close-dialog').onclick=()=>$('image-dialog').close();
 $('image-dialog').onclick=e=>{if(e.target===$('image-dialog'))$('image-dialog').close()};
-$('loading').hidden=true;rebuildPaths();setProgress(progress);renderGallery();resize();requestAnimationFrame(animate);
+$('loading').hidden=true;annotateTimeline(schedule(settings));rebuildPaths();setProgress(progress);renderGallery();resize();requestAnimationFrame(animate);
