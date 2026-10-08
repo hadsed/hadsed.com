@@ -87,6 +87,22 @@ Had added [this blue-hour SR-71 image](inspo/sr71-blue-hour-afterburners.png) on
 
 ![Blue-hour SR-71 with cold afterburners](inspo/sr71-blue-hour-afterburners.png)
 
+### Final page / transition into the main site — spectral flight references
+
+Had supplied these three images on October 7, 2026 as inspiration for the final page that becomes the real site. Keep them available for the styling and intro-to-content handoff, rather than treating them as a new locked camera sequence. Original artists and sources are not identified in the supplied attachments.
+
+- **Blue field and spectral fan:** a small black aircraft silhouette in a vast saturated cobalt field; luminous white, violet, orange and red trails fan outward into black negative space. Useful for letting the aircraft's wake expand into the page's background or transition surface.
+- **Diagonal light trails:** a small climbing silhouette, long pink/white streaks, and a broad diagonal white-to-red band against deep blue. Useful for directional energy, color boundaries and a transition that sweeps across the frame.
+- **Iridescent flow:** a dark aircraft seen from above, surrounded by flowing pale spectral ribbons on grainy blue-purple. Useful for fluid contours, restrained texture and turning motion trails into an abstract visual field around the eventual content.
+
+A possible connection to the existing climb-to-light ending: let exhaust or wake broaden into these flowing color fields, then settle into the real site's visual surface. This is an interpretation to explore, not an approved implementation. Preserve generous negative space and the wordless intro; the final content layout and exact handoff remain open.
+
+![Blue field with a black aircraft and widening spectral trails](inspo/site-handoff-blue-spectral-fan.png)
+
+![Climbing aircraft and diagonal pink-white light trails against blue](inspo/site-handoff-diagonal-light-trails.png)
+
+![Dark aircraft surrounded by iridescent flowing ribbons](inspo/site-handoff-iridescent-flow.png)
+
 ### Moody desktop and landscape references
 
 Had added these three screenshots on October 4, 2026 as a closer match for the SR-71 concept's mood:

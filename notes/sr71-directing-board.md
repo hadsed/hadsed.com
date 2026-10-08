@@ -52,6 +52,8 @@ Briefly align behind the climbing aircraft. Now close the distance smoothly so t
 
 Afterburner light blooms into a soft white/blue-purple gradient, with a hint of warm afterglow at the edges if useful. Let the recognizable plane dissolve only near the end. The glow becomes the transition surface; the handoff into site content is still open. The sketch's fade swatch is a transition idea, not a simulated lens effect.
 
+For the eventual transition into the main site, see the [spectral flight styling references](concepts.md#final-page--transition-into-the-main-site--spectral-flight-references) added October 7, 2026: cobalt fields, dark silhouettes, widening light trails and iridescent ribbons. These inform the ending surface; the camera sequence remains open.
+
 ## Blocking and easing proposal
 
 | Beat | Aircraft action | Camera translation | Camera aim / framing | Timing feel |
