@@ -36,3 +36,24 @@ assert.ok(Math.abs(Math.abs(last.camera.z-last.aircraft.z)-rush.endGap)<.01,'ope
 for(let i=1;i<=100;i++){const u=openingEnd*i/100;const p=pose(u,defaults);assert.ok(p.aircraft.z-p.camera.z>=Math.max(defaults.nose+40,80)-1e-6,'opening never crosses through plane')}
 for(const cut of schedule(defaults).slice(0,-1)){const a=pose(cut.end-1e-8,defaults),b=pose(cut.end+1e-8,defaults);assert.ok(Math.hypot(a.camera.x-b.camera.x,a.camera.y-b.camera.y,a.camera.z-b.camera.z)<.1,'phase boundary stays continuous')}
 console.log('Opening approach motion and phase continuity passed.');
+
+const revisedCuts=schedule(defaults);
+const boundary=revisedCuts[0].end,epsilon=1e-5;
+const relativeZ=u=>{const p=pose(u,defaults);return p.camera.z-p.aircraft.z};
+const before=(relativeZ(boundary)-relativeZ(boundary-epsilon))/(epsilon*defaults.duration);
+const after=(relativeZ(boundary+epsilon)-relativeZ(boundary))/(epsilon*defaults.duration);
+assert.ok(before>50,'closing does not stop at nose reveal');
+assert.ok(Math.abs(before-after)<1,'closing velocity matches across reveal boundary');
+const aircraftBefore=(pose(boundary,defaults).aircraft.z-pose(boundary-epsilon,defaults).aircraft.z)/(epsilon*defaults.duration);
+const aircraftAfter=(pose(boundary+epsilon,defaults).aircraft.z-pose(boundary,defaults).aircraft.z)/(epsilon*defaults.duration);
+assert.ok(Math.abs(aircraftBefore-aircraftAfter)<1,'aircraft speed remains matched');
+const revealMid=pose((revisedCuts[1].start+revisedCuts[1].end)/2,defaults);
+assert.equal(revealMid.camera.x,0,'no turn until nose reveal ends');
+for(const fraction of [0,.25,.5,.9,1]){
+ const p=pose(revisedCuts[3].start+fraction*(revisedCuts[3].end-revisedCuts[3].start),defaults);
+ assert.ok(Math.abs(p.camera.z-p.aircraft.z)<1e-6,'side hold is exactly abeam');
+ assert.ok(Math.abs(p.camera.x+defaults.side)<1e-6,'side hold has settled lateral offset');
+}
+assert.equal(defaults.hold,1.25,'default side hold is halved');
+assert.ok(Math.abs(revisedCuts[1].duration/revisedCuts[2].duration-2.75/.75)<1e-9,'half the former turn goes into reveal');
+console.log('Matched reveal velocity, delayed turn, and exact side profile passed.');

@@ -1,24 +1,31 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs';
+import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=3.2';
 const $=id=>document.getElementById(id);
 const descriptions=[
- 'Barely visible at the far end of the sky. Camera rushes toward the aircraft while it races toward us; the closing move brakes into the reveal.',
- 'The aircraft becomes readable as the last front-on distance closes. Keep the elevated viewpoint and sky-heavy framing.',
- 'The nose grows. Move above the upper fuselage and ease out to the side; never pass under the aircraft.',
- 'Match the aircraft’s forward speed in an elevated three-quarter profile. Hold this composition while the water travels underneath.',
+ 'Barely visible in the distance. Camera and aircraft close fast, carrying the same motion through the nose reveal without a pause.',
+ 'Stay head-on and keep the aircraft racing toward us. The camera follows the approach angle downward, staying above the aircraft, before the turn begins.',
+ 'The aircraft is already close. Now use the shortened overhead move to turn into the full side profile.',
+ 'Brief poster-like side profile: camera directly abeam, matching forward speed. The hold is half its previous length.',
  'The flight path curves upward and the nose follows that path. The camera falls behind in forward distance.',
  'Arc from the side to the rear while staying above the aircraft. Camera translation and camera aim are separate.',
  'Close the rear gap. The paired exhausts grow as the camera gains on the climbing aircraft.',
  'A palette-matched light overlay takes over. Disable it in the sidebar to inspect the final camera position.'
 ];
 let settings={...defaults},progress=0,playing=false,sceneView=false,lastTime=0,captures=[];
-try{const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v2'));const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v1'));if(current){settings=cleanSettings(current);progress=settings.progress/100}else if(previous){settings=cleanSettings({...previous,distant:defaults.distant,duration:previous.duration+defaults.approachDuration});progress=0}}catch{}
+try{
+ const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v3'));
+ const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v2'));
+ const original=JSON.parse(localStorage.getItem('sr71-directing-3d-v1'));
+ if(current){settings=cleanSettings(current);progress=settings.progress/100}
+ else if(previous){const hold=Math.max(.5,previous.hold/2);settings=cleanSettings({...previous,hold,duration:previous.duration-previous.hold+hold,nose:defaults.nose,lead:0});progress=0}
+ else if(original){settings=cleanSettings({...original,distant:defaults.distant,duration:defaults.duration,hold:defaults.hold,nose:defaults.nose,lead:0});progress=0}
+}catch{}
 const phaseFields=[
  ['distant','approachDuration','cameraRush','planeRush','height','framing','fov','ease'],
- ['nose','height','framing','fov','soft','ease'],
- ['side','lead','sideHeight','clearance','framing','fov','soft','ease'],
- ['hold','side','lead','sideHeight','framing','fov','speed','soft'],
+ ['nose','height','framing','fov'],
+ ['side','lead','sideHeight','clearance','framing','fov','ease'],
+ ['hold','side','lead','sideHeight','framing','fov','speed'],
  ['climb','speed','sideHeight','clearance','framing','fov','soft','ease'],
  ['rear','clearance','framing','fov','soft','ease'],
  ['endGap','clearance','framing','fov','soft','ease'],
@@ -27,25 +34,25 @@ const phaseFields=[
 const fieldInfo={
  distant:['Starting distance','Almost invisible at 1,800 units; increase for a smaller speck.'],
  approachDuration:['Approach duration','Seconds for the opening rush.'],
- cameraRush:['Camera rush speed','Average forward rush before braking; relative units/s.'],
- planeRush:['Aircraft approach speed','Nose-forward speed during the opening; relative units/s.'],
- height:['Camera height','Altitude above water for the head-on phases.'],
+ cameraRush:['Camera rush speed','Average opening rush; carries continuously into the reveal.'],
+ planeRush:['Aircraft approach speed','Maintained through closing approach and nose reveal.'],
+ height:['Camera height','Initial head-on altitude; reveal follows the approach angle.'],
  fov:['Lens / field of view','Degrees; lower values give a longer lens.'],
  framing:['Vertical aim bias','Positive places the aircraft lower in frame.'],
- nose:['Nose reveal gap','Front distance before the overhead move.'],
+ nose:['Nose reveal gap','Closer head-on endpoint before the camera starts to turn.'],
  side:['Side separation','Lateral distance at the side hold.'],
- lead:['Side forward lead','Positive = ahead; negative = behind.'],
+ lead:['Side forward lead','Zero = proper side profile; positive = ahead, negative = behind.'],
  sideHeight:['Side camera height','Altitude before climbing; minimum clearance takes priority.'],
  rear:['Rear acquisition gap','Behind the aircraft before catch-up.'],
  endGap:['Final rear gap','Behind the aircraft at the light transition.'],
  clearance:['Minimum height above plane','Keeps the camera above the aircraft.'],
  flightHeight:['Low flight altitude','Relative units above the water.'],
- speed:['Tracking flight speed','Nose-forward speed after the opening.'],
+ speed:['Tracking flight speed','Nose-forward speed after the close approach and turn.'],
  climb:['Climb gain','Altitude gained after the side hold.'],
  duration:['Clip duration','Seconds including the new approach.'],
  hold:['Side-track hold','Seconds; other phases share the remaining time.'],
- soft:['Tracking softness','Seconds of lag after the opening; zero follows exactly.'],
- ease:['Motion easing','Opening: brake the closing rush. Other phases: smooth start/stop.'],
+ soft:['Tracking softness','Climb/rear tracking lag; front approach and side hold stay exact.'],
+ ease:['Motion easing','Turn and later moves: smooth starts/stops. Front phases match velocity.'],
  grid:['Water grid','Depth and speed cues.'],clay:['Neutral clay view','Geometry without twilight styling.'],
  fade:['Light transition','Palette overlay; not a physical exhaust simulation.'],fadeStart:['Light begins at','Percentage of the full clip.']
 };
@@ -84,7 +91,7 @@ function annotateTimeline(cuts){
  });
 }
 function syncControls(){for(const [key,list] of inputs)for(const input of list){if(input.type==='checkbox')input.checked=!!settings[key];else input.value=settings[key]}}
-function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v2',JSON.stringify(settings))}catch{}}
+function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v3',JSON.stringify(settings))}catch{}}
 function configurationChanged(){persist();annotateTimeline(schedule(settings));rebuildPaths();render()}
 function setProgress(value){progress=clamp(value);$('progress').value=(progress*100).toFixed(1);persist();render()}
 function stop(){playing=false;$('play').textContent='Play'}
@@ -170,7 +177,7 @@ $('play').onclick=()=>{playing=!playing;if(playing&&progress>=1)setProgress(0);l
 $('start').onclick=()=>{stop();setProgress(0)};
 beats.forEach((label,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${i+1} ${label}</span><small></small>`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
 function animate(t){requestAnimationFrame(animate);if(playing){if(lastTime)setProgress(progress+Math.min(t-lastTime,100)/(settings.duration*1000));lastTime=t;if(progress>=1)stop()}else lastTime=0;if(sceneView){orbit.update();render()}}
-function exportObject(){return {kind:'sr71-3d-camera-blocking',version:2,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
+function exportObject(){return {kind:'sr71-3d-camera-blocking',version:3,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
 function download(data,name,type){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('save').onclick=()=>download(JSON.stringify(exportObject(),null,2)+'\n','sr71-camera-settings.json','application/json');
 $('reset').onclick=()=>{stop();settings={...defaults};syncControls();progress=0;configurationChanged();setProgress(0);$('status').textContent='Restored your imported preset and initial 3D defaults.'};

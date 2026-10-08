@@ -106,3 +106,11 @@ The new approach adds two seconds to a migrated browser preset's total duration 
 The scrubber has a duration-proportional phase strip with labels, exact time ranges, an active-phase highlight and a playhead. Click a phase to jump to its beginning. The sidebar automatically shows that phase's relevant controls; whole-clip duration, flight altitude and display toggles live in a collapsed section. Lens, vertical aim, softness and easing remain shared parameters wherever shown, rather than independent per-phase lens keyframes.
 
 At extreme timing settings the tool reserves at least 1.5 seconds for the other six phases and shortens the opening if necessary. The side hold retains its requested duration within the allowed controls. No image/video generation was submitted for this revision.
+
+## October 8 revision — continuous reveal and proper profile
+
+The closing approach now carries its relative velocity into the nose reveal without easing to a stop at the boundary. Aircraft rush speed continues throughout both phases and blends into tracking speed during the turn. The reveal remains head-on until a closer 28-unit front gap; half the former turn time is reassigned to the reveal, leaving a short move into side tracking. During the reveal, camera height follows the initial approach elevation angle until the minimum above-aircraft clearance takes priority.
+
+The side hold is shortened from 2.5 to 1.25 seconds. Its camera is directly abeam (zero forward lead), with lateral separation already settled at the start. Camera softness applies only to the climb and rear phases, so it cannot delay the side profile. The default clip is now 8.75 seconds. The timeline reflects the revised phase lengths.
+
+Browser settings migrate to version 3: preserve height, lens and other controls, halve the saved side hold, subtract that removed time from the clip, and reset the reveal gap and side lead to the new framing. New exports use version 3. Older captures remain reference images; restoring their settings runs the revised path. Verified in the live browser, with numerical checks for phase continuity, velocity continuity into the reveal, and an exactly abeam side hold.
