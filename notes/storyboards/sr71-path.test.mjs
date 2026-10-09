@@ -6,7 +6,7 @@ for (const s of [defaults,
   {...defaults,duration:6,hold:3,bank:65,turn:70},
   {...defaults,duration:30,speed:150,height:8}]) {
   const cuts=schedule(s);
-  const bankStart=Math.max(cuts[1].start,cuts[3].start-s.bankLead/s.duration);
+  const bankStart=cuts[1].start;
   assert.ok(Math.abs(cuts.at(-1).end-1)<1e-9, 'clip ends at 100%');
   assert.ok(Math.abs(cuts[2].duration-s.hold)<1e-9, 'bank setup lasts requested seconds');
   let previous=pose(0,s);
@@ -53,7 +53,7 @@ for(let n=0;n<=200;n++){
 for(let n=0;n<=100;n++){
  const u=revisedCuts[1].start+(1-revisedCuts[1].start)*n/100,p=pose(u,defaults);
  const radius=Math.hypot(p.camera.x-p.aircraft.x,p.camera.z-p.aircraft.z);
- assert.ok(Math.abs(radius-defaults.nose)<1e-8,'close orbit and departure never pull back');
+ if(u>=revisedCuts[1].end)assert.ok(radius<=defaults.nose+1e-8,'rear follow only pushes closer');
  if(u>=revisedCuts[1].end){const nozzleY=p.aircraft.y-9.5*Math.sin(p.pitch);assert.ok(Math.abs(p.camera.y-nozzleY-defaults.exhaustHeight)<1e-8,'camera follows nozzle eye height during climb');}
 }
 const exhaust=pose(revisedCuts[2].start,defaults);
@@ -68,4 +68,16 @@ const end=pose(1,defaults);
 assert.ok(end.aircraft.x>0,'departure curves toward aircraft right');
 assert.ok(end.bank>0&&end.heading>0&&end.pitch>0,'departure banks, turns, and climbs together');
 assert.equal(revisedCuts.length,5,'nose reveal removed; closing feeds directly into orbit');
-console.log('Constant close radius, rear exhaust framing, and banking departure passed.');
+const whipQuarter=pose(revisedCuts[1].start+.25*(revisedCuts[1].end-revisedCuts[1].start),defaults);
+assert.ok(whipQuarter.bank>.1,'bank visible during camera whip');
+const dx=whipQuarter.camera.x-whipQuarter.aircraft.x,dz=whipQuarter.camera.z-whipQuarter.aircraft.z;
+const localX=Math.cos(whipQuarter.heading)*dx+Math.sin(whipQuarter.heading)*dz;
+assert.ok(Math.abs(localX)<defaults.nose*.6,'pass hugs aircraft more closely than former circle');
+const endRadius=Math.hypot(end.camera.x-end.aircraft.x,end.camera.z-end.aircraft.z);
+assert.ok(Math.abs(endRadius-defaults.pushGap)<1e-8,'late jet push reaches requested closer gap');
+console.log('Tight side whip, bank during whip, eye-level follow, and late jet push passed.');
+
+const dt=1e-6,relativeForward=u=>{const p=pose(u,defaults);return p.camera.z-p.aircraft.z};
+const enterBefore=(relativeForward(openingEnd)-relativeForward(openingEnd-dt))/(dt*defaults.duration);
+const enterAfter=(relativeForward(openingEnd+dt)-relativeForward(openingEnd))/(dt*defaults.duration);
+assert.ok(enterBefore>50&&Math.abs(enterBefore-enterAfter)<.1,'forward rush carries into whip without stopping');
