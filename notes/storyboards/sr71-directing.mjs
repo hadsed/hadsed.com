@@ -1,29 +1,30 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=8';
+import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=9.1';
 const $=id=>document.getElementById(id);
 const descriptions=[
  'One continuous closing rush from the distant speck to the close nose frame. The camera descends smoothly throughout the approach, then goes straight into the orbit.',
  'Whip close along the wing, banking from the instant the approach ends. Enter fast, then slow smoothly toward the exhausts and lower to nozzle eye level.',
- 'Let the whip settle on the exhausts. The bank is already established; no separate late bank move.',
+ 'Continue moving: push closer and pan right to center both exhausts. The bank is already established.',
  'Follow the climbing aircraft at exhaust eye level. Begin the closer push late in this phase, with the horizon behind the jets.',
  'Stay close at exhaust eye level. Preserve both nozzles and the background; the full-screen wash is disabled.'
 ];
 const suppliedPreset=await (await fetch('./presets/had-close-exhaust-settings.json')).json();
 let settings={...defaults},progress=0,playing=false,sceneView=false,lastTime=0,captures=[];
 try{
- const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v8'));
- const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v7'));
+ const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v9'));
+ const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v8'));
  if(current){settings=cleanSettings(current);progress=settings.progress/100}
  else {
-  const source=previous||{...suppliedPreset.settings,approachDuration:defaults.approachDuration,exhaustHeight:defaults.exhaustHeight,fade:0};
-  settings=cleanSettings({...source,duration:source.duration+defaults.whipExtra,whipExtra:defaults.whipExtra});progress=0;
+  const source=previous||defaults;
+  const hold=previous?Math.max(.1,Math.round(source.hold*2/3*100)/100):source.hold;
+  settings=cleanSettings({...source,hold,duration:source.duration-source.hold+hold,settlePan:defaults.settlePan,settleZoom:defaults.settleZoom,settleAim:defaults.settleAim});progress=0;
  }
 }catch{}
 const phaseFields=[
  ['distant','approachDuration','cameraRush','planeRush','nose','height','clearance','framing','fov','ease'],
  ['whipExtra','nose','orbitAngle','clearance','exhaustHeight','hug','bankRamp','bank','framing','exhaustAim','fov','ease'],
- ['hold','bankRamp','bank','turn','nose','orbitAngle','exhaustHeight','exhaustAim','fov'],
+ ['hold','settleZoom','settlePan','settleAim','bankRamp','bank','turn','nose','orbitAngle','exhaustHeight','exhaustAim','fov'],
  ['climb','pushStart','pushGap','bankRamp','bank','turn','speed','nose','exhaustHeight','exhaustAim','fov'],
  ['fade','fadeStart','pushStart','pushGap','nose','exhaustHeight','exhaustAim','fov']
 ];
@@ -51,7 +52,10 @@ const fieldInfo={
  exhaustAim:['Exhaust aim bias','Zero centers the paired nozzles; positive moves them lower in frame.'],
  orbitAngle:['Exhaust orbit angle','180° is directly behind; 175° shows both exhausts with a slight offset.'],
  duration:['Clip duration','Seconds including the new approach.'],
- hold:['Exhaust settle duration','Brief rear framing after the whip; banking is already underway.'],
+ hold:['Exhaust settle duration','Moving push-in and rightward pan; banking is already underway.'],
+ settleZoom:['Settle push-in','Forward camera movement during section three.'],
+ settleAim:['Settle exhaust framing','Vertical aim reached during section three; keeps both banked nozzles in view.'],
+ settlePan:['Settle pan right','Camera movement toward the aircraft’s right during section three.'],
  ease:['Motion easing','Smooth descent and orbit easing; the closing rush follows one continuous curve.'],
  grid:['Water grid','Depth and speed cues.'],clay:['Neutral clay view','Geometry without twilight styling.'],
  fade:['Optional light wash','Disabled for this shot so the exhausts and horizon stay visible.'],fadeStart:['Light begins at','Percentage of the full clip.']
@@ -91,7 +95,7 @@ function annotateTimeline(cuts){
  });
 }
 function syncControls(){for(const [key,list] of inputs)for(const input of list){if(input.type==='checkbox')input.checked=!!settings[key];else input.value=settings[key]}}
-function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v8',JSON.stringify(settings))}catch{}}
+function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v9',JSON.stringify(settings))}catch{}}
 function configurationChanged(){persist();annotateTimeline(schedule(settings));rebuildPaths();render()}
 function setProgress(value){progress=clamp(value);$('progress').value=(progress*100).toFixed(1);persist();render()}
 function stop(){playing=false;$('play').textContent='Play'}
@@ -177,7 +181,7 @@ $('play').onclick=()=>{playing=!playing;if(playing&&progress>=1)setProgress(0);l
 $('start').onclick=()=>{stop();setProgress(0)};
 beats.forEach((label,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${i+1} ${label}</span><small></small>`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
 function animate(t){requestAnimationFrame(animate);if(playing){if(lastTime)setProgress(progress+Math.min(t-lastTime,100)/(settings.duration*1000));lastTime=t;if(progress>=1)stop()}else lastTime=0;if(sceneView){orbit.update();render()}}
-function exportObject(){return {kind:'sr71-3d-camera-blocking',version:8,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
+function exportObject(){return {kind:'sr71-3d-camera-blocking',version:9,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
 function download(data,name,type){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('save').onclick=()=>download(JSON.stringify(exportObject(),null,2)+'\n','sr71-camera-settings.json','application/json');
 $('reset').onclick=()=>{stop();settings={...defaults};syncControls();progress=0;configurationChanged();setProgress(0);$('status').textContent='Restored your imported preset and initial 3D defaults.'};

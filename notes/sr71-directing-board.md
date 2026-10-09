@@ -148,3 +148,7 @@ Begin a closer exhaust push 65% through phase four. Rear gap decreases from 19 t
 ## October 8 revision — slower whip experiment
 
 Add exactly 0.65 seconds to section two, from 0.94 to 1.59 seconds in the current preset. The clip becomes 7.65 seconds; subsequent sections shift later by 0.65 seconds while retaining their durations. Keep the elliptical camera path and terminal framing. An Extra whip time control in section two changes total clip duration along with the extra allocation. Version 8 migration applies the extension once and preserves the existing shot settings. Timing checks verify that only section two gains time.
+
+## October 8 revision — moving exhaust settle
+
+Shorten section three by one third, from 0.45 to 0.30 seconds. Its camera now pushes forward 0.3 units and pans right 2.6 units in the aircraft's heading frame, centering the paired exhausts rather than holding still. The resulting offset carries into the climb and the later jet push. Total clip duration becomes 7.50 seconds; the other section durations stay unchanged. Vertical aim shifts smoothly to 0.025, retaining the 56-degree lens and fitting both banked nozzles in the close frame. Version 9 migrates once and exposes Settle push-in and Settle pan right controls. Checks verify both camera movements and the isolated timing reduction.

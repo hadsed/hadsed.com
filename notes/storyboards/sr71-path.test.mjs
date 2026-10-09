@@ -82,6 +82,14 @@ const enterBefore=(relativeForward(openingEnd)-relativeForward(openingEnd-dt))/(
 const enterAfter=(relativeForward(openingEnd+dt)-relativeForward(openingEnd))/(dt*defaults.duration);
 assert.ok(enterBefore>30&&enterAfter>30,'forward rush continues into the slowed whip without stopping');
 
-const originalTiming=schedule({...defaults,duration:7,whipExtra:0}),extendedTiming=schedule(defaults);
+const originalTiming=schedule({...defaults,duration:defaults.duration-.65,whipExtra:0}),extendedTiming=schedule(defaults);
 for(let i=0;i<originalTiming.length;i++)assert.ok(Math.abs(extendedTiming[i].duration-originalTiming[i].duration-(i===1?.65:0))<1e-8,'only section two gains exactly 0.65 seconds');
 console.log('Section two adds exactly 0.65 seconds; other phase durations preserved.');
+
+const startSettle=pose(revisedCuts[2].start,defaults),endSettle=pose(revisedCuts[2].end,defaults);
+const localOffset=p=>{const dx=p.camera.x-p.aircraft.x,dz=p.camera.z-p.aircraft.z;return {x:Math.cos(p.heading)*dx+Math.sin(p.heading)*dz,z:-Math.sin(p.heading)*dx+Math.cos(p.heading)*dz}};
+const a=localOffset(startSettle),b=localOffset(endSettle);
+assert.ok(Math.abs(b.x-a.x-defaults.settlePan)<1e-8,'section three pans right');
+assert.ok(Math.abs(a.z-b.z-defaults.settleZoom)<1e-8,'section three pushes closer');
+const oldTiming=schedule({...defaults,hold:.45,duration:7.65});
+for(let i=0;i<oldTiming.length;i++)assert.ok(Math.abs(revisedCuts[i].duration-oldTiming[i].duration-(i===2?-.15:0))<1e-8,'only section three loses one third of its duration');

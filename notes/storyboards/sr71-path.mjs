@@ -1,11 +1,11 @@
 // Pure camera blocking model. World +Y is up; the aircraft flies toward -Z.
 export const beats = ['Closing approach','Side-hugging whip','Exhaust settle','Climb & exhaust follow','Exhaust ending'];
-export const defaults = {progress:0,height:42,hold:0.45,soft:0.6,duration:7.65,whipExtra:0.65,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
+export const defaults = {progress:0,height:42,hold:0.3,soft:0.6,duration:7.5,settlePan:2.6,settleZoom:0.3,settleAim:0.025,whipExtra:0.65,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
 export const ranges = {
  height:[8,100,1], fov:[20,85,1], framing:[-0.6,0.7,0.01], distant:[300,2600,10], nose:[16,160,1],
  approachDuration:[.5,5,.01],cameraRush:[50,1000,10],planeRush:[80,600,10],
  side:[25,100,1], lead:[-30,40,1], sideHeight:[8,60,1], rear:[35,200,1], endGap:[16,70,1], clearance:[4,30,1],
- whipExtra:[0,2,.05], hug:[8,16,.1], bankRamp:[.2,2,.05], pushStart:[.5,.8,.05], pushGap:[14,19,.1], exhaustHeight:[0,6,0.1], bankLead:[0,2,0.1], exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.1,3,0.05], soft:[0,1.5,0.05], duration:[6,30,0.05], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
+ settlePan:[0,6,.1], settleZoom:[0,3,.1], settleAim:[-.2,.2,.005], whipExtra:[0,2,.05], hug:[8,16,.1], bankRamp:[.2,2,.05], pushStart:[.5,.8,.05], pushGap:[14,19,.1], exhaustHeight:[0,6,0.1], bankLead:[0,2,0.1], exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.1,3,0.05], soft:[0,1.5,0.05], duration:[6,30,0.05], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
 };
 export const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -68,9 +68,12 @@ function desired(u,s,cuts,rush){
    // Match the terminal rear offset while retaining tight wing clearance mid-pass.
    x=mix(x,-s.nose*Math.sin(angle),smooth(clamp((raw-.65)/.35)));
   }
+  const settling=smooth(clamp((u-cuts[2].start)/(cuts[2].end-cuts[2].start)));
+  x+=s.settlePan*settling;z-=s.settleZoom*settling;
   const pushAt=cuts[3].start+s.pushStart*(cuts[3].end-cuts[3].start);
   const push=smooth(clamp((u-pushAt)/(1-pushAt)));
-  const factor=mix(1,Math.min(s.pushGap,s.nose)/s.nose,push);x*=factor;z*=factor;
+  const rearRadius=Math.hypot(x,z);
+  const factor=mix(1,Math.min(s.pushGap,rearRadius)/rearRadius,push);x*=factor;z*=factor;
   height=s.flightHeight+s.clearance;
  }
  return {x,z,height,i};
@@ -88,8 +91,10 @@ export function pose(progress,s){
   z:aircraft.z+sn*relative.x+c*relative.z};
  const distance=Math.hypot(camera.x-aircraft.x,camera.y-aircraft.y,camera.z-aircraft.z);
  const focus=smooth(orbitProgress),tail=9.5*focus;
+ const settle=smooth(clamp((u-cuts[2].start)/(cuts[2].end-cuts[2].start)));
+ const rearAim=mix(s.exhaustAim,s.settleAim,settle);
  const aim={x:aircraft.x-Math.sin(f.heading)*Math.cos(f.pitch)*tail,
-  y:aircraft.y-Math.sin(f.pitch)*tail+distance*Math.tan(s.fov*Math.PI/360)*mix(s.framing,s.exhaustAim,focus),
+  y:aircraft.y-Math.sin(f.pitch)*tail+distance*Math.tan(s.fov*Math.PI/360)*mix(s.framing,rearAim,focus),
   z:aircraft.z+Math.cos(f.heading)*Math.cos(f.pitch)*tail};
  const fade=s.fade?smooth((u-s.fadeStart/100)/Math.max(.001,1-s.fadeStart/100)):0;
  return {aircraft,camera,aim,pitch:f.pitch,heading:f.heading,bank:f.bank,beat:relative.i,time:u*s.duration,fade};
