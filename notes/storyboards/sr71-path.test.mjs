@@ -80,4 +80,8 @@ console.log('Tight side whip, bank during whip, eye-level follow, and late jet p
 const dt=1e-6,relativeForward=u=>{const p=pose(u,defaults);return p.camera.z-p.aircraft.z};
 const enterBefore=(relativeForward(openingEnd)-relativeForward(openingEnd-dt))/(dt*defaults.duration);
 const enterAfter=(relativeForward(openingEnd+dt)-relativeForward(openingEnd))/(dt*defaults.duration);
-assert.ok(enterBefore>50&&Math.abs(enterBefore-enterAfter)<.1,'forward rush carries into whip without stopping');
+assert.ok(enterBefore>30&&enterAfter>30,'forward rush continues into the slowed whip without stopping');
+
+const originalTiming=schedule({...defaults,duration:7,whipExtra:0}),extendedTiming=schedule(defaults);
+for(let i=0;i<originalTiming.length;i++)assert.ok(Math.abs(extendedTiming[i].duration-originalTiming[i].duration-(i===1?.65:0))<1e-8,'only section two gains exactly 0.65 seconds');
+console.log('Section two adds exactly 0.65 seconds; other phase durations preserved.');

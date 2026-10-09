@@ -1,11 +1,11 @@
 // Pure camera blocking model. World +Y is up; the aircraft flies toward -Z.
 export const beats = ['Closing approach','Side-hugging whip','Exhaust settle','Climb & exhaust follow','Exhaust ending'];
-export const defaults = {progress:0,height:42,hold:0.45,soft:0.6,duration:7,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
+export const defaults = {progress:0,height:42,hold:0.45,soft:0.6,duration:7.65,whipExtra:0.65,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
 export const ranges = {
  height:[8,100,1], fov:[20,85,1], framing:[-0.6,0.7,0.01], distant:[300,2600,10], nose:[16,160,1],
  approachDuration:[.5,5,.01],cameraRush:[50,1000,10],planeRush:[80,600,10],
  side:[25,100,1], lead:[-30,40,1], sideHeight:[8,60,1], rear:[35,200,1], endGap:[16,70,1], clearance:[4,30,1],
- hug:[8,16,.1], bankRamp:[.2,2,.05], pushStart:[.5,.8,.05], pushGap:[14,19,.1], exhaustHeight:[0,6,0.1], bankLead:[0,2,0.1], exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.1,3,0.05], soft:[0,1.5,0.05], duration:[6,30,0.25], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
+ whipExtra:[0,2,.05], hug:[8,16,.1], bankRamp:[.2,2,.05], pushStart:[.5,.8,.05], pushGap:[14,19,.1], exhaustHeight:[0,6,0.1], bankLead:[0,2,0.1], exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.1,3,0.05], soft:[0,1.5,0.05], duration:[6,30,0.05], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
 };
 export const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -17,9 +17,9 @@ export function cleanSettings(input){
 }
 export function schedule(s){
  // Preserve at least 1.5s for the other three phases, even at extreme controls.
- const hold=Math.min(s.hold,s.duration-2), approach=Math.min(s.approachDuration,s.duration-hold-1.5);
+ const hold=Math.min(s.hold,s.duration-2), extra=Math.min(s.whipExtra,s.duration-hold-2), approach=Math.min(s.approachDuration,s.duration-hold-extra-1.5);
  const weights=[0,1.5,0,1.8,1.2], sum=4.5;let time=0;
- return weights.map((w,i)=>{const duration=i===0?approach:i===2?hold:(s.duration-hold-approach)*w/sum;const start=time/s.duration;time+=duration;return {start,end:time/s.duration,duration}});
+ return weights.map((w,i)=>{const duration=i===0?approach:i===2?hold:(s.duration-hold-approach-extra)*w/sum+(i===1?extra:0);const start=time/s.duration;time+=duration;return {start,end:time/s.duration,duration}});
 }
 export function approachMotion(s){
  const seconds=schedule(s)[0].duration;
@@ -64,7 +64,7 @@ function desired(u,s,cuts,rush){
   x=-(i===1?Math.min(s.hug,s.nose):s.nose)*Math.sin(angle);z=-s.nose*Math.cos(angle);
   if(i===1){
    const entrySpeed=Math.min(80,(s.distant-s.nose)/cuts[0].duration);
-   z+=entrySpeed*b.duration*raw*(1-raw)**6;
+   z+=entrySpeed*(b.duration-Math.min(s.whipExtra,s.duration-s.hold-2))*raw*(1-raw)**6;
    // Match the terminal rear offset while retaining tight wing clearance mid-pass.
    x=mix(x,-s.nose*Math.sin(angle),smooth(clamp((raw-.65)/.35)));
   }

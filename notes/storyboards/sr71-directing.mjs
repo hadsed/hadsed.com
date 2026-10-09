@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=7';
+import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=8';
 const $=id=>document.getElementById(id);
 const descriptions=[
  'One continuous closing rush from the distant speck to the close nose frame. The camera descends smoothly throughout the approach, then goes straight into the orbit.',
@@ -12,17 +12,17 @@ const descriptions=[
 const suppliedPreset=await (await fetch('./presets/had-close-exhaust-settings.json')).json();
 let settings={...defaults},progress=0,playing=false,sceneView=false,lastTime=0,captures=[];
 try{
- const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v7'));
- const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v6'));
+ const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v8'));
+ const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v7'));
  if(current){settings=cleanSettings(current);progress=settings.progress/100}
  else {
   const source=previous||{...suppliedPreset.settings,approachDuration:defaults.approachDuration,exhaustHeight:defaults.exhaustHeight,fade:0};
-  settings=cleanSettings({...source,bank:defaults.bank,bankRamp:defaults.bankRamp,hug:defaults.hug,pushStart:defaults.pushStart,pushGap:defaults.pushGap});progress=0;
+  settings=cleanSettings({...source,duration:source.duration+defaults.whipExtra,whipExtra:defaults.whipExtra});progress=0;
  }
 }catch{}
 const phaseFields=[
  ['distant','approachDuration','cameraRush','planeRush','nose','height','clearance','framing','fov','ease'],
- ['nose','orbitAngle','clearance','exhaustHeight','hug','bankRamp','bank','framing','exhaustAim','fov','ease'],
+ ['whipExtra','nose','orbitAngle','clearance','exhaustHeight','hug','bankRamp','bank','framing','exhaustAim','fov','ease'],
  ['hold','bankRamp','bank','turn','nose','orbitAngle','exhaustHeight','exhaustAim','fov'],
  ['climb','pushStart','pushGap','bankRamp','bank','turn','speed','nose','exhaustHeight','exhaustAim','fov'],
  ['fade','fadeStart','pushStart','pushGap','nose','exhaustHeight','exhaustAim','fov']
@@ -38,6 +38,7 @@ const fieldInfo={
  nose:['Closing / rear gap','Front endpoint and rear acquisition gap; side-hug distance has its own control.'],
  clearance:['Approach clearance','Height above aircraft until the late orbit descends to nozzle level.'],
  exhaustHeight:['Height above exhausts','Late orbit and ending camera height above the nozzle midpoint; 0 is eye level.'],
+ whipExtra:['Extra whip time','Added seconds in section two; changes total clip length while preserving other phase durations.'],
  hug:['Wing-side distance','Tight lateral clearance during the whip; independent of the nose gap.'],
  bankRamp:['Bank buildup time','Seconds to reach the bank angle, starting exactly at the end of closing approach.'],
  pushStart:['Jet push starts in climb','Fraction of section four before the closer push begins.'],
@@ -65,7 +66,7 @@ for(const [key,[label,hint]] of Object.entries(fieldInfo)){
   const number=document.createElement('input');number.type='number';number.min=min;number.max=max;number.step=step;number.value=settings[key];number.setAttribute('aria-label',label+' value');top.append(number);
   const slider=document.createElement('input');slider.type='range';slider.id=key;slider.min=min;slider.max=max;slider.step=step;slider.value=settings[key];slider.setAttribute('aria-label',label);
   const small=document.createElement('small');small.textContent=hint;node.append(top,slider,small);inputs.set(key,[slider,number]);
-  for(const input of [slider,number])input.oninput=()=>{if(input.value===''||!Number.isFinite(+input.value))return;settings[key]=clamp(+input.value,min,max);for(const other of [slider,number])if(other!==input)other.value=settings[key];configurationChanged()};
+  for(const input of [slider,number])input.oninput=()=>{if(input.value===''||!Number.isFinite(+input.value))return;if(key==='whipExtra'){settings.duration=clamp(settings.duration+(+input.value-settings.whipExtra),...ranges.duration.slice(0,2));for(const field of inputs.get('duration')||[])field.value=settings.duration}settings[key]=clamp(+input.value,min,max);for(const other of [slider,number])if(other!==input)other.value=settings[key];configurationChanged()};
  }
  controlNodes.set(key,node);
  if(['duration','flightHeight','grid','clay'].includes(key))$('global-controls').append(node);
@@ -90,7 +91,7 @@ function annotateTimeline(cuts){
  });
 }
 function syncControls(){for(const [key,list] of inputs)for(const input of list){if(input.type==='checkbox')input.checked=!!settings[key];else input.value=settings[key]}}
-function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v7',JSON.stringify(settings))}catch{}}
+function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v8',JSON.stringify(settings))}catch{}}
 function configurationChanged(){persist();annotateTimeline(schedule(settings));rebuildPaths();render()}
 function setProgress(value){progress=clamp(value);$('progress').value=(progress*100).toFixed(1);persist();render()}
 function stop(){playing=false;$('play').textContent='Play'}
@@ -176,7 +177,7 @@ $('play').onclick=()=>{playing=!playing;if(playing&&progress>=1)setProgress(0);l
 $('start').onclick=()=>{stop();setProgress(0)};
 beats.forEach((label,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${i+1} ${label}</span><small></small>`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
 function animate(t){requestAnimationFrame(animate);if(playing){if(lastTime)setProgress(progress+Math.min(t-lastTime,100)/(settings.duration*1000));lastTime=t;if(progress>=1)stop()}else lastTime=0;if(sceneView){orbit.update();render()}}
-function exportObject(){return {kind:'sr71-3d-camera-blocking',version:7,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
+function exportObject(){return {kind:'sr71-3d-camera-blocking',version:8,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
 function download(data,name,type){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('save').onclick=()=>download(JSON.stringify(exportObject(),null,2)+'\n','sr71-camera-settings.json','application/json');
 $('reset').onclick=()=>{stop();settings={...defaults};syncControls();progress=0;configurationChanged();setProgress(0);$('status').textContent='Restored your imported preset and initial 3D defaults.'};
