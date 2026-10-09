@@ -1,33 +1,29 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=4.2';
+import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=5.1';
 const $=id=>document.getElementById(id);
 const descriptions=[
  'Barely visible in the distance. Camera and aircraft close fast, carrying motion through the nose reveal.',
  'Stay head-on until the aircraft fills the close frame. No pause at the approach boundary.',
- 'Keep the close reveal distance and orbit straight around to the exhausts. No side hold, pullback, or rear catch-up.',
- 'Almost directly behind: both exhausts face the camera. Keep this close framing before departure.',
- 'The aircraft climbs and banks to its own right. Camera follows at the same close radius while the flight path curves.',
- 'Close exhaust framing continues into the palette-matched light transition.'
+ 'Keep the saved close radius and angle. Lower toward exhaust eye level late in the orbit; the right bank leads the climb.',
+ 'Bank first while altitude stays level. Both exhausts remain close, with the horizon behind them.',
+ 'Climb after the bank has established. Camera follows nozzle height, keeping a near-level gaze and the background horizon.',
+ 'Stay close at exhaust eye level. Preserve both nozzles and the background; the full-screen wash is disabled.'
 ];
+const suppliedPreset=await (await fetch('./presets/had-close-exhaust-settings.json')).json();
 let settings={...defaults},progress=0,playing=false,sceneView=false,lastTime=0,captures=[];
 try{
- const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v4'));
- const v3=JSON.parse(localStorage.getItem('sr71-directing-3d-v3'));
- const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v2'));
- const original=JSON.parse(localStorage.getItem('sr71-directing-3d-v1'));
+ const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v5'));
  if(current){settings=cleanSettings(current);progress=settings.progress/100}
- else if(v3){settings=cleanSettings({...v3,nose:defaults.nose,hold:defaults.hold,duration:defaults.duration,climb:defaults.climb});progress=0}
- else if(previous){const hold=Math.max(.5,previous.hold/2);settings=cleanSettings({...previous,hold,duration:previous.duration-previous.hold+hold,nose:defaults.nose,lead:0});progress=0}
- else if(original){settings=cleanSettings({...original,distant:defaults.distant,duration:defaults.duration,hold:defaults.hold,nose:defaults.nose,lead:0});progress=0}
+ else {settings=cleanSettings({...suppliedPreset.settings,exhaustHeight:defaults.exhaustHeight,bankLead:defaults.bankLead,fade:0});progress=settings.progress/100}
 }catch{}
 const phaseFields=[
  ['distant','approachDuration','cameraRush','planeRush','height','framing','fov','ease'],
  ['nose','height','clearance','framing','fov'],
- ['nose','orbitAngle','clearance','framing','exhaustAim','fov','ease'],
- ['hold','nose','orbitAngle','clearance','exhaustAim','fov'],
- ['climb','bank','turn','speed','nose','clearance','exhaustAim','fov'],
- ['fade','fadeStart','nose','exhaustAim','fov']
+ ['nose','orbitAngle','clearance','exhaustHeight','bankLead','bank','framing','exhaustAim','fov','ease'],
+ ['hold','bankLead','bank','turn','nose','orbitAngle','exhaustHeight','exhaustAim','fov'],
+ ['climb','bankLead','bank','turn','speed','nose','exhaustHeight','exhaustAim','fov'],
+ ['fade','fadeStart','nose','exhaustHeight','exhaustAim','fov']
 ];
 const fieldInfo={
  distant:['Starting distance','Almost invisible at 1,800 units; increase for a smaller speck.'],
@@ -38,7 +34,9 @@ const fieldInfo={
  fov:['Lens / field of view','Degrees; lower values give a longer lens.'],
  framing:['Vertical aim bias','Positive places the aircraft lower in frame.'],
  nose:['Close orbit radius','Front reveal gap and fixed horizontal orbit radius. No pullback.'],
- clearance:['Minimum height above plane','Keeps the camera above the aircraft.'],
+ clearance:['Approach clearance','Height above aircraft until the late orbit descends to nozzle level.'],
+ exhaustHeight:['Height above exhausts','Late orbit and ending camera height above the nozzle midpoint; 0 is eye level.'],
+ bankLead:['Bank lead before climb','Seconds the right bank starts before upward motion.'],
  flightHeight:['Low flight altitude','Relative units above the water.'],
  speed:['Tracking flight speed','Nose-forward speed after the close approach and turn.'],
  climb:['Climb gain','Altitude gained during the banking departure.'],
@@ -47,10 +45,10 @@ const fieldInfo={
  exhaustAim:['Exhaust aim bias','Zero centers the paired nozzles; positive moves them lower in frame.'],
  orbitAngle:['Exhaust orbit angle','180° is directly behind; 175° shows both exhausts with a slight offset.'],
  duration:['Clip duration','Seconds including the new approach.'],
- hold:['Exhaust framing hold','Brief pause after the close orbit, before banking upward.'],
+ hold:['Bank setup duration','Level-altitude framing after the orbit, before the climb.'],
  ease:['Motion easing','Turn and later moves: smooth starts/stops. Front phases match velocity.'],
  grid:['Water grid','Depth and speed cues.'],clay:['Neutral clay view','Geometry without twilight styling.'],
- fade:['Light transition','Palette overlay; not a physical exhaust simulation.'],fadeStart:['Light begins at','Percentage of the full clip.']
+ fade:['Optional light wash','Disabled for this shot so the exhausts and horizon stay visible.'],fadeStart:['Light begins at','Percentage of the full clip.']
 };
 const inputs=new Map(),controlNodes=new Map();let activePhase=-1;
 for(const [key,[label,hint]] of Object.entries(fieldInfo)){
@@ -87,7 +85,7 @@ function annotateTimeline(cuts){
  });
 }
 function syncControls(){for(const [key,list] of inputs)for(const input of list){if(input.type==='checkbox')input.checked=!!settings[key];else input.value=settings[key]}}
-function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v4',JSON.stringify(settings))}catch{}}
+function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v5',JSON.stringify(settings))}catch{}}
 function configurationChanged(){persist();annotateTimeline(schedule(settings));rebuildPaths();render()}
 function setProgress(value){progress=clamp(value);$('progress').value=(progress*100).toFixed(1);persist();render()}
 function stop(){playing=false;$('play').textContent='Play'}
@@ -142,7 +140,7 @@ function rebuildPaths(){
 }
 let overviewInitialized=false;
 function updateScene(){
- const p=pose(progress,settings);phaseControls(p.beat,schedule(settings));$('phase-playhead').style.left=`${progress*100}%`;plane.position.set(p.aircraft.x,p.aircraft.y,p.aircraft.z);plane.rotation.set(p.pitch,-p.heading,-p.bank,'YXZ');
+ const p=pose(progress,settings),cuts=schedule(settings);phaseControls(p.beat,cuts);$('phase-playhead').style.left=`${progress*100}%`;plane.position.set(p.aircraft.x,p.aircraft.y,p.aircraft.z);plane.rotation.set(p.pitch,-p.heading,-p.bank,'YXZ');
  shotCamera.position.set(p.camera.x,p.camera.y,p.camera.z);shotCamera.fov=settings.fov;shotCamera.lookAt(p.aim.x,p.aim.y,p.aim.z);shotCamera.updateProjectionMatrix();shotCamera.updateMatrixWorld();
  cameraMarker.position.copy(shotCamera.position);cameraMarker.quaternion.copy(shotCamera.quaternion);
  aimLine.geometry.dispose();aimLine.geometry=new THREE.BufferGeometry().setFromPoints([shotCamera.position,new THREE.Vector3(p.aircraft.x,p.aircraft.y,p.aircraft.z)]);aimLine.computeLineDistances();frustumCamera.position.copy(shotCamera.position);frustumCamera.quaternion.copy(shotCamera.quaternion);frustumCamera.fov=shotCamera.fov;frustumCamera.aspect=shotCamera.aspect;frustumCamera.updateProjectionMatrix();frustumCamera.updateMatrixWorld();cameraHelper.update();
@@ -154,7 +152,7 @@ function updateScene(){
  $('light').style.opacity=sceneView?'0':p.fade;
  $('time').textContent=`${p.time.toFixed(2)} / ${settings.duration.toFixed(2)}s`;
  $('beat-title').textContent=`${p.beat+1} · ${beats[p.beat]}`;$('beat-note').textContent=descriptions[p.beat];
- $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Right bank ${(p.bank*180/Math.PI).toFixed(1)}° · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%` + (p.beat===0 ? ` · Rush ${approachMotion(settings).limited?'limited to keep a safe gap':'active'} · ends at ${approachMotion(settings).endGap.toFixed(0)} units` : '');
+ $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Right bank ${(p.bank*180/Math.PI).toFixed(1)}° · Exhaust eye height ${settings.exhaustHeight.toFixed(1)} · Bank starts ${Math.max(cuts[2].start*settings.duration,cuts[4].start*settings.duration-settings.bankLead).toFixed(2)}s / climb ${ (cuts[4].start*settings.duration).toFixed(2)}s · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%` + (p.beat===0 ? ` · Rush ${approachMotion(settings).limited?'limited to keep a safe gap':'active'} · ends at ${approachMotion(settings).endGap.toFixed(0)} units` : '');
  [...$('beats').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===p.beat));
  return p;
 }
@@ -173,7 +171,7 @@ $('play').onclick=()=>{playing=!playing;if(playing&&progress>=1)setProgress(0);l
 $('start').onclick=()=>{stop();setProgress(0)};
 beats.forEach((label,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${i+1} ${label}</span><small></small>`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
 function animate(t){requestAnimationFrame(animate);if(playing){if(lastTime)setProgress(progress+Math.min(t-lastTime,100)/(settings.duration*1000));lastTime=t;if(progress>=1)stop()}else lastTime=0;if(sceneView){orbit.update();render()}}
-function exportObject(){return {kind:'sr71-3d-camera-blocking',version:4,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
+function exportObject(){return {kind:'sr71-3d-camera-blocking',version:5,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
 function download(data,name,type){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('save').onclick=()=>download(JSON.stringify(exportObject(),null,2)+'\n','sr71-camera-settings.json','application/json');
 $('reset').onclick=()=>{stop();settings={...defaults};syncControls();progress=0;configurationChanged();setProgress(0);$('status').textContent='Restored your imported preset and initial 3D defaults.'};

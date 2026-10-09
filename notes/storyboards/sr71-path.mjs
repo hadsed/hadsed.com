@@ -1,11 +1,11 @@
 // Pure camera blocking model. World +Y is up; the aircraft flies toward -Z.
-export const beats = ['Closing approach','Nose reveal','Close exhaust orbit','Exhaust framing','Bank into climb','Light transition'];
-export const defaults = {progress:0,height:28,hold:0.45,soft:0.6,duration:7,approachDuration:2,cameraRush:500,planeRush:280,fov:42,framing:0.48,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:7,flightHeight:4,speed:65,climb:35,exhaustAim:0,orbitAngle:175,bank:40,turn:35,ease:1,fadeStart:91,fade:1,grid:1,clay:0};
+export const beats = ['Closing approach','Nose reveal','Close exhaust orbit','Bank before climb','Climb & exhaust follow','Exhaust ending'];
+export const defaults = {progress:0,height:42,hold:0.45,soft:0.6,duration:7,approachDuration:2,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:40,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
 export const ranges = {
  height:[8,100,1], fov:[20,85,1], framing:[-0.6,0.7,0.01], distant:[300,2600,10], nose:[16,160,1],
  approachDuration:[.5,5,.1],cameraRush:[50,1000,10],planeRush:[80,600,10],
  side:[25,100,1], lead:[-30,40,1], sideHeight:[8,60,1], rear:[35,200,1], endGap:[16,70,1], clearance:[4,30,1],
- exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.1,3,0.05], soft:[0,1.5,0.05], duration:[6,30,0.25], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
+ exhaustHeight:[0,6,0.1], bankLead:[0,2,0.1], exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.1,3,0.05], soft:[0,1.5,0.05], duration:[6,30,0.25], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
 };
 export const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -35,10 +35,12 @@ function flight(u,s,cuts,rush){
  const travel=rush.planeSpeed*opening+s.speed*after+(rush.planeSpeed-s.speed)*(v-v*v/(2*blend));
  const start=cuts[4].start, t=clamp((u-start)/(1-start)), seconds=(1-start)*s.duration;
  // Integrate the turning heading, so the bank turns the flight path rather than sliding the model sideways.
- const heading=s.turn*Math.PI/180*smooth(t),bank=s.bank*Math.PI/180*smooth(clamp(t*2));
+ const bankStart=Math.max(cuts[2].start,start-s.bankLead/s.duration),bankSeconds=(1-bankStart)*s.duration;
+ const bankT=clamp((u-bankStart)/(1-bankStart));
+ const heading=s.turn*Math.PI/180*smooth(bankT),bank=s.bank*Math.PI/180*smooth(clamp(bankT*2));
  let dx=0,dz=0;
- const count=Math.ceil(t*240),dt=count?t*seconds/count:0;
- for(let n=0;n<count;n++){const h=s.turn*Math.PI/180*smooth((n+.5)*t/count);dx+=s.speed*Math.sin(h)*dt;dz+=s.speed*(1-Math.cos(h))*dt}
+ const count=Math.ceil(bankT*240),dt=count?bankT*bankSeconds/count:0;
+ for(let n=0;n<count;n++){const h=s.turn*Math.PI/180*smooth((n+.5)*bankT/count);dx+=s.speed*Math.sin(h)*dt;dz+=s.speed*(1-Math.cos(h))*dt}
  return {aircraft:{x:dx,y:s.flightHeight+s.climb*t*t,z:-travel+dz},heading,bank,pitch:Math.atan2(2*s.climb*t/seconds,s.speed)};
 }
 // Cubic Hermite interpolation matches position AND velocity at phase boundaries.
@@ -67,9 +69,14 @@ export function pose(progress,s){
  const u=clamp(progress),cuts=schedule(s),rush=approachMotion(s),relative=desired(u,s,cuts,rush);
  const f=flight(u,s,cuts,rush),aircraft=f.aircraft;
  const c=Math.cos(f.heading),sn=Math.sin(f.heading);
- const camera={x:aircraft.x+c*relative.x-sn*relative.z,y:Math.max(aircraft.y+s.clearance,relative.height),z:aircraft.z+sn*relative.x+c*relative.z};
- const distance=Math.hypot(camera.x-aircraft.x,camera.y-aircraft.y,camera.z-aircraft.z);
  const orbitProgress=clamp((u-cuts[2].start)/(cuts[2].end-cuts[2].start));
+ // Lower only late in the orbit, then track nozzle height rather than fuselage height.
+ const eyeBlend=smooth(clamp((orbitProgress-.65)/.35));
+ const nozzleY=aircraft.y-9.5*Math.sin(f.pitch);
+ const camera={x:aircraft.x+c*relative.x-sn*relative.z,
+  y:Math.max(.2,mix(Math.max(aircraft.y+s.clearance,relative.height),nozzleY+s.exhaustHeight,eyeBlend)),
+  z:aircraft.z+sn*relative.x+c*relative.z};
+ const distance=Math.hypot(camera.x-aircraft.x,camera.y-aircraft.y,camera.z-aircraft.z);
  const focus=smooth(orbitProgress),tail=9.5*focus;
  const aim={x:aircraft.x-Math.sin(f.heading)*Math.cos(f.pitch)*tail,
   y:aircraft.y-Math.sin(f.pitch)*tail+distance*Math.tan(s.fov*Math.PI/360)*mix(s.framing,s.exhaustAim,focus),

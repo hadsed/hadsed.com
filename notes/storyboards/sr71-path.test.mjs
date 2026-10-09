@@ -6,23 +6,25 @@ for (const s of [defaults,
   {...defaults,duration:6,hold:3,bank:65,turn:70},
   {...defaults,duration:30,speed:150,height:8}]) {
   const cuts=schedule(s);
+  const bankStart=Math.max(cuts[2].start,cuts[4].start-s.bankLead/s.duration);
   assert.ok(Math.abs(cuts.at(-1).end-1)<1e-9, 'clip ends at 100%');
   assert.ok(Math.abs(cuts[3].duration-s.hold)<1e-9, 'side hold lasts requested seconds');
   let previous=pose(0,s);
   for (let i=0;i<=1000;i++) {
     const p=pose(i/1000,s);
     for (const v of [p.aircraft,p.camera,p.aim]) assert.ok(Object.values(v).every(Number.isFinite));
-    if(i/1000<=cuts[4].start)assert.equal(p.aircraft.x,0,'straight flight before banking departure');
+    if(i/1000<=bankStart)assert.equal(p.aircraft.x,0,'straight flight before banking departure');
     assert.ok(p.aircraft.z<=previous.aircraft.z, 'aircraft always moves nose-forward');
     assert.ok(p.aircraft.y>=previous.aircraft.y, 'climb does not reverse');
-    assert.ok(p.camera.y>=p.aircraft.y+s.clearance-1e-9, 'camera stays above flight path');
+    if(i/1000<cuts[2].start)assert.ok(p.camera.y>=p.aircraft.y+s.clearance-1e-9,'front camera stays above aircraft');
+    assert.ok(p.camera.y>=.2,'camera stays above water');
     previous=p;
   }
   const forward=[0,.2,.6,.9,1].map(u=>pose(u,s));
   const backward=[1,.9,.6,.2,0].map(u=>pose(u,s)).reverse();
   assert.deepEqual(forward,backward, 'scrubbing backward reproduces the same camera poses');
 }
-assert.equal(cleanSettings({height:Infinity}).height,28);
+assert.equal(cleanSettings({height:Infinity}).height,defaults.height);
 assert.equal(cleanSettings({height:28,hold:2.5,soft:.6,duration:8}).height,28);
 assert.equal(cleanSettings({settings:{height:65,progress:22}}).height,65);
 console.log('Camera path invariants passed.');
@@ -53,11 +55,16 @@ for(let n=0;n<=100;n++){
  const u=revisedCuts[2].start+(1-revisedCuts[2].start)*n/100,p=pose(u,defaults);
  const radius=Math.hypot(p.camera.x-p.aircraft.x,p.camera.z-p.aircraft.z);
  assert.ok(Math.abs(radius-defaults.nose)<1e-8,'close orbit and departure never pull back');
- assert.ok(Math.abs(p.camera.y-p.aircraft.y-defaults.clearance)<1e-8,'camera follows climb at fixed clearance');
+ if(u>=revisedCuts[2].end){const nozzleY=p.aircraft.y-9.5*Math.sin(p.pitch);assert.ok(Math.abs(p.camera.y-nozzleY-defaults.exhaustHeight)<1e-8,'camera follows nozzle eye height during climb');}
 }
 const exhaust=pose(revisedCuts[3].start,defaults);
 assert.ok(exhaust.camera.z>exhaust.aircraft.z,'camera acquired rear');
-assert.ok(Math.abs(exhaust.camera.x-exhaust.aircraft.x)<2,'exhausts almost square to camera');
+const rearAlignment=Math.atan2(exhaust.camera.x-exhaust.aircraft.x,exhaust.camera.z-exhaust.aircraft.z)+exhaust.heading;
+assert.ok(Math.abs(rearAlignment-(defaults.orbitAngle*Math.PI/180-Math.PI))<1e-8,'saved rear angle retained relative to turning aircraft');
+const beforeClimb=pose(revisedCuts[4].start-.01,defaults);
+assert.equal(beforeClimb.aircraft.y,defaults.flightHeight,'aircraft stays level while bank establishes');
+assert.ok(beforeClimb.bank>.1,'visible bank established before climb');
+assert.equal(pose(1,defaults).fade,0,'ending preserves horizon and exhausts without wash');
 const end=pose(1,defaults);
 assert.ok(end.aircraft.x>0,'departure curves toward aircraft right');
 assert.ok(end.bank>0&&end.heading>0&&end.pitch>0,'departure banks, turns, and climbs together');
