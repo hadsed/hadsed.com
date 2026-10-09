@@ -1,11 +1,11 @@
 // Pure camera blocking model. World +Y is up; the aircraft flies toward -Z.
-export const beats = ['Closing approach','Nose reveal','Over to side','Side-track hold','Pitch into climb','Arc behind','Rear catch-up','Light transition'];
-export const defaults = {progress:0,height:28,hold:1.25,soft:0.6,duration:8.75,approachDuration:2,cameraRush:500,planeRush:280,fov:42,framing:0.48,distant:1800,nose:28,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:7,flightHeight:4,speed:65,climb:90,ease:1,fadeStart:91,fade:1,grid:1,clay:0};
+export const beats = ['Closing approach','Nose reveal','Close exhaust orbit','Exhaust framing','Bank into climb','Light transition'];
+export const defaults = {progress:0,height:28,hold:0.45,soft:0.6,duration:7,approachDuration:2,cameraRush:500,planeRush:280,fov:42,framing:0.48,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:7,flightHeight:4,speed:65,climb:35,exhaustAim:0,orbitAngle:175,bank:40,turn:35,ease:1,fadeStart:91,fade:1,grid:1,clay:0};
 export const ranges = {
  height:[8,100,1], fov:[20,85,1], framing:[-0.6,0.7,0.01], distant:[300,2600,10], nose:[16,160,1],
  approachDuration:[.5,5,.1],cameraRush:[50,1000,10],planeRush:[80,600,10],
  side:[25,100,1], lead:[-30,40,1], sideHeight:[8,60,1], rear:[35,200,1], endGap:[16,70,1], clearance:[4,30,1],
- flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.5,6,0.05], soft:[0,1.5,0.05], duration:[8,30,0.25], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
+ exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1], hold:[0.1,3,0.05], soft:[0,1.5,0.05], duration:[6,30,0.25], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
 };
 export const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -16,9 +16,9 @@ export function cleanSettings(input){
  return result;
 }
 export function schedule(s){
- // Preserve at least 1.5s for the other six phases, even at extreme controls.
+ // Preserve at least 1.5s for the other four phases, even at extreme controls.
  const hold=Math.min(s.hold,s.duration-2), approach=Math.min(s.approachDuration,s.duration-hold-1.5);
- const weights=[0,2.75,.75,0,1.5,1.4,1.4,1.2], sum=9;let time=0;
+ const weights=[0,2.75,1.5,0,1.8,1.2], sum=7.25;let time=0;
  return weights.map((w,i)=>{const duration=i===0?approach:i===3?hold:(s.duration-hold-approach)*w/sum;const start=time/s.duration;time+=duration;return {start,end:time/s.duration,duration}});
 }
 export function approachMotion(s){
@@ -33,8 +33,13 @@ function flight(u,s,cuts,rush){
  const fastUntil=cuts[1].end*s.duration;
  const elapsed=u*s.duration,opening=Math.min(elapsed,fastUntil),after=Math.max(0,elapsed-fastUntil),blend=cuts[2].duration,v=Math.min(after,blend);
  const travel=rush.planeSpeed*opening+s.speed*after+(rush.planeSpeed-s.speed)*(v-v*v/(2*blend));
- const t=clamp((u-cuts[4].start)/(1-cuts[4].start));
- return {x:0,y:s.flightHeight+s.climb*t*t,z:-travel};
+ const start=cuts[4].start, t=clamp((u-start)/(1-start)), seconds=(1-start)*s.duration;
+ // Integrate the turning heading, so the bank turns the flight path rather than sliding the model sideways.
+ const heading=s.turn*Math.PI/180*smooth(t),bank=s.bank*Math.PI/180*smooth(clamp(t*2));
+ let dx=0,dz=0;
+ const count=Math.ceil(t*240),dt=count?t*seconds/count:0;
+ for(let n=0;n<count;n++){const h=s.turn*Math.PI/180*smooth((n+.5)*t/count);dx+=s.speed*Math.sin(h)*dt;dz+=s.speed*(1-Math.cos(h))*dt}
+ return {aircraft:{x:dx,y:s.flightHeight+s.climb*t*t,z:-travel+dz},heading,bank,pitch:Math.atan2(2*s.climb*t/seconds,s.speed)};
 }
 // Cubic Hermite interpolation matches position AND velocity at phase boundaries.
 function hermite(a,b,velocityA,velocityB,seconds,t){
@@ -47,38 +52,28 @@ function revealRate(s,cuts,rush){
 function desired(u,s,cuts,rush){
  const i=Math.max(0,cuts.findIndex((b,index)=>u<b.end-1e-10 || index===cuts.length-1));const b=cuts[i];const raw=clamp((u-b.start)/(b.end-b.start));
  const q=mix(raw,smooth(raw),s.ease),rate=revealRate(s,cuts,rush);
- const x=[0,0,0,-s.side,-s.side,-s.side*0.75,0,0,0];
- const z=[-s.distant,-rush.endGap,-s.nose,-s.lead,-s.lead,s.rear,s.rear,s.endGap,s.endGap];
- const noseHeight=Math.max(s.flightHeight+s.clearance,s.flightHeight+(s.height-s.flightHeight)*s.nose/rush.endGap);
- const height=[s.height,s.height,noseHeight,s.sideHeight,s.sideHeight,s.sideHeight,s.clearance,s.clearance,s.clearance];
- let forward=mix(z[i],z[i+1],q);
- if(i===0)forward=hermite(z[0],z[1],rush.cameraSpeed+rush.planeSpeed,rate,b.duration,raw);
- if(i===1)forward=hermite(z[1],z[2],rate,rate,b.duration,raw);
- if(i===2){
-  const delta=z[3]-z[2];
-  const startVelocity=Math.sign(delta)*Math.min(rate,3*Math.abs(delta)/b.duration);
-  forward=hermite(z[2],z[3],startVelocity,0,b.duration,raw);
+ let x=0,z=0,height=s.height;
+ if(i===0)z=hermite(-s.distant,-rush.endGap,rush.cameraSpeed+rush.planeSpeed,rate,b.duration,raw);
+ if(i===1){z=hermite(-rush.endGap,-s.nose,rate,rate,b.duration,raw);height=s.flightHeight+(s.height-s.flightHeight)*(-z)/rush.endGap}
+ if(i>=2){
+  // One uninterrupted orbit at the close reveal radius: no side retreat or rear gap excursion.
+  const angle=s.orbitAngle*Math.PI/180*(i===2?q:1);
+  x=-s.nose*Math.sin(angle);z=-s.nose*Math.cos(angle);
+  height=s.flightHeight+s.clearance;
  }
- const cameraHeight=i===1?s.flightHeight+(s.height-s.flightHeight)*(-forward)/rush.endGap:mix(height[i],height[i+1],q);
- return {x:mix(x[i],x[i+1],q),z:forward,height:cameraHeight,i};
+ return {x,z,height,i};
 }
 export function pose(progress,s){
- const u=clamp(progress),cuts=schedule(s),rush=approachMotion(s),target=desired(u,s,cuts,rush);let relative=desired(0,s,cuts,rush);
- const samples=Math.ceil(u*360), dt=s.duration/360;
- for(let n=1;n<=samples;n++){
-  const at=Math.min(u,n/360),next=desired(at,s,cuts,rush);
-  const step=n===samples?(u-(n-1)/360)*s.duration:dt;
-  const alpha=at<=cuts[3].end||s.soft===0?1:1-Math.exp(-step/s.soft);
-  for(const key of ['x','z','height']) relative[key]=mix(relative[key],next[key],alpha);
- }
- const aircraft=flight(u,s,cuts,rush);
- const following=u>=cuts[5].start?smooth((u-cuts[5].start)/(cuts[5].end-cuts[5].start)):0;
- const camera={x:relative.x,y:Math.max(aircraft.y+s.clearance,mix(relative.height,aircraft.y+relative.height,following)),z:aircraft.z+relative.z};
- const t=clamp((u-cuts[4].start)/(1-cuts[4].start));
- const rise=2*s.climb*t/((1-cuts[4].start)*s.duration);
- const pitch=Math.atan2(rise,s.speed);
+ const u=clamp(progress),cuts=schedule(s),rush=approachMotion(s),relative=desired(u,s,cuts,rush);
+ const f=flight(u,s,cuts,rush),aircraft=f.aircraft;
+ const c=Math.cos(f.heading),sn=Math.sin(f.heading);
+ const camera={x:aircraft.x+c*relative.x-sn*relative.z,y:Math.max(aircraft.y+s.clearance,relative.height),z:aircraft.z+sn*relative.x+c*relative.z};
  const distance=Math.hypot(camera.x-aircraft.x,camera.y-aircraft.y,camera.z-aircraft.z);
- const aim={...aircraft,y:aircraft.y+distance*Math.tan(s.fov*Math.PI/360)*s.framing};
+ const orbitProgress=clamp((u-cuts[2].start)/(cuts[2].end-cuts[2].start));
+ const focus=smooth(orbitProgress),tail=9.5*focus;
+ const aim={x:aircraft.x-Math.sin(f.heading)*Math.cos(f.pitch)*tail,
+  y:aircraft.y-Math.sin(f.pitch)*tail+distance*Math.tan(s.fov*Math.PI/360)*mix(s.framing,s.exhaustAim,focus),
+  z:aircraft.z+Math.cos(f.heading)*Math.cos(f.pitch)*tail};
  const fade=s.fade?smooth((u-s.fadeStart/100)/Math.max(.001,1-s.fadeStart/100)):0;
- return {aircraft,camera,aim,pitch,beat:target.i,time:u*s.duration,fade};
+ return {aircraft,camera,aim,pitch:f.pitch,heading:f.heading,bank:f.bank,beat:relative.i,time:u*s.duration,fade};
 }

@@ -3,7 +3,7 @@ import {defaults,pose,schedule,cleanSettings,approachMotion} from './sr71-path.m
 
 for (const s of [defaults,
   {...defaults,soft:0,climb:180,clearance:30},
-  {...defaults,duration:8,hold:6,soft:1.5},
+  {...defaults,duration:6,hold:3,bank:65,turn:70},
   {...defaults,duration:30,speed:150,height:8}]) {
   const cuts=schedule(s);
   assert.ok(Math.abs(cuts.at(-1).end-1)<1e-9, 'clip ends at 100%');
@@ -12,7 +12,7 @@ for (const s of [defaults,
   for (let i=0;i<=1000;i++) {
     const p=pose(i/1000,s);
     for (const v of [p.aircraft,p.camera,p.aim]) assert.ok(Object.values(v).every(Number.isFinite));
-    assert.equal(p.aircraft.x,0, 'aircraft never flies sideways');
+    if(i/1000<=cuts[4].start)assert.equal(p.aircraft.x,0,'straight flight before banking departure');
     assert.ok(p.aircraft.z<=previous.aircraft.z, 'aircraft always moves nose-forward');
     assert.ok(p.aircraft.y>=previous.aircraft.y, 'climb does not reverse');
     assert.ok(p.camera.y>=p.aircraft.y+s.clearance-1e-9, 'camera stays above flight path');
@@ -49,11 +49,17 @@ const aircraftAfter=(pose(boundary+epsilon,defaults).aircraft.z-pose(boundary,de
 assert.ok(Math.abs(aircraftBefore-aircraftAfter)<1,'aircraft speed remains matched');
 const revealMid=pose((revisedCuts[1].start+revisedCuts[1].end)/2,defaults);
 assert.equal(revealMid.camera.x,0,'no turn until nose reveal ends');
-for(const fraction of [0,.25,.5,.9,1]){
- const p=pose(revisedCuts[3].start+fraction*(revisedCuts[3].end-revisedCuts[3].start),defaults);
- assert.ok(Math.abs(p.camera.z-p.aircraft.z)<1e-6,'side hold is exactly abeam');
- assert.ok(Math.abs(p.camera.x+defaults.side)<1e-6,'side hold has settled lateral offset');
+for(let n=0;n<=100;n++){
+ const u=revisedCuts[2].start+(1-revisedCuts[2].start)*n/100,p=pose(u,defaults);
+ const radius=Math.hypot(p.camera.x-p.aircraft.x,p.camera.z-p.aircraft.z);
+ assert.ok(Math.abs(radius-defaults.nose)<1e-8,'close orbit and departure never pull back');
+ assert.ok(Math.abs(p.camera.y-p.aircraft.y-defaults.clearance)<1e-8,'camera follows climb at fixed clearance');
 }
-assert.equal(defaults.hold,1.25,'default side hold is halved');
-assert.ok(Math.abs(revisedCuts[1].duration/revisedCuts[2].duration-2.75/.75)<1e-9,'half the former turn goes into reveal');
-console.log('Matched reveal velocity, delayed turn, and exact side profile passed.');
+const exhaust=pose(revisedCuts[3].start,defaults);
+assert.ok(exhaust.camera.z>exhaust.aircraft.z,'camera acquired rear');
+assert.ok(Math.abs(exhaust.camera.x-exhaust.aircraft.x)<2,'exhausts almost square to camera');
+const end=pose(1,defaults);
+assert.ok(end.aircraft.x>0,'departure curves toward aircraft right');
+assert.ok(end.bank>0&&end.heading>0&&end.pitch>0,'departure banks, turns, and climbs together');
+assert.equal(revisedCuts.length,6,'middle stages collapsed into close orbit and exhaust framing');
+console.log('Constant close radius, rear exhaust framing, and banking departure passed.');
