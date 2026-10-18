@@ -152,3 +152,14 @@ Add exactly 0.65 seconds to section two, from 0.94 to 1.59 seconds in the curren
 ## October 8 revision — moving exhaust settle
 
 Shorten section three by one third, from 0.45 to 0.30 seconds. Its camera now pushes forward 0.3 units and pans right 2.6 units in the aircraft's heading frame, centering the paired exhausts rather than holding still. The resulting offset carries into the climb and the later jet push. Total clip duration becomes 7.50 seconds; the other section durations stay unchanged. Vertical aim shifts smoothly to 0.025, retaining the 56-degree lens and fitting both banked nozzles in the close frame. Version 9 migrates once and exposes Settle push-in and Settle pan right controls. Checks verify both camera movements and the isolated timing reduction.
+
+
+## October 18 revision — one rear acquisition and rendering handoff
+
+The last 45% of section two now overlaps the push-in, right pan, eye-height descent and rear aim. The former section three is absorbed into the whip, eliminating its separate start/stop. The four sections are closing approach (0–3.73s), side-hugging whip (3.73–5.62s), climb and exhaust follow (5.62–6.75s), and exhaust ending (6.75–7.50s). The rear endpoint retains the saved pan, push and aim. Version 10 migrates version 9 settings by folding settle duration into extra whip time, preserving clip duration and climb start. The climb height now starts cubically so pitch and nozzle-height tracking begin without a velocity jump. Numerical integration of the heading uses a fixed sample count to avoid tiny discontinuities while scrubbing.
+
+Page theme choices are Light, Dark and System; System tracks appearance changes and the choice persists separately from shot settings. The theme changes the directing interface, not shot lighting.
+
+The Rendering tab prepares a visual brief and a motion package for the current shot at 24, 30 or 60 fps. It contains exact camera positions, look-at targets, vertical lens angle, aircraft transforms, phase timing and coordinate conventions. Output includes the precise final sample. UI downloads were verified against the path model. This is renderer preparation, not an attached video-generation service. No paid generation is triggered.
+
+The proposed next step is a Blender importer that converts coordinates and bakes these samples into camera and aircraft keyframes. Replace the proxy geometry and approve one styled still before rendering a low-resolution motion draft. AI video remains an optional visual exploration route; compare its motion with the directed blockout. The Rendering tab keeps the route, visual direction, output size and frame rate locally.

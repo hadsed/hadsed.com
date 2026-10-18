@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
-import {defaults,pose,schedule,cleanSettings,approachMotion} from './sr71-path.mjs';
+import {defaults,pose,schedule,cleanSettings,approachMotion,migrateSettings} from './sr71-path.mjs';
 
 for (const s of [defaults,
   {...defaults,soft:0,climb:180,clearance:30},
-  {...defaults,duration:6,hold:3,bank:65,turn:70},
+  {...defaults,duration:6,whipExtra:2,bank:65,turn:70},
   {...defaults,duration:30,speed:150,height:8}]) {
   const cuts=schedule(s);
   const bankStart=cuts[1].start;
   assert.ok(Math.abs(cuts.at(-1).end-1)<1e-9, 'clip ends at 100%');
-  assert.ok(Math.abs(cuts[2].duration-s.hold)<1e-9, 'bank setup lasts requested seconds');
   let previous=pose(0,s);
   for (let i=0;i<=1000;i++) {
     const p=pose(i/1000,s);
@@ -59,15 +58,15 @@ for(let n=0;n<=100;n++){
 const exhaust=pose(revisedCuts[2].start,defaults);
 assert.ok(exhaust.camera.z>exhaust.aircraft.z,'camera acquired rear');
 const rearAlignment=Math.atan2(exhaust.camera.x-exhaust.aircraft.x,exhaust.camera.z-exhaust.aircraft.z)+exhaust.heading;
-assert.ok(Math.abs(rearAlignment-(defaults.orbitAngle*Math.PI/180-Math.PI))<1e-8,'saved rear angle retained relative to turning aircraft');
-const beforeClimb=pose(revisedCuts[3].start-.01,defaults);
+assert.ok(Math.abs(rearAlignment-Math.atan2(-defaults.nose*Math.sin(defaults.orbitAngle*Math.PI/180)+defaults.settlePan,-defaults.nose*Math.cos(defaults.orbitAngle*Math.PI/180)-defaults.settleZoom))<1e-8,'saved rear angle retained relative to turning aircraft');
+const beforeClimb=pose(revisedCuts[2].start-.01,defaults);
 assert.equal(beforeClimb.aircraft.y,defaults.flightHeight,'aircraft stays level while bank establishes');
 assert.ok(beforeClimb.bank>.1,'visible bank established before climb');
 assert.equal(pose(1,defaults).fade,0,'ending preserves horizon and exhausts without wash');
 const end=pose(1,defaults);
 assert.ok(end.aircraft.x>0,'departure curves toward aircraft right');
 assert.ok(end.bank>0&&end.heading>0&&end.pitch>0,'departure banks, turns, and climbs together');
-assert.equal(revisedCuts.length,5,'nose reveal removed; closing feeds directly into orbit');
+assert.equal(revisedCuts.length,4,'settle merged into whip; four phases remain');
 const whipQuarter=pose(revisedCuts[1].start+.25*(revisedCuts[1].end-revisedCuts[1].start),defaults);
 assert.ok(whipQuarter.bank>.1,'bank visible during camera whip');
 const dx=whipQuarter.camera.x-whipQuarter.aircraft.x,dz=whipQuarter.camera.z-whipQuarter.aircraft.z;
@@ -82,14 +81,30 @@ const enterBefore=(relativeForward(openingEnd)-relativeForward(openingEnd-dt))/(
 const enterAfter=(relativeForward(openingEnd+dt)-relativeForward(openingEnd))/(dt*defaults.duration);
 assert.ok(enterBefore>30&&enterAfter>30,'forward rush continues into the slowed whip without stopping');
 
-const originalTiming=schedule({...defaults,duration:defaults.duration-.65,whipExtra:0}),extendedTiming=schedule(defaults);
-for(let i=0;i<originalTiming.length;i++)assert.ok(Math.abs(extendedTiming[i].duration-originalTiming[i].duration-(i===1?.65:0))<1e-8,'only section two gains exactly 0.65 seconds');
-console.log('Section two adds exactly 0.65 seconds; other phase durations preserved.');
 
-const startSettle=pose(revisedCuts[2].start,defaults),endSettle=pose(revisedCuts[2].end,defaults);
+const legacy={...defaults,hold:.3,whipExtra:.65};
+const migrated=migrateSettings({version:9,settings:legacy});
+assert.equal(migrated.whipExtra,.95);
+assert.equal(migrated.duration,legacy.duration);
+assert.deepEqual(migrateSettings({version:10,settings:migrated}),migrated,'migration applies once');
+assert.ok(Math.abs(revisedCuts[1].duration-1.89)<1e-8,'former whip and settle share one section');
+assert.ok(Math.abs(revisedCuts[2].start*defaults.duration-5.62)<1e-8,'climb start unchanged');
+const baseTiming=schedule({...defaults,duration:defaults.duration-.65,whipExtra:defaults.whipExtra-.65});
+for(let i=0;i<4;i++)assert.ok(Math.abs(revisedCuts[i].duration-baseTiming[i].duration-(i===1?.65:0))<1e-8,'extra whip control only changes the whip');
+// The acquired rear frame is the former settle endpoint, with no separate hold.
+const acquired=pose(revisedCuts[1].end,defaults);
 const localOffset=p=>{const dx=p.camera.x-p.aircraft.x,dz=p.camera.z-p.aircraft.z;return {x:Math.cos(p.heading)*dx+Math.sin(p.heading)*dz,z:-Math.sin(p.heading)*dx+Math.cos(p.heading)*dz}};
-const a=localOffset(startSettle),b=localOffset(endSettle);
-assert.ok(Math.abs(b.x-a.x-defaults.settlePan)<1e-8,'section three pans right');
-assert.ok(Math.abs(a.z-b.z-defaults.settleZoom)<1e-8,'section three pushes closer');
-const oldTiming=schedule({...defaults,hold:.45,duration:7.65});
-for(let i=0;i<oldTiming.length;i++)assert.ok(Math.abs(revisedCuts[i].duration-oldTiming[i].duration-(i===2?-.15:0))<1e-8,'only section three loses one third of its duration');
+const rear=localOffset(acquired),angle=defaults.orbitAngle*Math.PI/180;
+assert.ok(Math.abs(rear.x-(-defaults.nose*Math.sin(angle)+defaults.settlePan))<1e-8);
+assert.ok(Math.abs(rear.z-(-defaults.nose*Math.cos(angle)-defaults.settleZoom))<1e-8);
+// Check first derivatives at the former late-whip kink and the new climb boundary.
+const difference=(a,b)=>({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
+for(const fraction of [.55,.65,1]){
+ const u=revisedCuts[1].start+(revisedCuts[1].end-revisedCuts[1].start)*fraction,h=1e-6;
+ for(const key of ['camera','aim']){
+  const left=difference(pose(u,defaults)[key],pose(u-h,defaults)[key]);
+  const right=difference(pose(u+h,defaults)[key],pose(u,defaults)[key]);
+  assert.ok(Math.hypot(...Object.keys(left).map(k=>(left[k]-right[k])/(h*defaults.duration)))<.1,'late acquisition has no velocity jump');
+ }
+}
+console.log('Merged acquisition endpoint, migration, timing and smoothness passed.');

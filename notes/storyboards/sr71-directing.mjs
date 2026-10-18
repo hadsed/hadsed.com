@@ -1,32 +1,27 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion} from './sr71-path.mjs?v=9.1';
+import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion,migrateSettings} from './sr71-path.mjs?v=10';
+import {motionPackage,renderBrief} from './sr71-render.mjs?v=10';
 const $=id=>document.getElementById(id);
 const descriptions=[
  'One continuous closing rush from the distant speck to the close nose frame. The camera descends smoothly throughout the approach, then goes straight into the orbit.',
- 'Whip close along the wing, banking from the instant the approach ends. Enter fast, then slow smoothly toward the exhausts and lower to nozzle eye level.',
- 'Continue moving: push closer and pan right to center both exhausts. The bank is already established.',
+ 'Whip close along the wing, banking from the instant the approach ends. Enter fast, then slow smoothly toward the exhausts and lower to nozzle eye level. Blend the final push and rightward pan into this same move.',
  'Follow the climbing aircraft at exhaust eye level. Begin the closer push late in this phase, with the horizon behind the jets.',
  'Stay close at exhaust eye level. Preserve both nozzles and the background; the full-screen wash is disabled.'
 ];
 const suppliedPreset=await (await fetch('./presets/had-close-exhaust-settings.json')).json();
 let settings={...defaults},progress=0,playing=false,sceneView=false,lastTime=0,captures=[];
 try{
- const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v9'));
- const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v8'));
+ const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v10'));
+ const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v9'));
  if(current){settings=cleanSettings(current);progress=settings.progress/100}
- else {
-  const source=previous||defaults;
-  const hold=previous?Math.max(.1,Math.round(source.hold*2/3*100)/100):source.hold;
-  settings=cleanSettings({...source,hold,duration:source.duration-source.hold+hold,settlePan:defaults.settlePan,settleZoom:defaults.settleZoom,settleAim:defaults.settleAim});progress=0;
- }
+ else if(previous){settings=migrateSettings(previous);progress=settings.progress/100}
 }catch{}
 const phaseFields=[
  ['distant','approachDuration','cameraRush','planeRush','nose','height','clearance','framing','fov','ease'],
- ['whipExtra','nose','orbitAngle','clearance','exhaustHeight','hug','bankRamp','bank','framing','exhaustAim','fov','ease'],
- ['hold','settleZoom','settlePan','settleAim','bankRamp','bank','turn','nose','orbitAngle','exhaustHeight','exhaustAim','fov'],
- ['climb','pushStart','pushGap','bankRamp','bank','turn','speed','nose','exhaustHeight','exhaustAim','fov'],
- ['fade','fadeStart','pushStart','pushGap','nose','exhaustHeight','exhaustAim','fov']
+ ['whipExtra','settleZoom','settlePan','settleAim','nose','orbitAngle','clearance','exhaustHeight','hug','bankRamp','bank','framing','exhaustAim','fov','ease'],
+ ['climb','pushStart','pushGap','bankRamp','bank','turn','speed','nose','exhaustHeight','settleAim','fov'],
+ ['fade','fadeStart','pushStart','pushGap','nose','exhaustHeight','settleAim','fov']
 ];
 const fieldInfo={
  distant:['Starting distance','Almost invisible at 1,800 units; increase for a smaller speck.'],
@@ -42,7 +37,7 @@ const fieldInfo={
  whipExtra:['Extra whip time','Added seconds in section two; changes total clip length while preserving other phase durations.'],
  hug:['Wing-side distance','Tight lateral clearance during the whip; independent of the nose gap.'],
  bankRamp:['Bank buildup time','Seconds to reach the bank angle, starting exactly at the end of closing approach.'],
- pushStart:['Jet push starts in climb','Fraction of section four before the closer push begins.'],
+ pushStart:['Jet push starts in climb','Fraction of the climb section before the closer push begins.'],
  pushGap:['Ending jet gap','Final behind-fuselage distance; smaller brings the exhausts closer.'],
  flightHeight:['Low flight altitude','Relative units above the water.'],
  speed:['Tracking flight speed','Nose-forward speed after the close approach and turn.'],
@@ -52,10 +47,9 @@ const fieldInfo={
  exhaustAim:['Exhaust aim bias','Zero centers the paired nozzles; positive moves them lower in frame.'],
  orbitAngle:['Exhaust orbit angle','180° is directly behind; 175° shows both exhausts with a slight offset.'],
  duration:['Clip duration','Seconds including the new approach.'],
- hold:['Exhaust settle duration','Moving push-in and rightward pan; banking is already underway.'],
- settleZoom:['Settle push-in','Forward camera movement during section three.'],
- settleAim:['Settle exhaust framing','Vertical aim reached during section three; keeps both banked nozzles in view.'],
- settlePan:['Settle pan right','Camera movement toward the aircraft’s right during section three.'],
+ settleZoom:['Settle push-in','Forward camera movement late in section two.'],
+ settleAim:['Settle exhaust framing','Vertical aim reached late in section two; keeps both banked nozzles in view.'],
+ settlePan:['Settle pan right','Camera movement toward the aircraft’s right late in section two.'],
  ease:['Motion easing','Smooth descent and orbit easing; the closing rush follows one continuous curve.'],
  grid:['Water grid','Depth and speed cues.'],clay:['Neutral clay view','Geometry without twilight styling.'],
  fade:['Optional light wash','Disabled for this shot so the exhausts and horizon stay visible.'],fadeStart:['Light begins at','Percentage of the full clip.']
@@ -95,7 +89,7 @@ function annotateTimeline(cuts){
  });
 }
 function syncControls(){for(const [key,list] of inputs)for(const input of list){if(input.type==='checkbox')input.checked=!!settings[key];else input.value=settings[key]}}
-function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v9',JSON.stringify(settings))}catch{}}
+function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v10',JSON.stringify(settings))}catch{}}
 function configurationChanged(){persist();annotateTimeline(schedule(settings));rebuildPaths();render()}
 function setProgress(value){progress=clamp(value);$('progress').value=(progress*100).toFixed(1);persist();render()}
 function stop(){playing=false;$('play').textContent='Play'}
@@ -162,12 +156,12 @@ function updateScene(){
  $('light').style.opacity=sceneView?'0':p.fade;
  $('time').textContent=`${p.time.toFixed(2)} / ${settings.duration.toFixed(2)}s`;
  $('beat-title').textContent=`${p.beat+1} · ${beats[p.beat]}`;$('beat-note').textContent=descriptions[p.beat];
- $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Right bank ${(p.bank*180/Math.PI).toFixed(1)}° · Exhaust eye height ${settings.exhaustHeight.toFixed(1)} · Bank starts ${(cuts[1].start*settings.duration).toFixed(2)}s / climb ${ (cuts[3].start*settings.duration).toFixed(2)}s · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%` + (p.beat===0 ? ` · Rush ${approachMotion(settings).limited?'limited to keep a safe gap':'active'} · ends at ${approachMotion(settings).endGap.toFixed(0)} units` : '');
+ $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Right bank ${(p.bank*180/Math.PI).toFixed(1)}° · Exhaust eye height ${settings.exhaustHeight.toFixed(1)} · Bank starts ${(cuts[1].start*settings.duration).toFixed(2)}s / climb ${ (cuts[2].start*settings.duration).toFixed(2)}s · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%` + (p.beat===0 ? ` · Rush ${approachMotion(settings).limited?'limited to keep a safe gap':'active'} · ends at ${approachMotion(settings).endGap.toFixed(0)} units` : '');
  [...$('beats').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===p.beat));
  return p;
 }
 function render(){updateScene();renderer.render(scene,sceneView?overviewCamera:shotCamera)}
-function resize(){const box=$('viewport').getBoundingClientRect();renderer.setSize(box.width,box.height,false);shotCamera.aspect=overviewCamera.aspect=box.width/box.height;overviewCamera.updateProjectionMatrix();render()}
+function resize(){const box=$('viewport').getBoundingClientRect();if(!box.width||!box.height)return;renderer.setSize(box.width,box.height,false);shotCamera.aspect=overviewCamera.aspect=box.width/box.height;overviewCamera.updateProjectionMatrix();render()}
 new ResizeObserver(resize).observe($('viewport'));
 function view(mode){sceneView=mode;orbit.enabled=mode;
  if(mode&&!overviewInitialized){const p=pose(progress,settings);overviewCamera.position.set(220,p.aircraft.y+170,p.aircraft.z+230);orbit.target.set(0,p.aircraft.y,p.aircraft.z);overviewInitialized=true}
@@ -181,13 +175,19 @@ $('play').onclick=()=>{playing=!playing;if(playing&&progress>=1)setProgress(0);l
 $('start').onclick=()=>{stop();setProgress(0)};
 beats.forEach((label,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${i+1} ${label}</span><small></small>`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
 function animate(t){requestAnimationFrame(animate);if(playing){if(lastTime)setProgress(progress+Math.min(t-lastTime,100)/(settings.duration*1000));lastTime=t;if(progress>=1)stop()}else lastTime=0;if(sceneView){orbit.update();render()}}
-function exportObject(){return {kind:'sr71-3d-camera-blocking',version:9,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
+function exportObject(){return {kind:'sr71-3d-camera-blocking',version:10,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
 function download(data,name,type){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('save').onclick=()=>download(JSON.stringify(exportObject(),null,2)+'\n','sr71-camera-settings.json','application/json');
 $('reset').onclick=()=>{stop();settings={...defaults};syncControls();progress=0;configurationChanged();setProgress(0);$('status').textContent='Restored your imported preset and initial 3D defaults.'};
-$('import').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;const parsed=JSON.parse(await file.text());const source=parsed.settings||parsed;if(!Object.keys(ranges).some(k=>typeof source[k]==='number'&&Number.isFinite(source[k])))throw Error('No camera settings found');settings=cleanSettings(parsed);progress=settings.progress/100;stop();syncControls();configurationChanged();setProgress(progress);$('status').textContent='Settings imported.'}catch(err){$('status').textContent='Could not import: '+err.message}finally{e.target.value=''}};
-function tab(gallery){$('directing').hidden=gallery;$('storyboard').hidden=!gallery;$('directing-tab').setAttribute('aria-selected',!gallery);$('storyboard-tab').setAttribute('aria-selected',gallery);if(gallery)renderGallery();else requestAnimationFrame(resize)}
-$('directing-tab').onclick=()=>tab(false);$('storyboard-tab').onclick=()=>tab(true);
+$('import').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;const parsed=JSON.parse(await file.text());const source=parsed.settings||parsed;if(!Object.keys(ranges).some(k=>typeof source[k]==='number'&&Number.isFinite(source[k])))throw Error('No camera settings found');settings=migrateSettings(parsed);progress=settings.progress/100;stop();syncControls();configurationChanged();setProgress(progress);$('status').textContent='Settings imported.'}catch(err){$('status').textContent='Could not import: '+err.message}finally{e.target.value=''}};
+function tab(name){
+ stop();
+ for(const id of ['directing','storyboard','rendering']){$(id).hidden=id!==name;$(id+'-tab').setAttribute('aria-selected',id===name)}
+ if(name==='storyboard')renderGallery();
+ if(name==='rendering')updateRendering();
+ if(name==='directing')requestAnimationFrame(resize);
+}
+for(const name of ['directing','storyboard','rendering'])$(name+'-tab').onclick=()=>tab(name);
 const studies=[
  ['latest','04-distant-elevated-twilight','Elevated distance','Small aircraft, high camera, sky dominant.','stills/'],
  ['latest','05-nose-elevated-twilight','Nose approach','Composition study; downward angle is stronger than the intended near-level gaze.','stills/'],
@@ -221,7 +221,7 @@ function renderGallery(){
 function openEntry(entry){$('dialog-image').src=entry.src;$('dialog-image').alt=entry.title;$('dialog-title').textContent=entry.title;$('dialog-note').textContent=entry.note;$('dialog-actions').replaceChildren();
  function action(label,run){const b=document.createElement('button');b.textContent=label;b.onclick=run;$('dialog-actions').append(b)}
  if(entry.configuration){
-  action('Restore shot settings',()=>{settings=cleanSettings(entry.configuration);progress=settings.progress/100;stop();syncControls();configurationChanged();setProgress(progress);view(false);$('image-dialog').close();tab(false)});
+  action('Restore shot settings',()=>{settings=migrateSettings(entry.configuration);progress=settings.progress/100;stop();syncControls();configurationChanged();setProgress(progress);view(false);$('image-dialog').close();tab('directing')});
   action('Download frame PNG',async()=>download(await (await fetch(entry.src)).blob(),entry.id+'.png','image/png'));
   action('Download frame settings',()=>download(JSON.stringify(entry.configuration,null,2)+'\n',entry.id+'.json','application/json'));
   action('Edit note',async()=>{const note=prompt('Shot note',entry.note);if(note===null)return;entry.note=note;try{await storeCapture(entry)}catch{$('status').textContent='Note could not be saved to browser storage.'}$('dialog-note').textContent=note;renderGallery()});
@@ -232,3 +232,16 @@ function openEntry(entry){$('dialog-image').src=entry.src;$('dialog-image').alt=
 $('gallery-filter').onchange=renderGallery;$('close-dialog').onclick=()=>$('image-dialog').close();
 $('image-dialog').onclick=e=>{if(e.target===$('image-dialog'))$('image-dialog').close()};
 $('loading').hidden=true;annotateTimeline(schedule(settings));rebuildPaths();setProgress(progress);renderGallery();resize();requestAnimationFrame(animate);
+
+// A local handoff workspace; no rendering service is called from this page.
+function renderingOptions(){const [width,height]=$('render-size').value.split('x').map(Number);return {route:$('render-route').value,look:$('render-look').value,width,height,fps:+$('render-fps').value}}
+function updateRendering(){
+ const o=renderingOptions();
+ $('route-description').textContent=o.route==='3d'?'Use the directed motion as the source of truth. Import and bake it in Blender, then add the final aircraft and environment.':'Use this to explore atmosphere and styling. A generative model may change the trajectory or aircraft, so compare every draft with the blockout.';
+ $('render-summary').textContent=`Live shot · ${settings.duration.toFixed(2)} seconds · ${o.width} × ${o.height} · ${o.fps} fps · ${Math.ceil(settings.duration*o.fps)+1} motion samples`;
+ $('render-phases').replaceChildren(...schedule(settings).map((b,i)=>{const li=document.createElement('li');li.textContent=`${beats[i]} · ${(b.start*settings.duration).toFixed(2)}–${(b.end*settings.duration).toFixed(2)}s`;return li}));
+}
+try{const o=JSON.parse(localStorage.getItem('sr71-render-options'));if(o){if(['3d','ai'].includes(o.route))$('render-route').value=o.route;if(typeof o.look==='string')$('render-look').value=o.look;if(['1280x720','1920x1080'].includes(o.size))$('render-size').value=o.size;if([24,30,60].includes(o.fps))$('render-fps').value=o.fps}}catch{}
+for(const id of ['render-route','render-look','render-size','render-fps'])$(id).addEventListener('input',()=>{try{localStorage.setItem('sr71-render-options',JSON.stringify({...renderingOptions(),size:$('render-size').value}))}catch{}updateRendering()});
+$('render-package').onclick=()=>{download(JSON.stringify(motionPackage(settings,renderingOptions()),null,2)+'\n','sr71-render-handoff.json','application/json');$('render-status').textContent='Motion package downloaded. Ready for a renderer importer.'};
+$('render-brief').onclick=()=>{download(renderBrief(settings,renderingOptions()),'sr71-render-brief.txt','text/plain');$('render-status').textContent='Render brief downloaded.'};
