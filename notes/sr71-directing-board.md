@@ -163,3 +163,11 @@ Page theme choices are Light, Dark and System; System tracks appearance changes 
 The Rendering tab prepares a visual brief and a motion package for the current shot at 24, 30 or 60 fps. It contains exact camera positions, look-at targets, vertical lens angle, aircraft transforms, phase timing and coordinate conventions. Output includes the precise final sample. UI downloads were verified against the path model. This is renderer preparation, not an attached video-generation service. No paid generation is triggered.
 
 The proposed next step is a Blender importer that converts coordinates and bakes these samples into camera and aircraft keyframes. Replace the proxy geometry and approve one styled still before rendering a low-resolution motion draft. AI video remains an optional visual exploration route; compare its motion with the directed blockout. The Rendering tab keeps the route, visual direction, output size and frame rate locally.
+
+## October 18 revision — nose lock and corkscrew finish
+
+Delete the fourth section rather than compressing it into the climb. The clip now ends at 6.748 seconds (shown as 6.75s). The opening, whip, and surviving climb retain their previous durations and camera / aircraft positions at the same timestamps. Version 11 migrates the saved clip length once.
+
+Acquire the physical proxy nose tip smoothly during the final 20% of the whip, then aim exactly at that point throughout section three. Roll the camera smoothly from level to the aircraft's bank angle over section three (50 degrees in the current preset). The nose remains on the optical axis while the horizon rotates. The aircraft's bank and flight trajectory are unchanged. The shot camera, captured frames, and motion handoff all use the new orientation; the handoff includes a per-sample up vector so the roll is reproducible in a renderer.
+
+Verified nose targeting throughout section three, normalized up vectors, continuous phase transitions, the trimmed timing, and unchanged surviving position paths. The rendered browser preview shows the three-section timeline and the rolled horizon around the centered nose.

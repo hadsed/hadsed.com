@@ -66,14 +66,14 @@ assert.equal(pose(1,defaults).fade,0,'ending preserves horizon and exhausts with
 const end=pose(1,defaults);
 assert.ok(end.aircraft.x>0,'departure curves toward aircraft right');
 assert.ok(end.bank>0&&end.heading>0&&end.pitch>0,'departure banks, turns, and climbs together');
-assert.equal(revisedCuts.length,4,'settle merged into whip; four phases remain');
+assert.equal(revisedCuts.length,3,'fourth section removed');
 const whipQuarter=pose(revisedCuts[1].start+.25*(revisedCuts[1].end-revisedCuts[1].start),defaults);
 assert.ok(whipQuarter.bank>.1,'bank visible during camera whip');
 const dx=whipQuarter.camera.x-whipQuarter.aircraft.x,dz=whipQuarter.camera.z-whipQuarter.aircraft.z;
 const localX=Math.cos(whipQuarter.heading)*dx+Math.sin(whipQuarter.heading)*dz;
 assert.ok(Math.abs(localX)<defaults.nose*.6,'pass hugs aircraft more closely than former circle');
 const endRadius=Math.hypot(end.camera.x-end.aircraft.x,end.camera.z-end.aircraft.z);
-assert.ok(Math.abs(endRadius-defaults.pushGap)<1e-8,'late jet push reaches requested closer gap');
+assert.ok(endRadius>defaults.pushGap&&endRadius<defaults.nose,'trimmed clip ends during the closer push');
 console.log('Tight side whip, bank during whip, eye-level follow, and late jet push passed.');
 
 const dt=1e-6,relativeForward=u=>{const p=pose(u,defaults);return p.camera.z-p.aircraft.z};
@@ -82,15 +82,15 @@ const enterAfter=(relativeForward(openingEnd+dt)-relativeForward(openingEnd))/(d
 assert.ok(enterBefore>30&&enterAfter>30,'forward rush continues into the slowed whip without stopping');
 
 
-const legacy={...defaults,hold:.3,whipExtra:.65};
+const legacy={...defaults,duration:7.5,hold:.3,whipExtra:.65};
 const migrated=migrateSettings({version:9,settings:legacy});
 assert.equal(migrated.whipExtra,.95);
-assert.equal(migrated.duration,legacy.duration);
-assert.deepEqual(migrateSettings({version:10,settings:migrated}),migrated,'migration applies once');
+assert.ok(Math.abs(migrated.duration-defaults.duration)<1e-8);
+assert.deepEqual(migrateSettings({version:11,settings:migrated}),migrated,'migration applies once');
 assert.ok(Math.abs(revisedCuts[1].duration-1.89)<1e-8,'former whip and settle share one section');
 assert.ok(Math.abs(revisedCuts[2].start*defaults.duration-5.62)<1e-8,'climb start unchanged');
 const baseTiming=schedule({...defaults,duration:defaults.duration-.65,whipExtra:defaults.whipExtra-.65});
-for(let i=0;i<4;i++)assert.ok(Math.abs(revisedCuts[i].duration-baseTiming[i].duration-(i===1?.65:0))<1e-8,'extra whip control only changes the whip');
+for(let i=0;i<3;i++)assert.ok(Math.abs(revisedCuts[i].duration-baseTiming[i].duration-(i===1?.65:0))<1e-8,'extra whip control only changes the whip');
 // The acquired rear frame is the former settle endpoint, with no separate hold.
 const acquired=pose(revisedCuts[1].end,defaults);
 const localOffset=p=>{const dx=p.camera.x-p.aircraft.x,dz=p.camera.z-p.aircraft.z;return {x:Math.cos(p.heading)*dx+Math.sin(p.heading)*dz,z:-Math.sin(p.heading)*dx+Math.cos(p.heading)*dz}};
@@ -108,3 +108,14 @@ for(const fraction of [.55,.65,1]){
  }
 }
 console.log('Merged acquisition endpoint, migration, timing and smoothness passed.');
+
+// The nose remains exactly on the optical axis throughout section three.
+for(let n=0;n<=50;n++){
+ const u=revisedCuts[2].start+(1-revisedCuts[2].start)*n/50,p=pose(u,defaults);
+ const nose={x:p.aircraft.x+Math.sin(p.heading)*Math.cos(p.pitch)*13.5,y:p.aircraft.y+Math.sin(p.pitch)*13.5,z:p.aircraft.z-Math.cos(p.heading)*Math.cos(p.pitch)*13.5};
+ assert.deepEqual(p.aim,nose);
+ assert.ok(Math.abs(Math.hypot(p.up.x,p.up.y,p.up.z)-1)<1e-8);
+}
+assert.equal(pose(revisedCuts[2].start,defaults).roll,0,'roll starts smoothly at section three');
+assert.ok(pose(1,defaults).roll>.8,'camera rolls visibly through bank');
+console.log('Nose lock, camera roll and trimmed ending passed.');

@@ -1,6 +1,6 @@
 // Pure camera blocking model. World +Y is up; the aircraft flies toward -Z.
-export const beats = ['Closing approach','Side-hugging whip','Climb & exhaust follow','Exhaust ending'];
-export const defaults = {progress:0,height:42,soft:0.6,duration:7.5,settlePan:2.6,settleZoom:0.3,settleAim:0.025,whipExtra:0.95,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
+export const beats = ['Closing approach','Side-hugging whip','Nose-locked climb'];
+export const defaults = {progress:0,height:42,soft:0.6,duration:6.748,settlePan:2.6,settleZoom:0.3,settleAim:0.025,whipExtra:0.95,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
 export const ranges = {
  height:[8,100,1], fov:[20,85,1], framing:[-0.6,0.7,0.01], distant:[300,2600,10], nose:[16,160,1],
  approachDuration:[.5,5,.01],cameraRush:[50,1000,10],planeRush:[80,600,10],
@@ -15,16 +15,21 @@ export function cleanSettings(input){
  for(const [key,[min,max]] of Object.entries(ranges)) if(typeof source[key]==='number' && Number.isFinite(source[key])) result[key]=clamp(source[key],min,max);
  return result;
 }
-// Fold the former settle time into the whip once, preserving old saved shot timing.
+// Migrate saved shots once: merge the old settle, then trim the old fourth section.
 export function migrateSettings(input){
  const source=input.settings||input;
- return cleanSettings(input.version>=10?source:{...source,whipExtra:(source.whipExtra??.65)+(source.hold??.3)});
+ if(input.version>=11)return cleanSettings(source);
+ const merged=cleanSettings(input.version>=10?source:{...source,whipExtra:(source.whipExtra??.65)+(source.hold??.3)});
+ const extra=Math.min(merged.whipExtra,merged.duration-2),approach=Math.min(merged.approachDuration,merged.duration-extra-1.5);
+ return cleanSettings({...merged,duration:merged.duration-(merged.duration-approach-extra)*1.2/4.5});
 }
 export function schedule(s){
- const extra=Math.min(s.whipExtra,s.duration-2), approach=Math.min(s.approachDuration,s.duration-extra-1.5);
+ const extra=Math.min(s.whipExtra,s.duration-2), approach=Math.min(s.approachDuration,s.duration-extra-1.1);
  const remaining=s.duration-approach-extra;let time=0;
- return [0,1.5,1.8,1.2].map((w,i)=>{const duration=i===0?approach:remaining*w/4.5+(i===1?extra:0);const start=time/s.duration;time+=duration;return {start,end:time/s.duration,duration}});
+ return [0,5,6].map((w,i)=>{const duration=i===0?approach:remaining*w/11+(i===1?extra:0);const start=time/s.duration;time+=duration;return {start,end:time/s.duration,duration}});
 }
+// Keep the surviving climb's speed and trajectory; do not squeeze the deleted tail into it.
+const departureEnd=(s,cuts)=>1+cuts[2].duration*(2/3)/s.duration;
 // One overlapping rear acquisition: position, eye height, and aim finish together.
 const acquisition=(u,cuts)=>smooth(clamp(((u-cuts[1].start)/(cuts[1].end-cuts[1].start)-.55)/.45));
 export function approachMotion(s){
@@ -39,10 +44,10 @@ function flight(u,s,cuts,rush){
  const fastUntil=cuts[0].end*s.duration;
  const elapsed=u*s.duration,opening=Math.min(elapsed,fastUntil),after=Math.max(0,elapsed-fastUntil),blend=cuts[1].duration,v=Math.min(after,blend);
  const travel=rush.planeSpeed*opening+s.speed*after+(rush.planeSpeed-s.speed)*(v-v*v/(2*blend));
- const start=cuts[2].start, t=clamp((u-start)/(1-start)), seconds=(1-start)*s.duration;
+ const start=cuts[2].start,end=departureEnd(s,cuts), t=clamp((u-start)/(end-start)), seconds=(end-start)*s.duration;
  // Integrate the turning heading, so the bank turns the flight path rather than sliding the model sideways.
- const bankStart=cuts[1].start,bankSeconds=(1-bankStart)*s.duration;
- const bankT=clamp((u-bankStart)/(1-bankStart));
+ const bankStart=cuts[1].start,bankSeconds=(end-bankStart)*s.duration;
+ const bankT=clamp((u-bankStart)/(end-bankStart));
  const heading=s.turn*Math.PI/180*smooth(bankT),bank=s.bank*Math.PI/180*smooth(clamp((u-bankStart)*s.duration/s.bankRamp));
  let dx=0,dz=0;
  const count=240,dt=bankT*bankSeconds/count;
@@ -77,7 +82,7 @@ function desired(u,s,cuts,rush){
   const settling=acquisition(u,cuts);
   x+=s.settlePan*settling;z-=s.settleZoom*settling;
   const pushAt=cuts[2].start+s.pushStart*(cuts[2].end-cuts[2].start);
-  const push=smooth(clamp((u-pushAt)/(1-pushAt)));
+  const push=smooth(clamp((u-pushAt)/(departureEnd(s,cuts)-pushAt)));
   const rearRadius=Math.hypot(x,z);
   const factor=mix(1,Math.min(s.pushGap,rearRadius)/rearRadius,push);x*=factor;z*=factor;
   height=s.flightHeight+s.clearance;
@@ -99,9 +104,16 @@ export function pose(progress,s){
  const focus=smooth(orbitProgress),tail=9.5*focus;
  const settle=acquisition(u,cuts);
  const rearAim=mix(s.exhaustAim,s.settleAim,settle);
- const aim={x:aircraft.x-Math.sin(f.heading)*Math.cos(f.pitch)*tail,
+ let aim={x:aircraft.x-Math.sin(f.heading)*Math.cos(f.pitch)*tail,
   y:aircraft.y-Math.sin(f.pitch)*tail+distance*Math.tan(s.fov*Math.PI/360)*mix(s.framing,rearAim,focus),
   z:aircraft.z+Math.cos(f.heading)*Math.cos(f.pitch)*tail};
+ // Acquire the physical nose tip at the end of the whip, then keep it on the optical axis.
+ const noseLock=smooth(clamp((orbitProgress-.8)/.2));
+ const nose={x:aircraft.x+sn*Math.cos(f.pitch)*13.5,y:aircraft.y+Math.sin(f.pitch)*13.5,z:aircraft.z-c*Math.cos(f.pitch)*13.5};
+ aim={x:mix(aim.x,nose.x,noseLock),y:mix(aim.y,nose.y,noseLock),z:mix(aim.z,nose.z,noseLock)};
+ const climbProgress=clamp((u-cuts[2].start)/(cuts[2].end-cuts[2].start));
+ const roll=f.bank*smooth(climbProgress);
+ const up={x:c*Math.sin(roll),y:Math.cos(roll),z:sn*Math.sin(roll)};
  const fade=s.fade?smooth((u-s.fadeStart/100)/Math.max(.001,1-s.fadeStart/100)):0;
- return {aircraft,camera,aim,pitch:f.pitch,heading:f.heading,bank:f.bank,beat:relative.i,time:u*s.duration,fade};
+ return {aircraft,camera,aim,up,roll,pitch:f.pitch,heading:f.heading,bank:f.bank,beat:relative.i,time:u*s.duration,fade};
 }

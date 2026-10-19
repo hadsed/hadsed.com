@@ -1,27 +1,25 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion,migrateSettings} from './sr71-path.mjs?v=10';
-import {motionPackage,renderBrief} from './sr71-render.mjs?v=10';
+import {defaults,ranges,cleanSettings,pose,schedule,beats,clamp,approachMotion,migrateSettings} from './sr71-path.mjs?v=11';
+import {motionPackage,renderBrief} from './sr71-render.mjs?v=11';
 const $=id=>document.getElementById(id);
 const descriptions=[
  'One continuous closing rush from the distant speck to the close nose frame. The camera descends smoothly throughout the approach, then goes straight into the orbit.',
  'Whip close along the wing, banking from the instant the approach ends. Enter fast, then slow smoothly toward the exhausts and lower to nozzle eye level. Blend the final push and rightward pan into this same move.',
- 'Follow the climbing aircraft at exhaust eye level. Begin the closer push late in this phase, with the horizon behind the jets.',
- 'Stay close at exhaust eye level. Preserve both nozzles and the background; the full-screen wash is disabled.'
+ 'Track the nose tip at frame center while the camera rolls into the aircraft’s right bank. The horizon corkscrews around the nose. End here; the former fourth section is removed.'
 ];
 const suppliedPreset=await (await fetch('./presets/had-close-exhaust-settings.json')).json();
 let settings={...defaults},progress=0,playing=false,sceneView=false,lastTime=0,captures=[];
 try{
- const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v10'));
- const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v9'));
+ const current=JSON.parse(localStorage.getItem('sr71-directing-3d-v11'));
+ const previous=JSON.parse(localStorage.getItem('sr71-directing-3d-v10'));
  if(current){settings=cleanSettings(current);progress=settings.progress/100}
- else if(previous){settings=migrateSettings(previous);progress=settings.progress/100}
+ else if(previous){settings=migrateSettings({version:10,settings:previous});progress=settings.progress/100}
 }catch{}
 const phaseFields=[
  ['distant','approachDuration','cameraRush','planeRush','nose','height','clearance','framing','fov','ease'],
  ['whipExtra','settleZoom','settlePan','settleAim','nose','orbitAngle','clearance','exhaustHeight','hug','bankRamp','bank','framing','exhaustAim','fov','ease'],
- ['climb','pushStart','pushGap','bankRamp','bank','turn','speed','nose','exhaustHeight','settleAim','fov'],
- ['fade','fadeStart','pushStart','pushGap','nose','exhaustHeight','settleAim','fov']
+ ['climb','pushStart','pushGap','bankRamp','bank','turn','speed','nose','exhaustHeight','fov'],
 ];
 const fieldInfo={
  distant:['Starting distance','Almost invisible at 1,800 units; increase for a smaller speck.'],
@@ -89,7 +87,7 @@ function annotateTimeline(cuts){
  });
 }
 function syncControls(){for(const [key,list] of inputs)for(const input of list){if(input.type==='checkbox')input.checked=!!settings[key];else input.value=settings[key]}}
-function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v10',JSON.stringify(settings))}catch{}}
+function persist(){settings.progress=progress*100;try{localStorage.setItem('sr71-directing-3d-v11',JSON.stringify(settings))}catch{}}
 function configurationChanged(){persist();annotateTimeline(schedule(settings));rebuildPaths();render()}
 function setProgress(value){progress=clamp(value);$('progress').value=(progress*100).toFixed(1);persist();render()}
 function stop(){playing=false;$('play').textContent='Play'}
@@ -145,7 +143,7 @@ function rebuildPaths(){
 let overviewInitialized=false;
 function updateScene(){
  const p=pose(progress,settings),cuts=schedule(settings);phaseControls(p.beat,cuts);$('phase-playhead').style.left=`${progress*100}%`;plane.position.set(p.aircraft.x,p.aircraft.y,p.aircraft.z);plane.rotation.set(p.pitch,-p.heading,-p.bank,'YXZ');
- shotCamera.position.set(p.camera.x,p.camera.y,p.camera.z);shotCamera.fov=settings.fov;shotCamera.lookAt(p.aim.x,p.aim.y,p.aim.z);shotCamera.updateProjectionMatrix();shotCamera.updateMatrixWorld();
+ shotCamera.position.set(p.camera.x,p.camera.y,p.camera.z);shotCamera.fov=settings.fov;shotCamera.up.set(p.up.x,p.up.y,p.up.z);shotCamera.lookAt(p.aim.x,p.aim.y,p.aim.z);shotCamera.updateProjectionMatrix();shotCamera.updateMatrixWorld();
  cameraMarker.position.copy(shotCamera.position);cameraMarker.quaternion.copy(shotCamera.quaternion);
  aimLine.geometry.dispose();aimLine.geometry=new THREE.BufferGeometry().setFromPoints([shotCamera.position,new THREE.Vector3(p.aircraft.x,p.aircraft.y,p.aircraft.z)]);aimLine.computeLineDistances();frustumCamera.position.copy(shotCamera.position);frustumCamera.quaternion.copy(shotCamera.quaternion);frustumCamera.fov=shotCamera.fov;frustumCamera.aspect=shotCamera.aspect;frustumCamera.updateProjectionMatrix();frustumCamera.updateMatrixWorld();cameraHelper.update();
  cameraHelper.visible=cameraMarker.visible=aimLine.visible=paths.visible=sceneView;
@@ -156,7 +154,7 @@ function updateScene(){
  $('light').style.opacity=sceneView?'0':p.fade;
  $('time').textContent=`${p.time.toFixed(2)} / ${settings.duration.toFixed(2)}s`;
  $('beat-title').textContent=`${p.beat+1} · ${beats[p.beat]}`;$('beat-note').textContent=descriptions[p.beat];
- $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Right bank ${(p.bank*180/Math.PI).toFixed(1)}° · Exhaust eye height ${settings.exhaustHeight.toFixed(1)} · Bank starts ${(cuts[1].start*settings.duration).toFixed(2)}s / climb ${ (cuts[2].start*settings.duration).toFixed(2)}s · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%` + (p.beat===0 ? ` · Rush ${approachMotion(settings).limited?'limited to keep a safe gap':'active'} · ends at ${approachMotion(settings).endGap.toFixed(0)} units` : '');
+ $('readout').textContent=`Aircraft ↑ ${p.aircraft.y.toFixed(1)} · Camera ↑ ${p.camera.y.toFixed(1)} · Camera roll ${(p.roll*180/Math.PI).toFixed(1)}° · Pitch ${(p.pitch*180/Math.PI).toFixed(1)}° · Right bank ${(p.bank*180/Math.PI).toFixed(1)}° · Exhaust eye height ${settings.exhaustHeight.toFixed(1)} · Bank starts ${(cuts[1].start*settings.duration).toFixed(2)}s / climb ${ (cuts[2].start*settings.duration).toFixed(2)}s · Camera ${p.camera.z<p.aircraft.z?'ahead':'behind'} ${Math.abs(p.camera.z-p.aircraft.z).toFixed(1)} · Side ${p.camera.x.toFixed(1)} · ${Math.round(progress*100)}%` + (p.beat===0 ? ` · Rush ${approachMotion(settings).limited?'limited to keep a safe gap':'active'} · ends at ${approachMotion(settings).endGap.toFixed(0)} units` : '');
  [...$('beats').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===p.beat));
  return p;
 }
@@ -175,7 +173,7 @@ $('play').onclick=()=>{playing=!playing;if(playing&&progress>=1)setProgress(0);l
 $('start').onclick=()=>{stop();setProgress(0)};
 beats.forEach((label,i)=>{const b=document.createElement('button');b.innerHTML=`<span>${i+1} ${label}</span><small></small>`;b.onclick=()=>{stop();setProgress(schedule(settings)[i].start+.00001)};$('beats').append(b)});
 function animate(t){requestAnimationFrame(animate);if(playing){if(lastTime)setProgress(progress+Math.min(t-lastTime,100)/(settings.duration*1000));lastTime=t;if(progress>=1)stop()}else lastTime=0;if(sceneView){orbit.update();render()}}
-function exportObject(){return {kind:'sr71-3d-camera-blocking',version:10,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
+function exportObject(){return {kind:'sr71-3d-camera-blocking',version:11,units:'relative-not-meters',progress:progress*100,settings:{...settings,progress:progress*100},pose:pose(progress,settings)}}
 function download(data,name,type){const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('save').onclick=()=>download(JSON.stringify(exportObject(),null,2)+'\n','sr71-camera-settings.json','application/json');
 $('reset').onclick=()=>{stop();settings={...defaults};syncControls();progress=0;configurationChanged();setProgress(0);$('status').textContent='Restored your imported preset and initial 3D defaults.'};
