@@ -1,9 +1,9 @@
 // Pure camera blocking model. World +Y is up; the aircraft flies toward -Z.
 export const beats = ['Closing approach','Side-hugging whip','Nose-locked climb'];
-export const defaults = {progress:0,height:42,soft:0.6,duration:6.748,settlePan:2.6,settleZoom:0.3,settleAim:0.025,whipExtra:0.95,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
+export const defaults = {progress:0,height:42,soft:0.6,duration:7.876,climbExtra:1.128,settlePan:2.6,settleZoom:0.3,settleAim:0.025,whipExtra:0.95,approachDuration:3.73,cameraRush:500,planeRush:280,fov:56,framing:-0.12,distant:1800,nose:19,side:42,lead:0,sideHeight:12,rear:90,endGap:19,clearance:4,flightHeight:4,speed:65,climb:35,exhaustHeight:0.6,bankLead:1,exhaustAim:0.06,orbitAngle:172,bank:50,bankRamp:0.85,hug:9,pushStart:0.65,pushGap:17,turn:35,ease:1,fadeStart:91,fade:0,grid:1,clay:0};
 export const ranges = {
  height:[8,100,1], fov:[20,85,1], framing:[-0.6,0.7,0.01], distant:[300,2600,10], nose:[16,160,1],
- approachDuration:[.5,5,.01],cameraRush:[50,1000,10],planeRush:[80,600,10],
+ climbExtra:[0,3,.001], approachDuration:[.5,5,.01],cameraRush:[50,1000,10],planeRush:[80,600,10],
  side:[25,100,1], lead:[-30,40,1], sideHeight:[8,60,1], rear:[35,200,1], endGap:[16,70,1], clearance:[4,30,1],
  settlePan:[0,6,.1], settleZoom:[0,3,.1], settleAim:[-.2,.2,.005], whipExtra:[0,2,.05], hug:[8,16,.1], bankRamp:[.2,2,.05], pushStart:[.5,.8,.05], pushGap:[14,19,.1], exhaustHeight:[0,6,0.1], bankLead:[0,2,0.1], exhaustAim:[-0.4,0.5,0.01], orbitAngle:[140,180,1], bank:[0,65,1], turn:[0,70,1], flightHeight:[2,25,1], speed:[20,150,1], climb:[0,180,1],  soft:[0,1.5,0.05], duration:[6,30,0.05], ease:[0,1,0.05], fadeStart:[80,100,1], progress:[0,100,0.1], fade:[0,1,1], grid:[0,1,1], clay:[0,1,1]
 };
@@ -18,12 +18,16 @@ export function cleanSettings(input){
 // Migrate saved shots once: merge the old settle, then trim the old fourth section.
 export function migrateSettings(input){
  const source=input.settings||input;
- if(input.version>=11)return cleanSettings(source);
+ if(input.version>=12)return cleanSettings(source);
+ if(input.version>=11){const old=cleanSettings({...source,climbExtra:0}),extra=+schedule(old)[2].duration.toFixed(6);return cleanSettings({...old,climbExtra:extra,duration:old.duration+extra})}
  const merged=cleanSettings(input.version>=10?source:{...source,whipExtra:(source.whipExtra??.65)+(source.hold??.3)});
  const extra=Math.min(merged.whipExtra,merged.duration-2),approach=Math.min(merged.approachDuration,merged.duration-extra-1.5);
- return cleanSettings({...merged,duration:merged.duration-(merged.duration-approach-extra)*1.2/4.5});
+ const trimmed={...merged,climbExtra:0,duration:merged.duration-(merged.duration-approach-extra)*1.2/4.5};
+ return migrateSettings({version:11,settings:trimmed});
 }
 export function schedule(s){
+ const added=Math.min(s.climbExtra||0,Math.max(0,s.duration-6));
+ if(added){const base=schedule({...s,duration:s.duration-added,climbExtra:0});let time=0;return base.map((b,i)=>{const duration=b.duration+(i===2?added:0),start=time/s.duration;time+=duration;return {start,end:time/s.duration,duration}})}
  const extra=Math.min(s.whipExtra,s.duration-2), approach=Math.min(s.approachDuration,s.duration-extra-1.1);
  const remaining=s.duration-approach-extra;let time=0;
  return [0,5,6].map((w,i)=>{const duration=i===0?approach:remaining*w/11+(i===1?extra:0);const start=time/s.duration;time+=duration;return {start,end:time/s.duration,duration}});
@@ -89,7 +93,7 @@ function desired(u,s,cuts,rush){
  }
  return {x,z,height,i};
 }
-export function pose(progress,s){
+function basePose(progress,s){
  const u=clamp(progress),cuts=schedule(s),rush=approachMotion(s),relative=desired(u,s,cuts,rush);
  const f=flight(u,s,cuts,rush),aircraft=f.aircraft;
  const c=Math.cos(f.heading),sn=Math.sin(f.heading);
@@ -116,4 +120,14 @@ export function pose(progress,s){
  const up={x:c*Math.sin(roll),y:Math.cos(roll),z:sn*Math.sin(roll)};
  const fade=s.fade?smooth((u-s.fadeStart/100)/Math.max(.001,1-s.fadeStart/100)):0;
  return {aircraft,camera,aim,up,roll,pitch:f.pitch,heading:f.heading,bank:f.bank,beat:relative.i,time:u*s.duration,fade};
+}
+
+// Stretch only the third section; ease out of the original speed into the slower move.
+export function pose(progress,s){
+ const cuts=schedule(s),added=Math.min(s.climbExtra||0,Math.max(0,s.duration-6));
+ if(!added)return basePose(progress,s);
+ const base={...s,duration:s.duration-added,climbExtra:0},time=clamp(progress)*s.duration,start=cuts[2].start*s.duration;
+ let sourceTime=time;
+ if(time>start){const t=clamp((time-start)/cuts[2].duration),baseSeconds=cuts[2].duration-added;const tangent=Math.min(3,cuts[2].duration/baseSeconds);sourceTime=start+baseSeconds*hermite(0,1,tangent,0,1,t)}
+ return {...basePose(sourceTime/base.duration,base),time};
 }

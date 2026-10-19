@@ -171,3 +171,7 @@ Delete the fourth section rather than compressing it into the climb. The clip no
 Acquire the physical proxy nose tip smoothly during the final 20% of the whip, then aim exactly at that point throughout section three. Roll the camera smoothly from level to the aircraft's bank angle over section three (50 degrees in the current preset). The nose remains on the optical axis while the horizon rotates. The aircraft's bank and flight trajectory are unchanged. The shot camera, captured frames, and motion handoff all use the new orientation; the handoff includes a per-sample up vector so the roll is reproducible in a renderer.
 
 Verified nose targeting throughout section three, normalized up vectors, continuous phase transitions, the trimmed timing, and unchanged surviving position paths. The rendered browser preview shows the three-section timeline and the rolled horizon around the centered nose.
+
+## October 18 revision — slower section three
+
+Double section three from 1.128 to 2.256 seconds; it now runs 5.62–7.876s. Sections one and two retain their timing. Retiming samples the same camera, aircraft, nose aim and roll path, easing continuously from the incoming speed toward a slower finish. Extra climb time is adjustable in section three. Version 12 adds this time once to saved settings. Path checks compare retimed poses against the previous geometry throughout the section; rendering exports use the same timing.

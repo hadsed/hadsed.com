@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {defaults,pose,schedule,cleanSettings,approachMotion,migrateSettings} from './sr71-path.mjs';
+import {defaults as slowDefaults,pose,schedule,cleanSettings,approachMotion,migrateSettings} from './sr71-path.mjs';
+const defaults={...slowDefaults,duration:slowDefaults.duration-slowDefaults.climbExtra,climbExtra:0};
 
 for (const s of [defaults,
   {...defaults,soft:0,climb:180,clearance:30},
@@ -85,8 +86,8 @@ assert.ok(enterBefore>30&&enterAfter>30,'forward rush continues into the slowed 
 const legacy={...defaults,duration:7.5,hold:.3,whipExtra:.65};
 const migrated=migrateSettings({version:9,settings:legacy});
 assert.equal(migrated.whipExtra,.95);
-assert.ok(Math.abs(migrated.duration-defaults.duration)<1e-8);
-assert.deepEqual(migrateSettings({version:11,settings:migrated}),migrated,'migration applies once');
+assert.ok(Math.abs(migrated.duration-slowDefaults.duration)<1e-8);
+assert.deepEqual(migrateSettings({version:12,settings:migrated}),migrated,'migration applies once');
 assert.ok(Math.abs(revisedCuts[1].duration-1.89)<1e-8,'former whip and settle share one section');
 assert.ok(Math.abs(revisedCuts[2].start*defaults.duration-5.62)<1e-8,'climb start unchanged');
 const baseTiming=schedule({...defaults,duration:defaults.duration-.65,whipExtra:defaults.whipExtra-.65});
@@ -119,3 +120,14 @@ for(let n=0;n<=50;n++){
 assert.equal(pose(revisedCuts[2].start,defaults).roll,0,'roll starts smoothly at section three');
 assert.ok(pose(1,defaults).roll>.8,'camera rolls visibly through bank');
 console.log('Nose lock, camera roll and trimmed ending passed.');
+
+const fastCuts=schedule(defaults),slowCuts=schedule(slowDefaults);
+for(let i=0;i<2;i++)assert.ok(Math.abs(fastCuts[i].duration-slowCuts[i].duration)<1e-8,'only section three slows');
+assert.ok(Math.abs(slowCuts[2].duration-2*fastCuts[2].duration)<1e-8);
+for(let n=0;n<=100;n++){
+ const t=n/100,q=2*t-t*t;
+ const slow=pose(slowCuts[2].start+(1-slowCuts[2].start)*t,slowDefaults);
+ const fast=pose(fastCuts[2].start+(1-fastCuts[2].start)*q,defaults);
+ for(const key of ['camera','aim','aircraft','up'])for(const axis of ['x','y','z'])assert.ok(Math.abs(slow[key][axis]-fast[key][axis])<1e-7,'retimed pose preserves geometry and orientation');
+}
+console.log('Section three doubles duration with unchanged motion path and framing.');
