@@ -1,0 +1,53 @@
+/* Design tokens. Content never lives here; see content/ for that. */
+:root {
+  --bg: #1c2433;
+  --text: #c8cdd5;
+  --muted: #8a919c;
+  --accent: #e6e9ed;
+  --rule: #8a919c;
+  --font: Verdana, Geneva, system-ui, -apple-system, sans-serif;
+  --measure: 42rem;
+  --gap: 2.5rem;
+  --menu-width: 9rem;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+  margin: 0 auto;
+  max-width: 64rem;
+  padding: 3rem 1.5rem;
+  display: grid;
+  grid-template-columns: var(--menu-width) minmax(0, 1fr);
+  column-gap: var(--gap);
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 var(--font);
+}
+
+a { color: var(--text); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Left menu */
+.menu ul { list-style: none; margin: 1.5rem 0 0; padding: 0; }
+.menu li { margin: 0 0 0.35rem; }
+.menu a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+.site-name { color: var(--accent); }
+
+main { min-width: 0; }
+
+footer {
+  grid-column: 1 / -1;
+  margin-top: 4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  body { grid-template-columns: minmax(0, 1fr); padding: 1.5rem 1rem; }
+  .menu ul { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.75rem; }
+  .menu li { margin: 0; }
+  footer { margin-top: 3rem; }
+}
