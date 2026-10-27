@@ -35,3 +35,25 @@ test("landing page shows about, timeline, and projects", () => {
   assert.doesNotMatch(html, /class="link"/);
   assert.doesNotMatch(html, /404-694/);
 });
+
+test("portfolio page and project pages", () => {
+  assert.equal((read("portfolio/index.html").match(/class="panel"/g) || []).length, 3);
+  assert.match(read("portfolio/subassembler/index.html"), /<h1>Subassembler<\/h1>/);
+});
+
+test("experience page renders bodies as lists", () => {
+  const html = read("experience/index.html");
+  assert.equal((html.match(/class="timeline-entry"/g) || []).length, 7);
+  assert.ok((html.match(/<ul>/g) || []).length >= 7);
+  assert.match(html, /Planetary Lake Lander/);
+});
+
+test("blog index and post", () => {
+  assert.match(read("blog/index.html"), /href="\/blog\/hello\/"/);
+  assert.match(read("blog/hello/index.html"), /27 October 2026/);
+});
+
+test("current page is marked in the menu", () => {
+  assert.match(read("blog/index.html"), /aria-current="page" href="\/blog\/"/);
+  assert.doesNotMatch(read("blog/index.html"), /aria-current="page" href="\/"/);
+});
