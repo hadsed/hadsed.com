@@ -2,7 +2,36 @@
 layout: base.njk
 permalink: /
 ---
-{% set roles = collections.experience %}{% set detailed = false %}
-{% include "timeline.njk" %}
-{% set projects = collections.projects %}
-{% include "panels.njk" %}
+{%- set about = collections.about[0] -%}
+<div class="landing">
+  <section class="about">
+    <img class="avatar" src="{{ about.data.avatar }}" alt="" width="72" height="72">
+    <h1>{{ about.data.name }}</h1>
+    <p class="tagline">{{ about.data.tagline }}</p>
+    <div class="blurb">{{ about.templateContent | safe }}</div>
+    <ul class="links">
+      {%- for link in about.data.links %}
+      <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+      {%- endfor %}
+    </ul>
+    <h2 class="label">Publications</h2>
+    <ul class="publications">
+      {%- for pub in about.data.publications %}
+      <li>{{ pub }}</li>
+      {%- endfor %}
+    </ul>
+    <p class="education">{{ about.data.education }}</p>
+  </section>
+
+  <section class="recent">
+    <h2 class="label">Experience</h2>
+    {% set roles = collections.experience %}{% set detailed = false %}
+    {% include "timeline.njk" %}
+  </section>
+</div>
+
+<section class="projects">
+  <h2 class="label">Projects</h2>
+  {% set projects = collections.projects %}
+  {% include "panels.njk" %}
+</section>

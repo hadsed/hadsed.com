@@ -21,3 +21,17 @@ test("notes and plans are not published", () => {
 test("content is not emitted as its own pages", () => {
   assert.equal(existsSync(new URL("../_site/content", import.meta.url)), false);
 });
+
+test("landing page shows about, timeline, and projects", () => {
+  const html = read("index.html");
+  assert.equal((html.match(/class="timeline-entry"/g) || []).length, 7);
+  assert.equal((html.match(/class="panel"/g) || []).length, 3);
+  assert.match(html, /2025 – now/);
+  assert.match(html, /2012 – 2015/);
+  assert.match(html, /class="dates">2013</);
+  assert.doesNotMatch(html, /2013 – 2013/);
+  assert.match(html, /mailto:hadsed@gmail.com/);
+  assert.match(html, /Adiabatic Quantum Optimization for Associative Memory Recall/);
+  assert.doesNotMatch(html, /class="link"/);
+  assert.doesNotMatch(html, /404-694/);
+});

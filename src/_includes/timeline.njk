@@ -5,7 +5,9 @@
     <span class="orb" aria-hidden="true"></span>
     <div class="entry-head">
       <span class="org">{{ item.data.org }}</span>
-      <span class="dates">{{ item.data.start | year }} – {% if item.data.end %}{{ item.data.end | year }}{% else %}now{% endif %}</span>
+      {%- set startYear = item.data.start | year -%}
+      {%- set endYear = (item.data.end | year) if item.data.end else "now" -%}
+      <span class="dates">{% if startYear == endYear %}{{ startYear }}{% else %}{{ startYear }} – {{ endYear }}{% endif %}</span>
     </div>
     <div class="role">{{ item.data.role }} · {{ item.data.subtitle }}</div>
     {%- if detailed %}

@@ -100,3 +100,38 @@ footer {
 @media (max-width: 640px) {
   .panels { column-count: 1; }
 }
+
+/* Landing page */
+.landing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--gap);
+  align-items: start;
+}
+.avatar { display: block; width: 72px; height: 72px; border-radius: 4px; margin-bottom: 1rem; }
+h1 { font-size: 1.6rem; font-weight: 400; margin: 0 0 0.25rem; color: var(--accent); }
+.tagline { color: var(--muted); margin: 0 0 1.25rem; }
+.blurb p { margin: 0 0 1rem; }
+.label {
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+.about .label { margin-top: 2rem; }
+.links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; }
+.links li + li::before { content: "·"; color: var(--muted); margin: 0 0.5rem; }
+.publications { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.9rem; }
+.publications li { margin: 0 0 0.25rem; }
+.education { color: var(--muted); font-size: 0.9rem; margin: 1rem 0 0; }
+.projects {
+  margin-top: var(--gap);
+  padding-top: var(--gap);
+  border-top: 1px solid var(--rule);
+}
+
+@media (max-width: 800px) {
+  .landing { grid-template-columns: minmax(0, 1fr); }
+}
