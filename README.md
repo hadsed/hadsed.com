@@ -13,7 +13,7 @@ npm test        # builds and checks the output
 
 Everything you write lives under `content/`. Each file is markdown with a short front matter block.
 
-A role, in `content/experience/<slug>.md` (omit `end` for a current role; `order` 1 is most recent):
+A role, in `content/experience/<slug>.md` (omit `end` for a current role; `order` 1 is most recent; `featured: false` keeps a role off the landing page timeline while it stays on the Experience page):
 
 ```md
 ---

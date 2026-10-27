@@ -33,7 +33,7 @@ test("landing page shows about, timeline, and projects", () => {
   assert.match(html, /mailto:hadsed@gmail.com/);
   assert.match(html, /Adiabatic Quantum Optimization for Associative Memory Recall/);
   assert.doesNotMatch(html, /class="link"/);
-  assert.doesNotMatch(html, /404-694/);
+  assert.doesNotMatch(html, /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/);
 });
 
 test("portfolio page and project pages", () => {
