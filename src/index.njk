@@ -2,4 +2,7 @@
 layout: base.njk
 permalink: /
 ---
-<p>About</p>
+{% set roles = collections.experience %}{% set detailed = false %}
+{% include "timeline.njk" %}
+{% set projects = collections.projects %}
+{% include "panels.njk" %}
