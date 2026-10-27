@@ -13,9 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: f659eb903a5d13a71c5b5dfa74a83cfb
-          command: pages deploy . --project-name=hadsed-com
+          command: pages deploy _site --project-name=hadsed-com
