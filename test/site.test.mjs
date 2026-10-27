@@ -17,3 +17,7 @@ test("notes and plans are not published", () => {
   assert.equal(existsSync(new URL("../_site/notes", import.meta.url)), false);
   assert.equal(existsSync(new URL("../_site/plans", import.meta.url)), false);
 });
+
+test("content is not emitted as its own pages", () => {
+  assert.equal(existsSync(new URL("../_site/content", import.meta.url)), false);
+});
