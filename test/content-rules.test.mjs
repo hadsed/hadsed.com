@@ -36,8 +36,8 @@ after(() => {
 });
 
 test("unfeatured roles stay off the landing timeline but appear on the Experience page", () => {
-  assert.equal((read("index.html").match(/class="timeline-entry"/g) || []).length, 7);
-  assert.equal((read("experience/index.html").match(/class="timeline-entry"/g) || []).length, 8);
+  assert.equal((read("index.html").match(/class="timeline-entry/g) || []).length, 8);
+  assert.equal((read("experience/index.html").match(/class="timeline-entry/g) || []).length, 9);
   assert.doesNotMatch(read("index.html"), /Fixture Lab/);
 });
 

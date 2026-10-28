@@ -7,8 +7,11 @@
   <link rel="stylesheet" href="/css/site.css">
 </head>
 <body>
+<div class="page">
   <nav class="menu">
+    {%- if page.url != "/" %}
     <a class="site-name" href="/">Had Seddiqi</a>
+    {%- endif %}
     <ul>
       {%- set items = [["/", "About"], ["/portfolio/", "Portfolio"], ["/experience/", "Experience"], ["/blog/", "Blog"]] -%}
       {%- for item in items -%}
@@ -21,6 +24,7 @@
   <main>
 {{ content | safe }}
   </main>
-  <footer>Had Seddiqi · {{ buildYear }}</footer>
+</div>
+<footer>© {{ buildYear }} Had Seddiqi</footer>
 </body>
 </html>

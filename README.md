@@ -13,13 +13,13 @@ npm test        # builds and checks the output
 
 Everything you write lives under `content/`. Each file is markdown with a short front matter block.
 
-A role, in `content/experience/<slug>.md` (omit `end` for a current role; `order` 1 is most recent; `featured: false` keeps a role off the landing page timeline while it stays on the Experience page):
+A role, in `content/experience/<slug>.md` (omit `end` for a current role; `order` 1 is most recent; `featured: false` keeps a role off the landing page timeline while it stays on the Experience page; `role` and `subtitle` are optional, and `link` turns the subtitle into a link; `upcoming: true` marks the entry with the glowing orb, as `next.md` does):
 
 ```md
 ---
 org: Vinci
 role: Founding ML Engineer
-subtitle: Foundation models for physics
+subtitle: Semiconductor physics AI unicorn
 start: "2024-03"
 end: "2025-09"
 featured: true

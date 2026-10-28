@@ -1,7 +1,7 @@
 ---
-org: Vinci
+org: Vinci4d
 role: Founding ML Engineer
-subtitle: Foundation models for physics
+subtitle: Semiconductor physics AI unicorn
 start: "2024-03"
 end: "2025-09"
 featured: true

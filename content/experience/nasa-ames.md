@@ -1,7 +1,7 @@
 ---
 org: NASA Ames Research Center
 role: Research Associate
-subtitle: AI for the Planetary Lake Lander
+subtitle: Intelligent Robotics Group
 start: "2013-06"
 end: "2013-12"
 featured: true

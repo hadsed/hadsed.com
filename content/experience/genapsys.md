@@ -1,6 +1,6 @@
 ---
 org: GenapSys
-role: Software and ML Engineer
+role: ML Engineer
 subtitle: Electrical DNA sequencing
 start: "2015-05"
 end: "2016-11"

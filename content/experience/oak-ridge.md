@@ -1,7 +1,7 @@
 ---
 org: Oak Ridge National Laboratory
 role: Research Associate
-subtitle: Machine learning and quantum computing
+subtitle: ML and quantum computing
 start: "2012-05"
 end: "2015-05"
 featured: true

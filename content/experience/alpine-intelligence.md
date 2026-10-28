@@ -1,7 +1,7 @@
 ---
 org: Alpine Intelligence
 role: Founder
-subtitle: Frontier models and agents for the physical world
+subtitle: AI research and product consulting
 start: "2025-09"
 featured: true
 order: 1

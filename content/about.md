@@ -6,14 +6,17 @@ tagline: Machine learning for the physical world
 avatar: /assets/avatar.svg
 links:
   - label: GitHub
+    icon: github
     url: https://github.com/hadsed
   - label: LinkedIn
+    icon: linkedin
     url: https://linkedin.com/in/hadsed
   - label: Google Scholar
+    icon: scholar
     url: https://scholar.google.com/citations?user=nYbFo6EAAAAJ
   - label: Email
+    icon: mail
     url: mailto:hadsed@gmail.com
-education: B.S. Physics, Georgia Southern University
 publications:
   - Adiabatic Quantum Optimization for Associative Memory Recall
   - "Planetary Lake Lander: Adaptive Science Initial Results"

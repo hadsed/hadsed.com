@@ -1,16 +1,18 @@
 {#- Consumes: roles (sorted experience items), detailed (bool) -#}
 <ol class="timeline">
 {%- for item in roles %}
-  <li class="timeline-entry" style="--i: {{ loop.index0 }}">
+  <li class="timeline-entry{% if item.data.upcoming %} is-upcoming{% endif %}" style="--i: {{ loop.index0 }}">
     <span class="orb" aria-hidden="true"></span>
-    <div class="entry-head">
-      <span class="org">{{ item.data.org }}</span>
-      {%- set startYear = item.data.start | year -%}
-      {%- set endYear = (item.data.end | year) if item.data.end else "now" -%}
-      <span class="dates">{% if startYear == endYear %}{{ startYear }}{% else %}{{ startYear }} – {{ endYear }}{% endif %}</span>
+    <span class="org">{{ item.data.org }}</span>
+    {%- set startYear = item.data.start | year -%}
+    {%- set endYear = (item.data.end | year) if item.data.end else "now" -%}
+    <span class="dates">{% if startYear == endYear %}{{ startYear }}{% else %}{{ startYear }} – {{ endYear }}{% endif %}</span>
+    {%- if item.data.role or item.data.subtitle %}
+    <div class="role">{%- if item.data.role %}{{ item.data.role }}{% if item.data.subtitle %}, {% endif %}{% endif -%}
+      {%- if item.data.subtitle and item.data.link %}<a href="{{ item.data.link }}">{{ item.data.subtitle }}</a>{% elif item.data.subtitle %}{{ item.data.subtitle }}{% endif -%}
     </div>
-    <div class="role">{{ item.data.role }} · {{ item.data.subtitle }}</div>
-    {%- if detailed %}
+    {%- endif %}
+    {%- if detailed and (item.templateContent | trim) %}
     <div class="entry-body">{{ item.templateContent | safe }}</div>
     {%- endif %}
   </li>

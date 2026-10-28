@@ -1,7 +1,7 @@
 ---
 org: Ontra
-role: Director of Machine Learning
-subtitle: Built the ML function from first hire to a team of 13
+role: Director of ML
+subtitle: Legal tech unicorn
 start: "2017-06"
 end: "2022-02"
 featured: true
