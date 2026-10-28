@@ -8,6 +8,9 @@
 # copied back into the vault, so a fix merged through a shell PR is not undone.
 set -euo pipefail
 
+# Same settings whether run by systemd or by hand; the environment wins.
+if [ -f /etc/hadsed-bridge.env ]; then set -a; . /etc/hadsed-bridge.env; set +a; fi
+
 VAULT=${VAULT:-/root/obsidian/vaults/unstructured-space/hadsed.com}
 REPO=${REPO:-/root/projects/hadsed.com}
 STATE=${STATE:-/root/.local/state/hadsed-bridge}
@@ -22,6 +25,10 @@ exec 9>"$STATE/lock"
 flock -n 9 || exit 0
 cd "$REPO"
 git fetch -q origin
+# A feature-branch base that has since merged into main is just main.
+if [ "$BASE_REF" != origin/main ] && git merge-base --is-ancestor "$BASE_REF" origin/main 2>/dev/null; then
+  BASE_REF=origin/main
+fi
 
 # Reverse sync: main -> vault, only for files that changed since the last run.
 MAIN=$(git rev-parse origin/main)
