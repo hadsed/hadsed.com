@@ -1,0 +1,8 @@
+[Unit]
+Description=Mirror the Obsidian vault's hadsed.com folder into GitHub
+After=network-online.target obsidian.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/hadsed-bridge.env
+ExecStart=/usr/local/bin/hadsed-bridge

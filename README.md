@@ -40,7 +40,7 @@ order: 1
 The write-up.
 ```
 
-A post, in `content/posts/<slug>.md` (renders at `/blog/<slug>/`):
+An article, in `content/articles/<slug>.md` (renders at `/blog/<slug>/`):
 
 ```md
 ---
@@ -58,3 +58,20 @@ The About page's name, tagline, avatar, links, education, and publications are f
 `src/` is the design: one layout (`src/_includes/base.njk`), two partials for the timeline and the project panels, four page templates, and one stylesheet (`src/css/site.css`) whose `:root` block holds every color and spacing value. A design pass changes `src/` and never touches `content/`.
 
 `notes/` holds the SR-71 intro work in progress and the research behind it. It stays in the repository and is not deployed. The design and plan documents are under `docs/superpowers/`.
+
+## Editing in Obsidian
+
+Content is edited in the Obsidian vault, folder `hadsed.com/`, which mirrors
+`content/`: `about.md`, `experience/`, `projects/`, `articles/`, `assets/`.
+A bridge on the Hetzner box (`scripts/hadsed-bridge.sh`, installed with the
+units in `scripts/systemd/`) copies that folder into the `obsidian` branch every
+two minutes and keeps one PR open to `main`. Pushes to `obsidian` deploy a
+preview at https://obsidian.hadsed-com.pages.dev; merging deploys hadsed.com.
+`[[slug]]` wikilinks resolve to project, article, and experience pages at build
+time, and `![[file.png]]` embeds images from `assets/`. An unresolved wikilink
+fails the build.
+
+Shell changes (anything outside `content/`) go through normal branches and
+PRs. The vault's `hadsed.com/AGENTS.md` explains the folder from the editing
+side. The `/publish` skill in `.claude/skills/` is the review step between the
+vault and a merge.

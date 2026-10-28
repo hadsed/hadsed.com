@@ -1,9 +1,42 @@
+import { readdirSync, readFileSync } from "node:fs";
+import matter from "gray-matter";
+
+// Obsidian-style [[wikilinks]] resolve against content/ by file slug:
+// projects -> /portfolio/<slug>/, articles -> /blog/<slug>/, experience -> /experience/#<slug>.
+// ![[file.png]] embeds become images served from content/assets.
+function wikilinkTargets() {
+  const targets = new Map();
+  const scan = (dir, url, label) => {
+    for (const file of readdirSync(`content/${dir}`)) {
+      if (!file.endsWith(".md")) continue;
+      const slug = file.slice(0, -3);
+      const { data } = matter(readFileSync(`content/${dir}/${file}`, "utf8"));
+      targets.set(slug, { url: url(slug), text: data[label] || slug });
+    }
+  };
+  scan("projects", (s) => `/portfolio/${s}/`, "title");
+  scan("articles", (s) => `/blog/${s}/`, "title");
+  scan("experience", (s) => `/experience/#${s}`, "org");
+  return targets;
+}
+
 export default function (eleventyConfig) {
   for (const path of ["notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
     eleventyConfig.ignores.add(path);
   }
 
-  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets" });
+  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets" });
+
+  const targets = wikilinkTargets();
+  eleventyConfig.addTransform("wikilinks", function (content) {
+    if (!(this.page.outputPath || "").endsWith(".html")) return content;
+    return content.replace(/(!?)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, embed, target, alias) => {
+      if (embed) return `<img src="/assets/${target.trim()}" alt="">`;
+      const hit = targets.get(target.trim());
+      if (!hit) throw new Error(`Unresolved wikilink ${match} in ${this.page.inputPath}`);
+      return `<a href="${hit.url}">${alias ? alias.trim() : hit.text}</a>`;
+    });
+  });
 
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
 
