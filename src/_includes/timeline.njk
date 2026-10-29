@@ -1,7 +1,7 @@
 {#- Consumes: roles (sorted experience items), detailed (bool) -#}
 <ol class="timeline">
 {%- for item in roles %}
-  <li id="{{ item.fileSlug }}" class="timeline-entry{% if item.data.upcoming %} is-upcoming{% endif %}" style="--i: {{ loop.index0 }}">
+  <li id="{{ item.fileSlug | roleSlug }}" class="timeline-entry{% if item.data.upcoming %} is-upcoming{% endif %}" style="--i: {{ loop.index0 }}">
     <span class="orb" aria-hidden="true"></span>
     <span class="org">{{ item.data.org }}</span>
     {%- set startYear = item.data.start | year -%}

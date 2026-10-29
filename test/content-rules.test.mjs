@@ -32,7 +32,7 @@ title: Links fixture
 date: 2026-01-02
 summary: Uses wikilinks.
 ---
-See [[subassembler]] and [[ontra|the Ontra years]] and [[hello]].
+See [[subassembler]] and [[ontra|the Ontra years]] and [[2017-06-ontra]] and [[hello]].
 
 ![[diagram.png]]
 `);
@@ -63,6 +63,7 @@ test("wikilinks resolve to project, experience, and article pages; embeds become
   const html = read("blog/zz-fixture-links/index.html");
   assert.match(html, /<a href="\/portfolio\/subassembler\/">Subassembler<\/a>/);
   assert.match(html, /<a href="\/experience\/#ontra">the Ontra years<\/a>/);
+  assert.match(html, /<a href="\/experience\/#ontra">Ontra<\/a>/);
   assert.match(html, /<a href="\/blog\/hello\/">Hello<\/a>/);
   assert.match(html, /<img src="\/assets\/diagram.png" alt="">/);
   assert.doesNotMatch(html, /\[\[/);

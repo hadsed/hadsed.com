@@ -13,7 +13,7 @@ npm test        # builds and checks the output
 
 Everything you write lives under `content/`. Each file is markdown with a short front matter block.
 
-A role, in `content/experience/<slug>.md` (omit `end` for a current role; `order` 1 is most recent; `featured: false` keeps a role off the landing page timeline while it stays on the Experience page; `role` and `subtitle` are optional, and `link` turns the subtitle into a link; `upcoming: true` marks the entry with the glowing orb, as `next.md` does):
+A role, in `content/experience/<start>-<slug>.md`, such as `2017-06-ontra.md`, so the files sort chronologically; the site addresses the role by the part after the date, as `/experience/#ontra` (omit `end` for a current role; `order` 1 is most recent; `featured: false` keeps a role off the landing page timeline while it stays on the Experience page; `role` and `subtitle` are optional, and `link` turns the subtitle into a link; `upcoming: true` marks the entry with the glowing orb, as `2026-next.md` does):
 
 ```md
 ---
@@ -68,7 +68,7 @@ units in `scripts/systemd/`) copies that folder into the `obsidian` branch every
 two minutes and keeps one PR open to `main`. Pushes to `obsidian` deploy a
 preview at https://obsidian.hadsed-com.pages.dev; merging deploys hadsed.com.
 `[[slug]]` wikilinks resolve to project, article, and experience pages at build
-time, and `![[file.png]]` embeds images from `assets/`. An unresolved wikilink
+time (a role by its filename, `[[2017-06-ontra]]`, or by the bare `[[ontra]]`), and `![[file.png]]` embeds images from `assets/`. An unresolved wikilink
 fails the build.
 
 Shell changes (anything outside `content/`) go through normal branches and

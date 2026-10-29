@@ -4,19 +4,25 @@ import matter from "gray-matter";
 // Obsidian-style [[wikilinks]] resolve against content/ by file slug:
 // projects -> /portfolio/<slug>/, articles -> /blog/<slug>/, experience -> /experience/#<slug>.
 // ![[file.png]] embeds become images served from content/assets.
+// Role files carry their start date as a prefix (2017-06-ontra.md) so they
+// sort chronologically in Obsidian; the site addresses the role by the rest.
+const roleSlug = (slug) => slug.replace(/^\d{4}(-\d{2})?-/, "");
+
 function wikilinkTargets() {
   const targets = new Map();
-  const scan = (dir, url, label) => {
+  const scan = (dir, url, label, key = (s) => s) => {
     for (const file of readdirSync(`content/${dir}`)) {
       if (!file.endsWith(".md")) continue;
       const slug = file.slice(0, -3);
       const { data } = matter(readFileSync(`content/${dir}/${file}`, "utf8"));
-      targets.set(slug, { url: url(slug), text: data[label] || slug });
+      const target = { url: url(key(slug)), text: data[label] || key(slug) };
+      targets.set(slug, target);   // [[2017-06-ontra]], what Obsidian autocompletes
+      targets.set(key(slug), target); // [[ontra]]
     }
   };
   scan("projects", (s) => `/portfolio/${s}/`, "title");
   scan("articles", (s) => `/blog/${s}/`, "title");
-  scan("experience", (s) => `/experience/#${s}`, "org");
+  scan("experience", (s) => `/experience/#${s}`, "org", roleSlug);
   return targets;
 }
 
@@ -43,6 +49,7 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("year", (value) =>
     value instanceof Date ? String(value.getUTCFullYear()) : String(value).slice(0, 4)
   );
+  eleventyConfig.addFilter("roleSlug", roleSlug);
   eleventyConfig.addFilter("readableDate", (date) =>
     new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(date)
   );
