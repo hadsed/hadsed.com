@@ -1,8 +1,11 @@
-name: Deploy to Cloudflare Pages
+name: Build and deploy to Cloudflare Pages
 
+# main deploys to hadsed.com. The obsidian branch (written by the bridge on the
+# Hetzner box) deploys a preview at https://obsidian.hadsed-com.pages.dev so a
+# content PR can be checked before it is merged.
 on:
   push:
-    branches: [main]
+    branches: [main, obsidian]
 
 jobs:
   deploy:
@@ -12,10 +15,14 @@ jobs:
       deployments: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: f659eb903a5d13a71c5b5dfa74a83cfb
-          command: pages deploy . --project-name=hadsed-com
+          command: pages deploy _site --project-name=hadsed-com --branch=${{ github.ref_name }}

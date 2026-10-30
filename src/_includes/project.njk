@@ -1,0 +1,8 @@
+---
+layout: base.njk
+---
+<article class="prose">
+  <h1>{{ title }}</h1>
+  <p class="meta">{{ year }}{% if link %} · <a href="{{ link }}">{{ link | replace("https://", "") }}</a>{% endif %}</p>
+  {{ content | safe }}
+</article>
