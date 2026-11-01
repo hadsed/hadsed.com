@@ -156,7 +156,9 @@ footer {
   gap: var(--gap);
   align-items: start;
 }
-.about-head { display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem; }
+.about-head { display: flex; align-items: flex-start; gap: 1rem; margin: 0 0 1.25rem; }
+/* Trim the leading above the name so its cap height lines up with the avatar top. */
+.about-head h1 { line-height: 1.2; text-box: trim-start cap alphabetic; }
 .avatar { display: block; width: 56px; height: 56px; border-radius: 4px; flex-shrink: 0; }
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
 .tagline { color: var(--muted); margin: 0; }
