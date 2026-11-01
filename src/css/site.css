@@ -188,6 +188,13 @@ h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--acce
 @media (max-width: 800px) {
   .landing { grid-template-columns: minmax(0, 1fr); }
 }
+/* Side by side, the timeline fills the About column's height instead of a
+   fixed cap; contain: size keeps it from stretching the row itself. */
+@media (min-width: 801px) {
+  .landing { align-items: stretch; }
+  .recent { display: flex; flex-direction: column; }
+  .timeline-scroll { flex: 1 1 0; max-height: none; min-height: 12rem; contain: size; }
+}
 
 /* Reading pages and lists */
 .prose { max-width: var(--measure); }
