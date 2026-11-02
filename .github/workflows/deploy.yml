@@ -2,10 +2,11 @@ name: Build and deploy to Cloudflare Pages
 
 # main deploys to hadsed.com. The obsidian branch (written by the bridge on the
 # Hetzner box) deploys a preview at https://obsidian.hadsed-com.pages.dev so a
-# content PR can be checked before it is merged.
+# content PR can be checked before it is merged. claude/** branches (cloud
+# sessions) get their own preview at https://<branch-slug>.hadsed-com.pages.dev.
 on:
   push:
-    branches: [main, obsidian]
+    branches: [main, obsidian, 'claude/**']
 
 jobs:
   deploy:
