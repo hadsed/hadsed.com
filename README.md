@@ -65,8 +65,10 @@ Content is edited in the Obsidian vault, folder `hadsed.com/`, which mirrors
 `content/`: `about.md`, `experience/`, `projects/`, `articles/`, `assets/`.
 A bridge on the Hetzner box (`scripts/hadsed-bridge.sh`, installed with the
 units in `scripts/systemd/`) copies that folder into the `obsidian` branch every
-20 seconds (pushing only when something changed) and keeps one PR open to `main`. Pushes to `obsidian` deploy a
-preview at https://obsidian.hadsed-com.pages.dev; merging deploys hadsed.com.
+20 seconds, pushing only when something changed. That branch is a record of the
+vault and deploys nothing. To publish copy, bring it into a branch that deploys:
+`git checkout origin/obsidian -- content` on a feature branch gives a preview at
+`https://<branch-slug>.hadsed-com.pages.dev`, and merging to `main` ships it.
 `[[slug]]` wikilinks resolve to project, article, and experience pages at build
 time (a role by its filename, `[[2017-06-ontra]]`, or by the bare `[[ontra]]`), and `![[file.png]]` embeds images from `assets/`. An unresolved wikilink
 fails the build.
