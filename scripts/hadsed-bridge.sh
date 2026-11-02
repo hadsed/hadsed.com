@@ -2,7 +2,6 @@
 # Obsidian -> GitHub bridge for hadsed.com. Runs on the Hetzner box from a
 # systemd timer (see scripts/systemd/). Installed copy: /usr/local/bin/hadsed-bridge.
 #
-# Runs every 20 seconds; pushes only when something changed.
 # Forward: rebuild the `obsidian` branch as BASE_REF plus the vault's hadsed.com/
 # site folders, push it, and keep one open PR to main.
 # Reverse: files under content/ that changed on main since the last run are
@@ -72,13 +71,6 @@ if git diff --quiet origin/main "$BRANCH"; then
   exit 0
 fi
 
-# Each run makes a fresh commit, so compare trees: push (and redeploy the
-# preview) only when the content or the base actually changed.
-if git rev-parse -q --verify "origin/$BRANCH" >/dev/null &&
-   [ "$(git rev-parse "$BRANCH^{tree}")" = "$(git rev-parse "origin/$BRANCH^{tree}")" ]; then
-  exit 0
-fi
-
 git --no-pager diff --stat origin/main "$BRANCH" -- content/ | tail -1
 [ "$PUSH" = 1 ] || { echo "PUSH=0, not pushing"; exit 0; }
 git push -q -f origin "$BRANCH"
@@ -88,5 +80,5 @@ if [ -z "$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].numbe
 
 Preview (after the deploy check passes): $PREVIEW
 
-This branch is rebuilt from the vault every 20 seconds; fix content in Obsidian, not here."
+This branch is rebuilt from the vault every two minutes; fix content in Obsidian, not here."
 fi
