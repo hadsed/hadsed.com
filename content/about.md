@@ -29,4 +29,4 @@ Hello and welcome. I'm Had, and I like applying AI to hard science and engineeri
 
 Lately I've been interested in spatial intelligence, both digital and real-world. My recent work spans neural networks and agents for physics simulation, generative models and UX for next-gen CAD, and understanding construction plans for permitting.
 
-I like receiving email. Drop me a line if you like my work, have a problem I'd be interested in, or just want to say hi.
+I like hearing from people with similar interests. If you like my work, have a problem I'd be interested in, or just want to say hi, drop me a line over email, X, etc.
