@@ -1,9 +1,9 @@
 ---
 org: Solara Health
 role: Cofounder and CTO
-subtitle: Clinician-facing AI copilot
-start: "2023-06"
-end: "2024-01"
+subtitle: Clinician AI copilot
+start: 2023-06
+end: 2024-01
 featured: true
 order: 3
 ---
