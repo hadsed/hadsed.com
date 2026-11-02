@@ -73,12 +73,17 @@ fi
 
 git --no-pager diff --stat origin/main "$BRANCH" -- content/ | tail -1
 [ "$PUSH" = 1 ] || { echo "PUSH=0, not pushing"; exit 0; }
-git push -q -f origin "$BRANCH"
+# The rebuild makes a fresh commit every run; only push when the tree changed.
+if git rev-parse -q --verify "origin/$BRANCH" >/dev/null && git diff --quiet "origin/$BRANCH" "$BRANCH"; then
+  echo "obsidian already up to date"
+else
+  git push -q -f origin "$BRANCH"
+fi
 if [ -z "$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')" ]; then
   gh pr create --base main --head "$BRANCH" --title "Content from Obsidian" \
     --body "Edits from the Obsidian vault folder \`hadsed.com/\`, mirrored by the bridge on the Hetzner box.
 
 Preview (after the deploy check passes): $PREVIEW
 
-This branch is rebuilt from the vault every two minutes; fix content in Obsidian, not here."
+This branch is rebuilt from the vault every 20 seconds; fix content in Obsidian, not here."
 fi
