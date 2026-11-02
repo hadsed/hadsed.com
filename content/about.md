@@ -25,7 +25,8 @@ publications:
   - Approximate Mean-Field Equations for Quasi-2D Bose-Einstein Condensates
 ---
 <!-- Draft from the May 2026 resume. Rewrite freely. -->
+Hello and welcome. I'm Had, and I like applying AI to hard science and engineering problems. I also think a lot about human-computer interaction. I've been a founding engineer at two AI unicorns ($1bn+) and also founded a company.
 
-I build machine learning systems for the physical world: foundation models for physics and CAD, agents that read engineering plans, and the tooling around them. Twelve years in, I have done this as a researcher, a founding engineer, and a department head.
+Lately I've been interested in spatial intelligence, both digital and real-world. My recent work spans neural networks and agents for physics simulation, generative models and UX for next-gen CAD, and understanding construction plans for permitting.
 
-I founded the ML function at Ontra as its first ML hire and grew it to a team of thirteen through two growth rounds. More recently I have focused on foundation models and agentic systems for scientific and industrial domains, at Vinci and now independently through Alpine Intelligence.
+I like hearing from people with similar interests. If you like my work, have a problem I'd be interested in, or just want to say hi, drop me a line over email, X, etc.
