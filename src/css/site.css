@@ -60,7 +60,8 @@ footer {
 
 @media (max-width: 640px) {
   .page { grid-template-columns: minmax(0, 1fr); padding: 1.5rem 1rem 0; }
-  .menu ul { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+  .menu { margin-bottom: 2.25rem; }
+  .menu ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.75rem; }
   .site-name + ul { margin-top: 0.75rem; }
   .menu li { margin: 0; }
   footer { margin-top: 3rem; }
@@ -158,8 +159,8 @@ footer {
 }
 .about-head { display: flex; align-items: flex-start; gap: 1rem; margin: 0 0 1.25rem; }
 /* Trim the leading above the name so its cap height lines up with the avatar top;
-   the 1px nudge keeps Verdana's taller ascenders from poking above the box. */
-.about-head h1 { line-height: 1.2; text-box: trim-start cap alphabetic; margin-top: 1px; }
+   the 3px nudge keeps Verdana's taller ascenders from poking above the box. */
+.about-head h1 { line-height: 1.2; text-box: trim-start cap alphabetic; margin-top: 3px; }
 .avatar { display: block; width: 56px; height: 56px; border-radius: 4px; flex-shrink: 0; }
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
 .tagline { color: var(--muted); margin: 0; }
@@ -189,7 +190,8 @@ h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--acce
 .projects { margin-top: var(--gap); }
 
 @media (max-width: 800px) {
-  .landing { grid-template-columns: minmax(0, 1fr); }
+  .landing { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+  .blurb p:last-child { margin-bottom: 0; }
 }
 /* Side by side, the timeline is sized to 80% of the About column instead of a
    fixed cap; contain: size keeps it from stretching the row itself. */

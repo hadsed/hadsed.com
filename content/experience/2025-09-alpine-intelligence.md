@@ -1,8 +1,8 @@
 ---
 org: Alpine Intelligence
 role: Founder
-subtitle: AI research and product consulting
-start: "2025-09"
+subtitle: AI research & product consulting
+start: 2025-09
 featured: true
 order: 1
 ---
