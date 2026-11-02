@@ -7,7 +7,7 @@ description: Check the content PR that the Obsidian bridge opened, fix what bloc
 
 Content is edited in Obsidian, in the vault folder `hadsed.com/`. A bridge on the
 Hetzner box (`ssh hetzner`) mirrors that folder into `content/` on the `obsidian`
-branch every two minutes and keeps one open PR from `obsidian` to `main`. Merging
+branch every 20 seconds and keeps one open PR from `obsidian` to `main`. Merging
 the PR deploys hadsed.com. This skill is the review step in between.
 
 ## Steps
