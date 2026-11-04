@@ -1,0 +1,133 @@
+import assert from 'node:assert/strict';
+import {defaults as slowDefaults,pose,schedule,cleanSettings,approachMotion,migrateSettings} from './sr71-path.mjs';
+const defaults={...slowDefaults,duration:slowDefaults.duration-slowDefaults.climbExtra,climbExtra:0};
+
+for (const s of [defaults,
+  {...defaults,soft:0,climb:180,clearance:30},
+  {...defaults,duration:6,whipExtra:2,bank:65,turn:70},
+  {...defaults,duration:30,speed:150,height:8}]) {
+  const cuts=schedule(s);
+  const bankStart=cuts[1].start;
+  assert.ok(Math.abs(cuts.at(-1).end-1)<1e-9, 'clip ends at 100%');
+  let previous=pose(0,s);
+  for (let i=0;i<=1000;i++) {
+    const p=pose(i/1000,s);
+    for (const v of [p.aircraft,p.camera,p.aim]) assert.ok(Object.values(v).every(Number.isFinite));
+    if(i/1000<=bankStart)assert.equal(p.aircraft.x,0,'straight flight before banking departure');
+    assert.ok(p.aircraft.z<=previous.aircraft.z, 'aircraft always moves nose-forward');
+    assert.ok(p.aircraft.y>=previous.aircraft.y, 'climb does not reverse');
+    if(i/1000<cuts[1].start)assert.ok(p.camera.y>=p.aircraft.y+s.clearance-1e-9,'front camera stays above aircraft');
+    assert.ok(p.camera.y>=.2,'camera stays above water');
+    previous=p;
+  }
+  const forward=[0,.2,.6,.9,1].map(u=>pose(u,s));
+  const backward=[1,.9,.6,.2,0].map(u=>pose(u,s)).reverse();
+  assert.deepEqual(forward,backward, 'scrubbing backward reproduces the same camera poses');
+}
+assert.equal(cleanSettings({height:Infinity}).height,defaults.height);
+assert.equal(cleanSettings({height:28,hold:2.5,soft:.6,duration:8}).height,28);
+assert.equal(cleanSettings({settings:{height:65,progress:22}}).height,65);
+console.log('Camera path invariants passed.');
+
+const rush=approachMotion(defaults),openingEnd=schedule(defaults)[0].end;
+const first=pose(0,defaults),early=pose(openingEnd*.25,defaults),last=pose(openingEnd,defaults);
+assert.ok(first.camera.z<early.camera.z,'camera initially travels toward aircraft');
+assert.ok(early.aircraft.z<first.aircraft.z,'aircraft independently travels toward camera');
+assert.ok(Math.abs(last.camera.z-last.aircraft.z)<Math.abs(first.camera.z-first.aircraft.z),'opening closes distance');
+assert.ok(Math.abs(Math.abs(last.camera.z-last.aircraft.z)-rush.endGap)<.01,'opening reaches computed gap');
+for(let i=1;i<=100;i++){const u=openingEnd*i/100;const p=pose(u,defaults);assert.ok(p.aircraft.z-p.camera.z>=defaults.nose-1e-6,'opening never crosses through plane')}
+for(const cut of schedule(defaults).slice(0,-1)){const a=pose(cut.end-1e-8,defaults),b=pose(cut.end+1e-8,defaults);assert.ok(Math.hypot(a.camera.x-b.camera.x,a.camera.y-b.camera.y,a.camera.z-b.camera.z)<.1,'phase boundary stays continuous')}
+console.log('Opening approach motion and phase continuity passed.');
+
+const revisedCuts=schedule(defaults);
+assert.equal(last.camera.x,0,'closing endpoint remains head-on');
+assert.ok(Math.abs(last.camera.y-(defaults.flightHeight+defaults.clearance))<1e-8,'closing reaches the supplied frame height');
+assert.ok(Math.abs(last.aircraft.z-last.camera.z-defaults.nose)<1e-8,'single approach reaches exact close frame');
+let priorGap=Infinity,priorHeight=Infinity;
+for(let n=0;n<=200;n++){
+ const p=pose(openingEnd*n/200,defaults),gap=p.aircraft.z-p.camera.z;
+ assert.ok(gap<=priorGap+1e-7,'single closing path never retreats');
+ assert.ok(p.camera.y<=priorHeight+1e-7,'camera descends continuously through closing path');
+ priorGap=gap;priorHeight=p.camera.y;
+}
+for(let n=0;n<=100;n++){
+ const u=revisedCuts[1].start+(1-revisedCuts[1].start)*n/100,p=pose(u,defaults);
+ const radius=Math.hypot(p.camera.x-p.aircraft.x,p.camera.z-p.aircraft.z);
+ if(u>=revisedCuts[1].end)assert.ok(radius<=defaults.nose+1e-8,'rear follow only pushes closer');
+ if(u>=revisedCuts[1].end){const nozzleY=p.aircraft.y-9.5*Math.sin(p.pitch);assert.ok(Math.abs(p.camera.y-nozzleY-defaults.exhaustHeight)<1e-8,'camera follows nozzle eye height during climb');}
+}
+const exhaust=pose(revisedCuts[2].start,defaults);
+assert.ok(exhaust.camera.z>exhaust.aircraft.z,'camera acquired rear');
+const rearAlignment=Math.atan2(exhaust.camera.x-exhaust.aircraft.x,exhaust.camera.z-exhaust.aircraft.z)+exhaust.heading;
+assert.ok(Math.abs(rearAlignment-Math.atan2(-defaults.nose*Math.sin(defaults.orbitAngle*Math.PI/180)+defaults.settlePan,-defaults.nose*Math.cos(defaults.orbitAngle*Math.PI/180)-defaults.settleZoom))<1e-8,'saved rear angle retained relative to turning aircraft');
+const beforeClimb=pose(revisedCuts[2].start-.01,defaults);
+assert.equal(beforeClimb.aircraft.y,defaults.flightHeight,'aircraft stays level while bank establishes');
+assert.ok(beforeClimb.bank>.1,'visible bank established before climb');
+assert.equal(pose(1,defaults).fade,0,'ending preserves horizon and exhausts without wash');
+const end=pose(1,defaults);
+assert.ok(end.aircraft.x>0,'departure curves toward aircraft right');
+assert.ok(end.bank>0&&end.heading>0&&end.pitch>0,'departure banks, turns, and climbs together');
+assert.equal(revisedCuts.length,3,'fourth section removed');
+const whipQuarter=pose(revisedCuts[1].start+.25*(revisedCuts[1].end-revisedCuts[1].start),defaults);
+assert.ok(whipQuarter.bank>.1,'bank visible during camera whip');
+const dx=whipQuarter.camera.x-whipQuarter.aircraft.x,dz=whipQuarter.camera.z-whipQuarter.aircraft.z;
+const localX=Math.cos(whipQuarter.heading)*dx+Math.sin(whipQuarter.heading)*dz;
+assert.ok(Math.abs(localX)<defaults.nose*.6,'pass hugs aircraft more closely than former circle');
+const endRadius=Math.hypot(end.camera.x-end.aircraft.x,end.camera.z-end.aircraft.z);
+assert.ok(endRadius>defaults.pushGap&&endRadius<defaults.nose,'trimmed clip ends during the closer push');
+console.log('Tight side whip, bank during whip, eye-level follow, and late jet push passed.');
+
+const dt=1e-6,relativeForward=u=>{const p=pose(u,defaults);return p.camera.z-p.aircraft.z};
+const enterBefore=(relativeForward(openingEnd)-relativeForward(openingEnd-dt))/(dt*defaults.duration);
+const enterAfter=(relativeForward(openingEnd+dt)-relativeForward(openingEnd))/(dt*defaults.duration);
+assert.ok(enterBefore>30&&enterAfter>30,'forward rush continues into the slowed whip without stopping');
+
+
+const legacy={...defaults,duration:7.5,hold:.3,whipExtra:.65};
+const migrated=migrateSettings({version:9,settings:legacy});
+assert.equal(migrated.whipExtra,.95);
+assert.ok(Math.abs(migrated.duration-slowDefaults.duration)<1e-8);
+assert.deepEqual(migrateSettings({version:12,settings:migrated}),migrated,'migration applies once');
+assert.ok(Math.abs(revisedCuts[1].duration-1.89)<1e-8,'former whip and settle share one section');
+assert.ok(Math.abs(revisedCuts[2].start*defaults.duration-5.62)<1e-8,'climb start unchanged');
+const baseTiming=schedule({...defaults,duration:defaults.duration-.65,whipExtra:defaults.whipExtra-.65});
+for(let i=0;i<3;i++)assert.ok(Math.abs(revisedCuts[i].duration-baseTiming[i].duration-(i===1?.65:0))<1e-8,'extra whip control only changes the whip');
+// The acquired rear frame is the former settle endpoint, with no separate hold.
+const acquired=pose(revisedCuts[1].end,defaults);
+const localOffset=p=>{const dx=p.camera.x-p.aircraft.x,dz=p.camera.z-p.aircraft.z;return {x:Math.cos(p.heading)*dx+Math.sin(p.heading)*dz,z:-Math.sin(p.heading)*dx+Math.cos(p.heading)*dz}};
+const rear=localOffset(acquired),angle=defaults.orbitAngle*Math.PI/180;
+assert.ok(Math.abs(rear.x-(-defaults.nose*Math.sin(angle)+defaults.settlePan))<1e-8);
+assert.ok(Math.abs(rear.z-(-defaults.nose*Math.cos(angle)-defaults.settleZoom))<1e-8);
+// Check first derivatives at the former late-whip kink and the new climb boundary.
+const difference=(a,b)=>({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
+for(const fraction of [.55,.65,1]){
+ const u=revisedCuts[1].start+(revisedCuts[1].end-revisedCuts[1].start)*fraction,h=1e-6;
+ for(const key of ['camera','aim']){
+  const left=difference(pose(u,defaults)[key],pose(u-h,defaults)[key]);
+  const right=difference(pose(u+h,defaults)[key],pose(u,defaults)[key]);
+  assert.ok(Math.hypot(...Object.keys(left).map(k=>(left[k]-right[k])/(h*defaults.duration)))<.1,'late acquisition has no velocity jump');
+ }
+}
+console.log('Merged acquisition endpoint, migration, timing and smoothness passed.');
+
+// The nose remains exactly on the optical axis throughout section three.
+for(let n=0;n<=50;n++){
+ const u=revisedCuts[2].start+(1-revisedCuts[2].start)*n/50,p=pose(u,defaults);
+ const nose={x:p.aircraft.x+Math.sin(p.heading)*Math.cos(p.pitch)*13.5,y:p.aircraft.y+Math.sin(p.pitch)*13.5,z:p.aircraft.z-Math.cos(p.heading)*Math.cos(p.pitch)*13.5};
+ assert.deepEqual(p.aim,nose);
+ assert.ok(Math.abs(Math.hypot(p.up.x,p.up.y,p.up.z)-1)<1e-8);
+}
+assert.equal(pose(revisedCuts[2].start,defaults).roll,0,'roll starts smoothly at section three');
+assert.ok(pose(1,defaults).roll>.8,'camera rolls visibly through bank');
+console.log('Nose lock, camera roll and trimmed ending passed.');
+
+const fastCuts=schedule(defaults),slowCuts=schedule(slowDefaults);
+for(let i=0;i<2;i++)assert.ok(Math.abs(fastCuts[i].duration-slowCuts[i].duration)<1e-8,'only section three slows');
+assert.ok(Math.abs(slowCuts[2].duration-2*fastCuts[2].duration)<1e-8);
+for(let n=0;n<=100;n++){
+ const t=n/100,q=2*t-t*t;
+ const slow=pose(slowCuts[2].start+(1-slowCuts[2].start)*t,slowDefaults);
+ const fast=pose(fastCuts[2].start+(1-fastCuts[2].start)*q,defaults);
+ for(const key of ['camera','aim','aircraft','up'])for(const axis of ['x','y','z'])assert.ok(Math.abs(slow[key][axis]-fast[key][axis])<1e-7,'retimed pose preserves geometry and orientation');
+}
+console.log('Section three doubles duration with unchanged motion path and framing.');

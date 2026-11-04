@@ -1,0 +1,9 @@
+{
+  "kind": "sr71-camera-blocking-proposal",
+  "units": "normalized-not-meters",
+  "progress": 0,
+  "height": 28,
+  "hold": 2.5,
+  "soft": 0.6,
+  "duration": 8
+}

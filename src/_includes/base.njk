@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if title %}{{ title }} · Had Seddiqi{% else %}Had Seddiqi{% endif %}</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<div class="page">
+  <nav class="menu">
+    {%- if page.url != "/" %}
+    <a class="site-name" href="/">Had Seddiqi</a>
+    {%- endif %}
+    <ul>
+      {%- set items = [["/", "About"], ["/portfolio/", "Portfolio"], ["/experience/", "Experience"], ["/blog/", "Blog"]] -%}
+      {%- for item in items -%}
+        {%- set href = item[0] -%}
+        {%- set current = (href == "/" and page.url == "/") or (href != "/" and page.url.startsWith(href)) -%}
+        <li><a{% if current %} aria-current="page"{% endif %} href="{{ href }}">{{ item[1] }}</a></li>
+      {%- endfor -%}
+    </ul>
+  </nav>
+  <main>
+{{ content | safe }}
+  </main>
+</div>
+<footer>© {{ buildYear }} Had Seddiqi</footer>
+</body>
+</html>

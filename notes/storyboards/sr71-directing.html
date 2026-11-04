@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SR-71 · Directing room</title>
+<script src="sr71-theme.js"></script>
+<link rel="stylesheet" href="sr71-directing.css?v=12">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+<header><div><strong>SR-71</strong><span class="muted"> / directing room</span></div><nav aria-label="Workspace"><button id="directing-tab" aria-selected="true">Directing</button><button id="storyboard-tab" aria-selected="false">Storyboard <span id="capture-count"></span></button><button id="rendering-tab" aria-selected="false">Rendering</button></nav><div class="header-tools"><label class="theme-label">Theme <select id="theme" aria-label="Page theme"><option value="light">Light</option><option value="dark">Dark</option><option value="system" selected>System</option></select></label><a href="../sr71-directing-board.md">Shot notes ↗</a></div></header>
+<main id="directing">
+<aside>
+<div class="aside-title"><strong id="phase-controls-title">Closing approach</strong><small id="phase-controls-time">Current phase controls · relative units</small></div>
+<div id="controls"></div><details id="global-settings"><summary>Whole clip & display</summary><div id="global-controls"></div></details>
+<section class="files"><h2>Settings & frames</h2><button id="capture">Capture this frame</button><button id="save">Export settings JSON</button><label class="file-button">Import settings JSON<input id="import" type="file" accept="application/json,.json"></label><button id="reset">Reset to Had’s preset</button><p>Captures stay in this browser’s storyboard gallery. Download a frame and its settings there to keep them with the repo.</p><p id="status" role="status" aria-live="polite"></p></section>
+</aside>
+<div class="workspace">
+<div class="toolbar"><div><span class="dot"></span> LIVE 3D BLOCKOUT <span class="muted">· original proxy geometry</span></div><div><button id="shot-view" aria-pressed="true">Shot</button><button id="scene-view" aria-pressed="false">Scene / paths</button></div></div>
+<div id="viewport" tabindex="0" aria-label="3D shot viewport. Scroll to scrub, arrow keys to step through time."><div id="loading">Loading local 3D renderer…</div><canvas id="canvas"></canvas><div id="light"></div><div id="view-label">SHOT CAMERA</div><div id="viewport-hint">Scroll to scrub · ← → step</div></div>
+<div class="transport"><button id="play">Play</button><button id="start" aria-label="Return to start">↤</button><input id="progress" type="range" min="0" max="100" step="0.1" value="0" aria-label="Clip progress"><output id="time">0.00 / 8.00s</output></div>
+<div class="phase-timeline"><div id="beats" class="beats" aria-label="Timeline phases"></div><div id="phase-playhead" aria-hidden="true"></div></div>
+<div class="beat-info"><h1 id="beat-title"></h1><p id="beat-note"></p><div id="readout" class="muted"></div></div>
+<footer>Controls follow the current phase. Lens, aim and easing are shared wherever shown. <span class="muted">This is camera previs; clouds, water, exhaust and aircraft details are placeholders.</span></footer>
+</div>
+</main>
+<section id="storyboard" hidden><div class="gallery-head"><div><h1>Storyboard</h1><p>Composition studies, original blockouts, and frames captured from your shot. Open a capture to restore its camera settings.</p></div><select id="gallery-filter" aria-label="Filter storyboard"><option value="all">Everything</option><option value="capture">My captures</option><option value="latest">Latest stills</option><option value="earlier">Earlier studies</option><option value="blockout">Original blockouts</option></select></div><div id="gallery"></div></section>
+<section id="rendering" hidden>
+ <div class="gallery-head"><div><h1>Rendering</h1><p>Keep the motion we directed. Build the atmosphere around it.</p></div><span class="render-badge">Preparation · renderer not connected</span></div>
+ <div class="render-layout">
+ <article class="render-panel"><h2>01 / Choose the handoff</h2>
+ <label for="render-route">Rendering route</label><select id="render-route"><option value="3d">3D render · preserve the camera path</option><option value="ai">AI video · explore a visual treatment</option></select>
+ <p id="route-description"></p>
+ <label for="render-look">Visual direction</label><textarea id="render-look" rows="6">Blue-purple twilight over dark water. A huge, quiet storm ceiling with smooth cloud layers, subtle orange afterglow at the horizon, matte black SR-71, and pale blue-white exhaust. Keep the poster's photographic mood. No lightning, text, camera shake, or sideways aircraft motion.</textarea>
+ <div class="render-options"><label>Output size<select id="render-size"><option value="1280x720">1280 × 720 · draft</option><option value="1920x1080">1920 × 1080</option></select></label><label>Frame rate<select id="render-fps"><option value="24">24 fps</option><option value="30" selected>30 fps</option><option value="60">60 fps</option></select></label></div>
+ </article>
+ <article class="render-panel"><h2>02 / Prepare this shot</h2><p id="render-summary"></p><ol id="render-phases"></ol>
+ <div class="render-actions"><button id="render-package">Download motion package</button><button id="render-brief">Download render brief</button></div>
+ <p class="muted">The package contains sampled camera positions, targets, lens, aircraft transforms, phase timing, and your visual brief. It is a handoff for a renderer, not a finished video.</p>
+ <p id="render-status" role="status" aria-live="polite"></p></article>
+ <article class="render-panel render-wide"><h2>03 / From blockout to finished video</h2><div class="render-steps"><div><h3>Lock movement</h3><p>Review the complete shot in Directing. Capture the opening, wing pass, rear acquisition, and ending in Storyboard.</p></div><div><h3>Approve one still</h3><p>Replace the proxy with the final aircraft, water, clouds, and lighting. Match a captured frame before rendering the sequence.</p></div><div><h3>Render & compare</h3><p>Make a small draft first. Compare it with the blockout, then render the final video and compress it for the site.</p></div></div><p class="muted">Next integration: import the motion package into Blender and bake camera / aircraft keyframes. For AI exploration, use approved stills and a blockout clip as references; motion fidelity must be checked against the directed shot.</p></article>
+ </div>
+</section>
+<dialog id="image-dialog"><button id="close-dialog" aria-label="Close image">×</button><img id="dialog-image" alt=""><h2 id="dialog-title"></h2><p id="dialog-note"></p><div id="dialog-actions"></div></dialog>
+<script type="module" src="sr71-directing.mjs?v=12"></script>
+</body>
+</html>
