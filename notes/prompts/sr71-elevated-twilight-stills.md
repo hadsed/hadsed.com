@@ -1,0 +1,16 @@
+# SR-71 elevated twilight still prompts
+
+October 4, 2026. Built-in GPT Image edits of the three previous still studies. Camera height and distance change in the first two; the side/three-quarter angle is preserved in the third. Blue-purple twilight remains dominant, with subdued orange afterglow and smoother cloud masses. These are composition studies, not a new paid video submission.
+
+## Distant elevated approach
+
+Edit this cinematic SR-71 still. Preserve the single aircraft and its distant head-on approach, but move the camera substantially higher above the water, farther back, with only a very gentle downward viewing angle. The aircraft should be smaller, about 5–7% of frame width, and appear lower in the frame, around 78% down; do not show its belly. This is an elevated viewpoint with huge sky scale, not a steep top-down view. Keep water a narrow band. Change the grade to primarily deep blue-purple / indigo twilight with a subtle muted orange-peach afterglow close to the distant horizon. Replace the highly choppy cauliflower storm clouds with smoother, broader continuous layered cloud masses and soft atmospheric transitions. Quiet post-sunset overcast, photographic and restrained. No lightning, turbulent procedural-looking texture, daytime white glare, text, labels, interface or border. Full-bleed 16:9 single image.
+
+## Elevated nose approach
+
+Edit this close head-on SR-71 still. Raise the camera substantially above the water and increase camera distance so the plane is visibly smaller, occupying around one-third of frame width, lower in the image around 72–78% down. View gently down toward the upper nose and canopy rather than from water level; do not use a steep overhead perspective or underside view. The nose should still be significant compared to the distant approach, just before the camera changes position. Preserve a recognizable single SR-71 and quiet dark reflective water. Regrade into deep blue-purple / indigo post-sunset twilight with restrained muted orange-peach afterglow near the distant horizon. Replace choppy cauliflower clouds with smoother broad continuous layered cloud masses, soft haze and photographic diffuse light. Sky is dominant, water only below. No lightning, bright daytime white cloud breaks, turbulent procedural texture, text, labels, panels, interface or borders. Full-bleed 16:9.
+
+## Smooth-cloud twilight side view
+
+Edit this blue-toned side/three-quarter SR-71 still. Preserve the current aircraft angle, whole-aircraft framing, matte dark aircraft, cold white-blue afterburners and broadly blue-purple palette; this angle is the preferred side-tracking study. Make the scene post-sunset rather than bright stormy daytime: deep indigo and bluish purple remain dominant, with a subtle muted peach-orange afterglow along the distant horizon softly reflected in dark water. Smooth the clouds into broad layered overcast masses with soft continuous transitions, rather than choppy cauliflower/boiling turbulent patterns. Keep photographic depth and the poster's quiet reflective mood. Avoid sunset sun disk, intense orange sky, lightning, daytime white glare, procedural texture. One plane and subdued soft reflection. Full-bleed 16:9 single image, no text, captions, UI or borders.
+

@@ -1,0 +1,1 @@
+{ "tags": ["projects"], "layout": "project.njk", "permalink": "/portfolio/{{ page.fileSlug }}/" }

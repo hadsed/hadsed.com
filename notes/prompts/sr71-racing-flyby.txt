@@ -1,0 +1,5 @@
+Create a cinematic shot of an SR-71 Blackbird flying fast over dark water beneath a huge, moody overcast sky. Use @Image1, the supplied poster, as inspiration for the aircraft and atmosphere; ignore the black surround of the screenshot.
+
+Take inspiration from car-racing cinematography: the anticipation of something approaching at speed, then the visceral rush when it suddenly zooms past the camera. Translate that feeling to the aircraft. Find an exciting camera position and let the shot develop naturally. Choose the framing, camera movement, and timing yourself.
+
+Keep the world quiet, looming, and stormy, with the aircraft's speed providing the drama. No visible text or interface. Silent output.

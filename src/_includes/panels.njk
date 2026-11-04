@@ -1,0 +1,13 @@
+{#- Consumes: projects (sorted project items) -#}
+<section class="panels">
+{%- for item in projects %}
+  <article class="panel">
+    <h3><a href="{{ item.url }}">{{ item.data.title }}</a></h3>
+    <span class="year">{{ item.data.year }}</span>
+    <p class="summary">{{ item.data.summary }}</p>
+    {%- if item.data.link %}
+    <a class="link" href="{{ item.data.link }}">{{ item.data.link | replace("https://", "") }}</a>
+    {%- endif %}
+  </article>
+{%- endfor %}
+</section>

@@ -1,0 +1,61 @@
+{
+  "kind": "sr71-3d-camera-blocking",
+  "version": 4,
+  "units": "relative-not-meters",
+  "progress": 63.21962689879279,
+  "settings": {
+    "progress": 63.21962689879279,
+    "height": 42,
+    "hold": 0.45,
+    "soft": 0.6,
+    "duration": 7,
+    "approachDuration": 2,
+    "cameraRush": 500,
+    "planeRush": 280,
+    "fov": 56,
+    "framing": -0.12,
+    "distant": 1800,
+    "nose": 19,
+    "side": 42,
+    "lead": 0,
+    "sideHeight": 12,
+    "rear": 90,
+    "endGap": 19,
+    "clearance": 4,
+    "flightHeight": 4,
+    "speed": 65,
+    "climb": 35,
+    "exhaustAim": 0.06,
+    "orbitAngle": 172,
+    "bank": 40,
+    "turn": 35,
+    "ease": 1,
+    "fadeStart": 91,
+    "fade": 1,
+    "grid": 1,
+    "clay": 0
+  },
+  "pose": {
+    "aircraft": {
+      "x": 0,
+      "y": 4,
+      "z": -1183.22757897587
+    },
+    "camera": {
+      "x": -11.228999854258007,
+      "y": 8,
+      "z": -1167.9008192963724
+    },
+    "aim": {
+      "x": 0,
+      "y": 4.314457264692637,
+      "z": -1175.2866837841373
+    },
+    "pitch": 0,
+    "heading": 0,
+    "bank": 0,
+    "beat": 2,
+    "time": 4.425373882915496,
+    "fade": 0
+  }
+}

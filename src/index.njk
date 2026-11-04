@@ -1,0 +1,36 @@
+---
+layout: base.njk
+permalink: /
+---
+{%- set about = collections.about[0] -%}
+<div class="landing">
+  <section class="about">
+    <header class="about-head">
+      <img class="avatar" src="{{ about.data.avatar }}" alt="" width="56" height="56">
+      <div>
+        <h1>{{ about.data.name }}</h1>
+        <p class="tagline">{{ about.data.tagline }}</p>
+      </div>
+    </header>
+    <ul class="links">
+      {%- for link in about.data.links %}
+      <li><a class="button" href="{{ link.url }}">{% set icon = link.icon %}{% include "icon.njk" %}{{ link.label }}</a></li>
+      {%- endfor %}
+    </ul>
+    <div class="blurb">{{ about.templateContent | safe }}</div>
+  </section>
+
+  <section class="recent">
+    <h2 class="label">Experience</h2>
+    <div class="timeline-scroll">
+      {% set roles = collections.featured %}{% set detailed = false %}
+      {% include "timeline.njk" %}
+    </div>
+  </section>
+</div>
+
+<section class="projects">
+  <h2 class="label">Projects</h2>
+  {% set projects = collections.projects %}
+  {% include "panels.njk" %}
+</section>

@@ -1,0 +1,14 @@
+{
+  "id": "gen-vid-1791176515-7Vg7Cm4cIFHouizkCO6B",
+  "status": "completed",
+  "generation_id": "gen-vid-1791176515-7Vg7Cm4cIFHouizkCO6B",
+  "usage": {
+    "cost": 1.0322825,
+    "is_byok": false
+  },
+  "model": "bytedance/seedance-2.5",
+  "duration": 10,
+  "resolution": "480p",
+  "aspect_ratio": "16:9",
+  "generate_audio": false
+}
