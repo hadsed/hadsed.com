@@ -3,7 +3,7 @@ tags: [about]
 permalink: false
 name: Had Seddiqi
 tagline: Machine learning for the physical world
-avatar: /assets/avatar.svg
+avatar: /assets/avatar.jpg
 links:
   - label: GitHub
     icon: github

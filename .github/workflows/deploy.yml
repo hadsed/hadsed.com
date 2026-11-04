@@ -5,7 +5,7 @@ name: Build and deploy to Cloudflare Pages
 # content PR can be checked before it is merged.
 on:
   push:
-    branches: [main, obsidian]
+    branches: [main, obsidian, 'claude/**']
 
 jobs:
   deploy:

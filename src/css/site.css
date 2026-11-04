@@ -159,10 +159,10 @@ footer {
   gap: var(--gap);
   align-items: start;
 }
-.about-head { display: flex; align-items: flex-start; gap: 1rem; margin: 0 0 1.25rem; }
-/* Trim the leading above the name so its cap height lines up with the avatar top;
-   the 1px nudge keeps Verdana's taller ascenders from poking above the box. */
-.about-head h1 { line-height: 1.2; text-box: trim-start cap alphabetic; margin-top: 1px; }
+.about-head { display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem; }
+/* Name and tagline sit centered on the avatar, so the space above the name
+   matches the space below the tagline instead of pinning the cap height to the top. */
+.about-head h1 { line-height: 1.2; }
 .avatar { display: block; width: 56px; height: 56px; border-radius: 4px; flex-shrink: 0; }
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
 .tagline { color: var(--muted); margin: 0; }
