@@ -33,11 +33,11 @@ test("landing page shows about, timeline, and projects", () => {
   assert.match(html, /2012 – 2015/);
   assert.match(html, /class="dates">2013</);
   assert.doesNotMatch(html, /2013 – 2013/);
-  assert.match(html, /mailto:hadsed@gmail.com/);
+  assert.match(html, /mailto:h@hadsed.com/);
   assert.doesNotMatch(html, /Adiabatic Quantum Optimization for Associative Memory Recall/);
   assert.match(html, /class="org">Vinci4d</);
   assert.match(html, /My next 5-year role/);
-  assert.match(html, /class="role"><a href="mailto:hadsed@gmail.com">Reach out to me<\/a><\/div>/);
+  assert.match(html, /class="role"><a href="mailto:h@hadsed.com">Reach out to me<\/a><\/div>/);
   assert.match(html, /ML Engineer, Electrical DNA sequencing/);
   assert.doesNotMatch(html, / · /);
   assert.doesNotMatch(html, /entry-head/);
@@ -45,7 +45,7 @@ test("landing page shows about, timeline, and projects", () => {
   assert.doesNotMatch(html, /Georgia Southern/);
   assert.match(html, /<\/header>[\s\S]*?class="links"[\s\S]*?class="blurb"/);
   assert.equal((html.match(/class="button"/g) || []).length, 4);
-  assert.match(html, /<svg[\s\S]*?mailto:hadsed@gmail.com|mailto:hadsed@gmail.com[\s\S]*?<svg/);
+  assert.match(html, /<svg[\s\S]*?mailto:h@hadsed.com|mailto:h@hadsed.com[\s\S]*?<svg/);
   assert.match(html, /Intelligent Robotics Group/);
   assert.match(html, /class="about-head">\s*<img class="avatar"[\s\S]*?<h1>Had Seddiqi<\/h1>/);
   assert.doesNotMatch(html, /class="site-name"/);
