@@ -160,12 +160,24 @@ footer {
   align-items: start;
 }
 .about-head { display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem; }
-/* Name and tagline sit centered on the avatar, so the space above the name
-   matches the space below the tagline instead of pinning the cap height to the top. */
-.about-head h1 { line-height: 1.2; }
-.avatar { display: block; width: 56px; height: 56px; border-radius: 4px; flex-shrink: 0; }
+/* The name is the page's one serif moment: a single line set large beside the photo.
+   It scales with the column (cqi) so it never runs into the timeline. */
+.about { container-type: inline-size; }
+.about-head h1 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(36px, calc((100cqi - 96px) * 0.2), 56px);
+  letter-spacing: -0.01em;
+  line-height: 1;
+  margin: 0;
+  white-space: nowrap;
+}
+.avatar { display: block; width: 80px; height: 80px; border-radius: 4px; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .about-head h1 { font-size: min(44px, calc((100cqi - 80px) * 0.2)); }
+  .avatar { width: 64px; height: 64px; }
+}
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
-.tagline { color: var(--muted); margin: 0; }
 .blurb p { margin: 0 0 1rem; }
 .blurb a { text-decoration: underline; text-underline-offset: 2px; }
 .label {
