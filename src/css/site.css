@@ -167,6 +167,7 @@ footer {
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
 .tagline { color: var(--muted); margin: 0; }
 .blurb p { margin: 0 0 1rem; }
+.blurb a { text-decoration: underline; text-underline-offset: 2px; }
 .label {
   font-size: 0.75rem;
   font-weight: 400;
