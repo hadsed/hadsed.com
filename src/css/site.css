@@ -176,10 +176,17 @@ footer {
   line-height: 1;
   margin: 0;
   white-space: nowrap;
-  /* With line-height 1 the glyphs sit 0.055em low in the line box; lift them so the
-     ink, not the line box, is centered on the photo. */
+  /* Fallback: with line-height 1 the glyphs sit about 0.055em low in the line box
+     (this depends on the platform's font metrics), so lift them. */
   position: relative;
   top: -0.055em;
+}
+/* Where supported, trim the line box to cap height and baseline, which come from the
+   glyphs, not platform metrics. Petrona's "d" rises 0.09em above the cap and the "q"
+   drops 0.26em below the baseline, so lift by half the difference to center
+   the ink on the photo. */
+@supports (text-box: trim-both cap alphabetic) {
+  .about-head h1 { text-box: trim-both cap alphabetic; top: -0.085em; }
 }
 .avatar {
   display: block; width: calc(var(--name) + 5px); height: calc(var(--name) + 5px);
