@@ -160,12 +160,14 @@ footer {
   align-items: start;
 }
 /* The name is the page's one serif moment: a single line beside the photo.
-   Petrona's ink, from the top of the "H" to the bottom of the "q", is 1em tall, so the
-   photo is 1em + 5px and the name fills it with about 2.5px to spare at top and bottom.
+   It is optically centered: the eye reads the body of the letters (cap height to
+   baseline, 0.65em in Petrona), not the lone descender, so that block sits dead center
+   on the photo. The photo is 1.17em + 5px so the "q" (0.26em below the baseline)
+   still lands about 2.5px inside its bottom edge.
    Both scale with the column (cqi) so the name never runs into the timeline. */
 .about { container-type: inline-size; }
 .about-head {
-  --name: clamp(28px, calc((100cqi - 24px) * 0.165), 56px);
+  --name: clamp(28px, calc((100cqi - 24px) * 0.155), 56px);
   display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem;
 }
 .about-head h1 {
@@ -176,20 +178,18 @@ footer {
   line-height: 1;
   margin: 0;
   white-space: nowrap;
-  /* Fallback: with line-height 1 the glyphs sit about 0.055em low in the line box
-     (this depends on the platform's font metrics), so lift them. */
+  /* Fallback: with line-height 1 the cap block sits about 0.03em above the line box's
+     center (this depends on the platform's font metrics), so nudge it down. */
   position: relative;
-  top: -0.055em;
+  top: 0.03em;
 }
 /* Where supported, trim the line box to cap height and baseline, which come from the
-   glyphs, not platform metrics. Petrona's "d" rises 0.09em above the cap and the "q"
-   drops 0.26em below the baseline, so lift by half the difference to center
-   the ink on the photo. */
+   glyphs, not platform metrics, so flex centering centers the cap block exactly. */
 @supports (text-box: trim-both cap alphabetic) {
-  .about-head h1 { text-box: trim-both cap alphabetic; top: -0.085em; }
+  .about-head h1 { text-box: trim-both cap alphabetic; top: 0; }
 }
 .avatar {
-  display: block; width: calc(var(--name) + 5px); height: calc(var(--name) + 5px);
+  display: block; width: calc(var(--name) * 1.17 + 5px); height: calc(var(--name) * 1.17 + 5px);
   border-radius: 4px; flex-shrink: 0;
 }
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
