@@ -159,23 +159,31 @@ footer {
   gap: var(--gap);
   align-items: start;
 }
-.about-head { display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem; }
-/* The name is the page's one serif moment: a single line set large beside the photo.
-   It scales with the column (cqi) so it never runs into the timeline. */
+/* The name is the page's one serif moment: a single line beside the photo.
+   Petrona's ink, from the top of the "H" to the bottom of the "q", is 1em tall, so the
+   photo is 1em + 5px and the name fills it with about 2.5px to spare at top and bottom.
+   Both scale with the column (cqi) so the name never runs into the timeline. */
 .about { container-type: inline-size; }
+.about-head {
+  --name: clamp(28px, calc((100cqi - 24px) * 0.165), 56px);
+  display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem;
+}
 .about-head h1 {
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-weight: 500;
-  font-size: clamp(36px, calc((100cqi - 96px) * 0.2), 56px);
-  letter-spacing: -0.01em;
+  font-family: Petrona, Georgia, serif;
+  font-weight: 300;
+  font-size: var(--name);
+  letter-spacing: -0.02em;
   line-height: 1;
   margin: 0;
   white-space: nowrap;
+  /* With line-height 1 the glyphs sit 0.055em low in the line box; lift them so the
+     ink, not the line box, is centered on the photo. */
+  position: relative;
+  top: -0.055em;
 }
-.avatar { display: block; width: 80px; height: 80px; border-radius: 4px; flex-shrink: 0; }
-@media (max-width: 640px) {
-  .about-head h1 { font-size: min(44px, calc((100cqi - 80px) * 0.2)); }
-  .avatar { width: 64px; height: 64px; }
+.avatar {
+  display: block; width: calc(var(--name) + 5px); height: calc(var(--name) + 5px);
+  border-radius: 4px; flex-shrink: 0;
 }
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
 .blurb p { margin: 0 0 1rem; }
