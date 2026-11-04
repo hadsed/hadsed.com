@@ -36,6 +36,9 @@ body {
   grid-template-columns: var(--menu-width) minmax(0, 1fr);
   column-gap: var(--gap);
   align-items: start;
+  /* Short pages: keep the menu and content at the top instead of spreading the
+     leftover height between the stacked rows on mobile. */
+  align-content: start;
 }
 
 a { color: var(--text); text-decoration: none; }
@@ -59,7 +62,7 @@ footer {
 }
 
 @media (max-width: 640px) {
-  .page { grid-template-columns: minmax(0, 1fr); padding: 1.5rem 1rem 0; }
+  .page { grid-template-columns: minmax(0, 1fr); row-gap: 2.25rem; padding: 1.5rem 1rem 0; }
   .menu ul { display: flex; flex-wrap: wrap; gap: 1.25rem; }
   .site-name + ul { margin-top: 0.75rem; }
   .menu li { margin: 0; }
