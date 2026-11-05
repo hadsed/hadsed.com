@@ -9,7 +9,7 @@
   --font: Verdana, Geneva, system-ui, -apple-system, sans-serif;
   --measure: 42rem;
   --gap: 2.5rem;
-  --menu-width: 9rem;
+  --menu-width: 6.5rem;
   --date-col: 6.5rem;
 }
 
@@ -34,7 +34,7 @@ body {
   padding: 3rem 1.5rem 0;
   display: grid;
   grid-template-columns: var(--menu-width) minmax(0, 1fr);
-  column-gap: var(--gap);
+  column-gap: 2rem;
   align-items: start;
   /* Short pages: keep the menu and content at the top instead of spreading the
      leftover height between the stacked rows on mobile. */
@@ -158,7 +158,7 @@ footer {
 /* The blurb gets the wider column and a generous gutter separates it from Experience. */
 .landing {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
   column-gap: 4rem;
   row-gap: var(--gap);
   align-items: start;
