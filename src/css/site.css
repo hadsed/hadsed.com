@@ -9,7 +9,7 @@
   --font: Verdana, Geneva, system-ui, -apple-system, sans-serif;
   --measure: 42rem;
   --gap: 2.5rem;
-  --menu-width: 9rem;
+  --menu-width: 6.5rem;
   --date-col: 6.5rem;
 }
 
@@ -34,7 +34,7 @@ body {
   padding: 3rem 1.5rem 0;
   display: grid;
   grid-template-columns: var(--menu-width) minmax(0, 1fr);
-  column-gap: var(--gap);
+  column-gap: 2rem;
   align-items: start;
   /* Short pages: keep the menu and content at the top instead of spreading the
      leftover height between the stacked rows on mobile. */
@@ -119,6 +119,8 @@ footer {
   mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
 }
 .timeline-scroll::-webkit-scrollbar { display: none; }
+/* Dates on the landing timeline are short ("2024 – 2025"), so give roles more room. */
+.recent { --date-col: 5.25rem; }
 .recent .timeline-entry { margin-bottom: 1rem; }
 .recent .org { font-size: 0.9rem; }
 .recent .dates, .recent .role { font-size: 0.8rem; }
@@ -153,19 +155,48 @@ footer {
 }
 
 /* Landing page */
+/* The blurb gets the wider column and a generous gutter separates it from Experience. */
 .landing {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--gap);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  column-gap: 4rem;
+  row-gap: var(--gap);
   align-items: start;
 }
-.about-head { display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem; }
-/* Name and tagline sit centered on the avatar, so the space above the name
-   matches the space below the tagline instead of pinning the cap height to the top. */
-.about-head h1 { line-height: 1.2; }
-.avatar { display: block; width: 56px; height: 56px; border-radius: 4px; flex-shrink: 0; }
+/* The name is the page's one serif moment: a single line beside the photo.
+   It is optically centered: the eye reads the body of the letters (cap height to
+   baseline, 0.65em in Petrona), not the lone descender, so that block sits dead center
+   on the photo. The photo is 1.17em + 5px so the "q" (0.26em below the baseline)
+   still lands about 2.5px inside its bottom edge.
+   Both scale with the column (cqi) so the name never runs into the timeline. */
+.about { container-type: inline-size; }
+.about-head {
+  --name: clamp(28px, calc((100cqi - 24px) * 0.155), 56px);
+  display: flex; align-items: center; gap: 1rem; margin: 0 0 1.25rem;
+}
+.about-head h1 {
+  font-family: Petrona, Georgia, serif;
+  font-weight: 300;
+  font-size: var(--name);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin: 0;
+  white-space: nowrap;
+  /* Fallback: with line-height 1 the cap block sits about 0.03em above the line box's
+     center (this depends on the platform's font metrics), so nudge it down. */
+  position: relative;
+  top: 0.03em;
+}
+/* Where supported, trim the line box to cap height and baseline, which come from the
+   glyphs, not platform metrics, so flex centering centers the cap block exactly. */
+@supports (text-box: trim-both cap alphabetic) {
+  .about-head h1 { text-box: trim-both cap alphabetic; top: 0; }
+}
+.avatar {
+  display: block; width: calc(var(--name) * 1.17 + 5px); height: calc(var(--name) * 1.17 + 5px);
+  border-radius: 4px; flex-shrink: 0;
+}
 h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--accent); }
-.tagline { color: var(--muted); margin: 0; }
 .blurb p { margin: 0 0 1rem; }
 .blurb a { text-decoration: underline; text-underline-offset: 2px; }
 .label {

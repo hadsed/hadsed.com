@@ -7,10 +7,7 @@ permalink: /
   <section class="about">
     <header class="about-head">
       <img class="avatar" src="{{ about.data.avatar }}" alt="" width="56" height="56">
-      <div>
-        <h1>{{ about.data.name }}</h1>
-        <p class="tagline">{{ about.data.tagline }}</p>
-      </div>
+      <h1>{{ about.data.name }}</h1>
     </header>
     <ul class="links">
       {%- for link in about.data.links %}
