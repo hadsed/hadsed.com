@@ -119,6 +119,8 @@ footer {
   mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
 }
 .timeline-scroll::-webkit-scrollbar { display: none; }
+/* Dates on the landing timeline are short ("2024 – 2025"), so give roles more room. */
+.recent { --date-col: 5.25rem; }
 .recent .timeline-entry { margin-bottom: 1rem; }
 .recent .org { font-size: 0.9rem; }
 .recent .dates, .recent .role { font-size: 0.8rem; }
@@ -153,10 +155,12 @@ footer {
 }
 
 /* Landing page */
+/* The blurb gets the wider column and a generous gutter separates it from Experience. */
 .landing {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--gap);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  column-gap: 4rem;
+  row-gap: var(--gap);
   align-items: start;
 }
 /* The name is the page's one serif moment: a single line beside the photo.
