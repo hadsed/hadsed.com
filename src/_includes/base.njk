@@ -12,6 +12,16 @@
   {%- else %}
   <link rel="canonical" href="https://hadsed.com{{ page.url }}">
   {%- endif %}
+  {#- A top-level visit hands over to /lab/home/, which shows this page over the live sky with Fly.
+      Inside that frame (or for crawlers, link previews and browsers without WebGL) the page stays as is. #}
+  <script>(function () {
+    try {
+      if (window.top !== window || /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|lighthouse/i.test(navigator.userAgent)) return;
+      var c = document.createElement('canvas');
+      if (!(c.getContext('webgl2') || c.getContext('webgl'))) return;
+      location.replace('/lab/home/?p=' + encodeURIComponent(location.pathname + location.search) + location.hash);
+    } catch (e) {}
+  })();</script>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Had Seddiqi">
   <meta property="og:title" content="{{ pageTitle }}">
@@ -42,6 +52,8 @@
   } | dump | safe }}
   </script>
   {%- endif %}
+  {#- Framed by the home's 3D backdrop: let it dress the page before first paint (no flicker on navigation). -#}
+  <script>try { if (window.frameElement && frameElement.id === 'site' && parent.__siteHook) parent.__siteHook(document); } catch (e) {}</script>
 </head>
 <body>
 <div class="page">

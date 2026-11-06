@@ -2,3 +2,5 @@ node_modules/
 _site/
 _site-test/
 .superpowers/
+.wrangler/
+flight/test/out/

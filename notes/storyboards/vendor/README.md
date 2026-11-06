@@ -8,3 +8,5 @@ Vendored files: `build/three.module.js`, `build/three.core.js`, and
 resolves the controls' `three` import locally. No runtime CDN is required.
 
 Copyright and MIT license: [THREE-LICENSE](THREE-LICENSE).
+
+Minified copies (`*.min.js`) were made with esbuild 0.24 (`--minify --format=esm --legal-comments=inline`) for the backdrop lab; `three.module.min.js` imports `./three.core.min.js`.

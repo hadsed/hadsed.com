@@ -27,11 +27,43 @@ function wikilinkTargets() {
 }
 
 export default function (eleventyConfig) {
-  for (const path of ["notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
+  for (const path of ["flight/**", "notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
     eleventyConfig.ignores.add(path);
   }
 
   eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
+
+  // Flight (multiplayer jets) and the home that wraps the site over its live sky ship everywhere,
+  // production included: every site page hands a top-level visit to /lab/home/ (see base.njk).
+  // The room server in flight/server deploys separately as a Cloudflare Worker.
+  for (const part of ["index.html", "main.js", "attract.js", "config.json", "packages", "assets", "vendor"]) {
+    eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
+  }
+  eleventyConfig.addPassthroughCopy({ "notes/storyboards/fly-home.html": "lab/home/index.html" });
+
+  // Branch previews (SITE_URL set) also carry the SR-71 backdrop lab at /lab/sr71/,
+  // so it can be explored on any device. Production builds never include it.
+  if (process.env.SITE_URL || process.env.LAB) {
+    const lab = "notes/storyboards";
+    eleventyConfig.addPassthroughCopy({
+      [`${lab}/sr71-backdrop.html`]: "lab/sr71/index.html",
+      [`${lab}/sr71-backdrop.mjs`]: "lab/sr71/sr71-backdrop.mjs",
+      [`${lab}/site-gestures.mjs`]: "lab/sr71/site-gestures.mjs",
+      [`${lab}/vendor/*.min.js`]: "lab/sr71/vendor",
+      [`${lab}/terrain/regions.json`]: "lab/sr71/terrain/regions.json",
+      [`${lab}/terrain/*.webp`]: "lab/sr71/terrain",
+      // shared sky/terrain/tone module, the same file the flight lab uses
+      "flight/packages/world/*.js": "lab/sr71/world",
+      // edge-affordance mockups that sit on top of the lab
+      [`${lab}/edge-affordances.html`]: "lab/edge/index.html",
+    });
+  }
+
+  // Branch previews (SITE_URL set) carry the SR-71 model shootout at /lab/sr71-models/.
+  // Production builds never include it.
+  if (process.env.SITE_URL || process.env.LAB) {
+    eleventyConfig.addPassthroughCopy({ "notes/lab/sr71-models": "lab/sr71-models" });
+  }
 
   const targets = wikilinkTargets();
   eleventyConfig.addTransform("wikilinks", function (content) {

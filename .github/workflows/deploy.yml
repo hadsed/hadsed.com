@@ -28,6 +28,24 @@ jobs:
         run: |
           slug=$(echo "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-28 | sed 's/-*$//')
           echo "SITE_URL=https://${slug}.hadsed-com.pages.dev" >> "$GITHUB_ENV"
+      # Flight room server (flight/server). Previews share hadsed-flight; main deploys its own
+      # hadsed-flight-prod (--env production). A failure here never blocks the site, it just flies solo.
+      - name: Deploy flight room server
+        id: flight
+        if: github.ref_name != 'obsidian'
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: f659eb903a5d13a71c5b5dfa74a83cfb
+          workingDirectory: flight/server
+          command: deploy${{ github.ref_name == 'main' && ' --env production' || '' }}
+      - name: Point the flight lab at the room server
+        if: steps.flight.outcome == 'success' && steps.flight.outputs.deployment-url != ''
+        run: |
+          url="${{ steps.flight.outputs.deployment-url }}"
+          echo "{ \"server\": \"${url/https:/wss:}\" }" > flight/config.json
+          cat flight/config.json
       - run: npm run build
       - uses: cloudflare/wrangler-action@v3
         with:
