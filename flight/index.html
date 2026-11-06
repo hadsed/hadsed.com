@@ -37,6 +37,10 @@
   #stick { position: fixed; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px solid var(--gold); pointer-events: none; display: none; }
   #thr { display: inline-block; width: 80px; height: 3px; background: #2a3448; vertical-align: middle; margin-left: 6px; }
   #thr i { display: block; height: 100%; background: var(--gold); }
+  /* ?attract: the site backdrop. No HUD until Fly; it fades in as the camera settles behind the jet. */
+  .hud, #labels, #boost, #tilt { transition: opacity .8s ease 2s; }
+  body.attract .hud, body.attract #labels, body.attract #reticle, body.attract #boost, body.attract #tilt, body.attract #stick { opacity: 0 !important; pointer-events: none; transition: opacity .4s ease; }
+  body.attract canvas { cursor: default; }
 </style>
 </head>
 <body>

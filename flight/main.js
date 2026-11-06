@@ -9,11 +9,16 @@ import { FLAG } from './packages/net/protocol.js';
 import { loadManifest } from './packages/assets/index.js';
 import { createRenderer } from './packages/render/index.js';
 import { escort } from './packages/bots/pilot.js';
+import { createAttractPilot, SLOTS } from './attract.js';
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
 const base = new URL('./', import.meta.url);
 const params = new URLSearchParams(location.search);
+// ?attract: the site backdrop. The jet flies itself, the HUD is hidden, and the
+// socket only watches (no seat, so the aloft count stays honest) until fly().
+let attract = params.has('attract');
+if (attract) document.body.classList.add('attract');
 
 const manifest = await loadManifest(base);
 // Licensed jet models carry their credit and reuse terms; the license asks us to show them.
@@ -66,20 +71,25 @@ for (const g of ['gesturestart', 'gesturechange', 'gestureend']) addEventListene
 addEventListener('touchmove', swallow, { passive: false });
 
 // ---- sim ----
-let jet = createJet({ heading: Math.PI * 0.25 });
+const attractPilot = createAttractPilot();
+const fitSlot = () => { attractPilot.me.slot = innerWidth < innerHeight ? SLOTS.tall : SLOTS.wide; };
+fitSlot(); addEventListener('resize', fitSlot);
+let jet = attract ? attractPilot.place([]) : createJet({ heading: Math.PI * 0.25 });
 const prev = cloneJet(jet), view = cloneJet(jet);
 let waggleLeft = 0;
 
 // ---- net ----
 const remotes = createRemotes();
 const roster = new Map();
-let welcomed = false;
+let welcomed = attract;   // a backdrop jet is already in the sky; Fly keeps it there
+let upgrading = false, snaps = 0;
 const config = await fetch(new URL('config.json', base)).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 const serverUrl = params.get('server') ?? config.server ?? null;
 const net = connect({
   url: serverUrl,
   world: world.id,
-  onSnapshot: (snap, t) => remotes.push(t, snap.entries, snap.time),
+  watch: attract,
+  onSnapshot: (snap, t) => { snaps++; remotes.push(t, snap.entries, snap.time); },
   onMessage: (m) => {
     if (m.t === 'welcome') {
       // First welcome places the jet. After a reconnect, keep flying where you
@@ -90,7 +100,9 @@ const net = connect({
         assist.reset(jet);   // aim where the new jet points
         welcomed = true;
       }
-      remotes.clear(); roster.clear();
+      // Watcher -> seat keeps the jets it already sees, so nothing blinks.
+      if (!upgrading) { remotes.clear(); roster.clear(); }
+      upgrading = false;
       $('callsign').textContent = m.callsign;
       $('you').hidden = false;
     }
@@ -151,7 +163,10 @@ try {
 }
 Object.assign(window.__flight, { net, remotes, renderer, input: controls.read(0) });   // read() reuses one frame object
 Object.defineProperty(window.__flight, 'jet', { get: () => jet });
-renderer.setWorld(world);
+if (attract) renderer.rig.blend = renderer.rig.target = 0;
+// The backdrop shows once it has drawn the ground and, if the sky has company, sits next to it.
+let readyAt = 0;
+renderer.setWorld(world).then(() => { readyAt = performance.now(); });
 
 // ---- loop: fixed 60 Hz sim, render interpolated, send at 10 Hz ----
 const remoteList = [];
@@ -168,7 +183,8 @@ function frame(nowMs) {
     const input = controls.read(STEP);
     if (input.pressed.waggle) waggleLeft = 1.2;
     copyJet(prev, jet);
-    step(jet, flyIntent(input), STEP);
+    step(jet, attract ? attractPilot.think(jet, remoteList, STEP) : flyIntent(input), STEP);
+    if (attract) attractPilot.hold(jet, STEP);
     waggleLeft = Math.max(0, waggleLeft - STEP);
     jet.flags = waggleLeft > 0 ? FLAG.WAGGLE : 0;
     if (!helpHidden && input.active.size) { helpHidden = true; setTimeout(() => ($('help').style.opacity = 0.25), 6000); }
@@ -177,12 +193,13 @@ function frame(nowMs) {
   lerpJet(view, prev, jet, acc / STEP);
 
   sendAcc += dt;
-  if (sendAcc >= 0.1) { sendAcc = 0; net.send(jet); }
+  if (sendAcc >= (attract ? 1 : 0.1)) { sendAcc = 0; net.send(jet); }   // watchers only report where they look from
 
   remotes.sample(nowMs);
   remoteList.length = 0;
   for (const [id, r] of remotes.remotes) { r.id = id; remoteList.push(r); }
 
+  if (attract && !window.__flight.ready && readyAt) placeBackdrop(nowMs);
   renderer.draw({ self: view, remotes: remoteList, time: nowMs / 1000, dt });
 
   $('alt').textContent = `alt ${Math.round(jet.pos[1] * 3.281).toLocaleString()} ft`;
@@ -197,7 +214,7 @@ function frame(nowMs) {
   // Reticle: where the jet is headed. Hidden while the autopilot follows someone.
   assist.direction(aimDir);
   proj.set(view.pos[0] + aimDir[0] * 20000, view.pos[1] + aimDir[1] * 20000, view.pos[2] + aimDir[2] * 20000).project(renderer.camera);
-  const showReticle = !follow && proj.z < 1;
+  const showReticle = !follow && !attract && renderer.rig.blend === 1 && proj.z < 1;
   reticle.style.display = showReticle ? 'block' : 'none';
   if (showReticle) reticle.style.transform = `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
 }
@@ -291,3 +308,43 @@ function followAxes() {
   return followIntent;
 }
 Object.assign(window.__flight, { startFollow, stopFollow });
+
+// ---- attract <-> flying (the site backdrop's Fly and Back) ----
+// Before the backdrop is shown, drop the jet next to a live one if any are about,
+// and hold off "ready" until it sits in its slot (the other jet's interpolated
+// position wanders while the page is still busy loading). At most 4 s.
+let placed = false;
+function placeBackdrop(nowMs) {
+  const waited = nowMs - readyAt;
+  const seen = remoteList.some((r) => r.view && r.visible);
+  if (!placed && seen && remoteList.some((r) => remotes.remotes.get(r.id)?.buf.length >= 6)) {
+    placed = true;
+    jet = attractPilot.place(remoteList);
+    copyJet(prev, jet); lerpJet(view, prev, jet, 0);
+    renderer.rig.reset();
+  }
+  // Done when settled next to someone, or when the sky is known to be empty (or out of reach).
+  const done = placed ? attractPilot.gap(jet) < 120 : (!seen && snaps >= 6) || net.state.status === 'solo';
+  if (done || waited > 4000) window.__flight.ready = true;
+}
+
+function fly() {
+  if (!attract) return;
+  attract = false;
+  document.body.classList.remove('attract');
+  assist.reset(jet);   // aim where the nose is, or the reticle swings to an old heading
+  if (net.state.watch) { upgrading = true; net.join(); }
+  renderer.rig.target = 1;
+  canvas.focus?.();
+}
+
+function land() {
+  if (attract) return;
+  attract = true;
+  stopFollow();
+  document.body.classList.add('attract');
+  net.watch();
+  renderer.rig.target = 0;
+}
+Object.assign(window.__flight, { fly, land, attractPilot });
+Object.defineProperty(window.__flight, 'attract', { get: () => attract });

@@ -36,7 +36,7 @@ export default function (eleventyConfig) {
   // Flight lab (multiplayer jets) ships on branch previews only, like the other labs.
   // The room server in flight/server deploys separately as a Cloudflare Worker.
   if (process.env.SITE_URL || process.env.FLIGHT_LAB) {
-    for (const part of ["index.html", "main.js", "config.json", "packages", "assets", "vendor"]) {
+    for (const part of ["index.html", "main.js", "attract.js", "config.json", "packages", "assets", "vendor"]) {
       eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
     }
   }
