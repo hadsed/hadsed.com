@@ -1,0 +1,82 @@
+[
+ {
+  "id": "sierra",
+  "label": "Sierra Nevada",
+  "lat": 37.25,
+  "lon": -118.75,
+  "zoom": 9,
+  "size": 1024,
+  "metersPerPixel": 243.38,
+  "widthKm": 249.2,
+  "minM": 30,
+  "maxM": 4310,
+  "peakKm": [
+   43.8,
+   -69.1
+  ]
+ },
+ {
+  "id": "alps",
+  "label": "Alps, Valais",
+  "lat": 46.05,
+  "lon": 7.65,
+  "zoom": 9,
+  "size": 1024,
+  "metersPerPixel": 212.2,
+  "widthKm": 217.3,
+  "minM": 53,
+  "maxM": 4676,
+  "peakKm": [
+   -67.1,
+   26.3
+  ]
+ },
+ {
+  "id": "himalaya",
+  "label": "Himalaya, Everest",
+  "lat": 27.95,
+  "lon": 86.95,
+  "zoom": 9,
+  "size": 1024,
+  "metersPerPixel": 270.08,
+  "widthKm": 276.6,
+  "minM": 54,
+  "maxM": 8461,
+  "peakKm": [
+   -24.9,
+   -31.3
+  ]
+ },
+ {
+  "id": "grandcanyon",
+  "label": "Grand Canyon",
+  "lat": 36.15,
+  "lon": -112.15,
+  "zoom": 9,
+  "size": 1024,
+  "metersPerPixel": 246.88,
+  "widthKm": 252.8,
+  "minM": 359,
+  "maxM": 3609,
+  "peakKm": [
+   74.1,
+   76.0
+  ]
+ },
+ {
+  "id": "denali",
+  "label": "Alaska Range, Denali",
+  "lat": 63.05,
+  "lon": -151.0,
+  "zoom": 8,
+  "size": 1024,
+  "metersPerPixel": 277.14,
+  "widthKm": 283.8,
+  "minM": 12,
+  "maxM": 5798,
+  "peakKm": [
+   -27.7,
+   -16.6
+  ]
+ }
+]

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 
 const EARTH_R = 6371000;
-const STORE = 'sr71-backdrop-v1';
+const STORE = 'sr71-backdrop-v2';
 
 // ---------- settings ----------
 const PRESETS = {
@@ -14,10 +14,18 @@ const PRESETS = {
   ash: { shadow: '#060606', mid: '#2f2f30', light: '#dcdad6', highlight: '#ffffff' },
   dusk: { shadow: '#06050d', mid: '#262447', light: '#c6c3dc', highlight: '#e9a77a' },
 };
+const STYLES = {
+  grid: { grid: 1, contour: 0, shade: 0.35 },
+  gridcontour: { grid: 0.7, contour: 0.8, shade: 0.3 },
+  contour: { grid: 0, contour: 1, shade: 0.3 },
+  shaded: { grid: 0, contour: 0, shade: 1 },
+  shadedgrid: { grid: 0.6, contour: 0, shade: 1 },
+};
 const DEFAULTS = {
   preset: 'site', ...PRESETS.site,
   midPoint: 0.42, hlStart: 0.74, hlAmount: 0.85, mono: 1, exposure: 1.0, contrast: 1.0, grain: 0.018, vignette: 0.45,
-  altitude: 24000, sunAz: 215, sunEl: 18, haze: 210, clouds: 0.35, relief: 1, fov: 34,
+  region: 'sierra', altitudeFt: 60000, exag: 1.5, offsetX: null, offsetZ: null, sunAz: 215, sunEl: 18, haze: 260, clouds: 0, fov: 34,
+  style: 'grid', grid: 1, gridSize: 2000, contour: 0, contourStep: 200, shade: 0.35, lineBright: 0.6, lineGold: 0,
   drift: true, driftSpeed: 0.2,
   site: false, sitePath: '/', siteOpacity: 1, siteBg: 0.35, siteClick: false,
 };
@@ -37,6 +45,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDraw
 const coarse = matchMedia('(pointer: coarse)').matches;
 renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.5 : 2));
 renderer.autoClear = false;
+renderer.setClearColor(0x000000, 0);
 
 const sunDir = new THREE.Vector3();
 const shared = {
@@ -45,7 +54,6 @@ const shared = {
   uSun: { value: sunDir },
   uHaze: { value: new THREE.Vector3(0.50, 0.56, 0.66) },
   uHazeDist: { value: 210000 },
-  uRelief: { value: 1 },
   uCover: { value: 0.5 },
   uDip: { value: 0 },
 };
@@ -73,7 +81,7 @@ float ridged(vec2 p, int oct){
 }`;
 
 // Bends a flat plane down with the Earth's curvature relative to the camera, so the horizon
-// lands where it would from altitude (about 5 degrees below level at 24 km).
+// lands where it would from altitude (about 4.4 degrees below level at 60k ft, 5.2 at 85k).
 const CURVED_VERT = /* glsl */`
 uniform vec3 uCam; uniform float uEarthR;
 varying vec2 vXZ; varying float vDist;
@@ -96,62 +104,138 @@ const sky = new THREE.Mesh(
         vec3 d = normalize(vDir);
         float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;       // angle above the true horizon
         vec3 zenith = vec3(0.010, 0.020, 0.055);             // near-space dark blue
-        vec3 c = mix(uHaze, zenith, pow(smoothstep(0.0, 0.7, el), 0.55));
-        c += vec3(0.32) * exp(-abs(el) * 40.0);              // bright limb on the horizon
+        // at 85k ft most of the air is below you: a thin bright band at the horizon, dark navy by ~20 degrees up
+        vec3 c = mix(uHaze, zenith, 1.0 - exp(-max(el, 0.0) * 9.0));
+        c += vec3(0.30) * exp(-abs(el) * 70.0);              // bright limb on the horizon
         float sun = max(dot(d, uSun), 0.0);
         c += vec3(0.35) * pow(sun, 12.0) + vec3(3.0) * pow(sun, 2500.0);
         c = mix(c, uHaze * 0.9, smoothstep(0.0, -0.03, el));
-        gl_FragColor = vec4(c, 1.0);
+        gl_FragColor = vec4(c, 0.0);
       }`,
   }),
 );
 farScene.add(sky);
 
+// ---------- ground: real elevation drawn as a terrain grid ----------
+// Heights come from stitched AWS terrain tiles (terrain/*.png, terrarium encoding), mirrored past the
+// region edge so the ground runs to the horizon. The mesh is one grid whose vertices are dense under
+// the jet (~280 m apart) and stretch out toward the horizon, so a single draw covers 1,500 km.
+function terrainGeometry(n = 640, R = 750000, a = 0.12) {
+  const pos = new Float32Array(n * n * 3), idx = new Uint32Array((n - 1) * (n - 1) * 6);
+  const warp = (u) => R * u * (a + (1 - a) * u * u);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const k = (j * n + i) * 3;
+    pos[k] = warp((i / (n - 1)) * 2 - 1); pos[k + 2] = warp((j / (n - 1)) * 2 - 1);
+  }
+  let t = 0;
+  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+    const v = j * n + i;
+    idx.set([v, v + n, v + 1, v + 1, v + n, v + n + 1], t); t += 6;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), R * 1.5);
+  return g;
+}
+const terrainU = {
+  uHeight: { value: null }, uWidth: { value: 250000 }, uTexel: { value: 1 / 1024 }, uOffset: { value: new THREE.Vector2() },
+  uExag: { value: 1.5 }, uGroundY: { value: -18000 }, uMaxH: { value: 4000 },
+  uGrid: { value: 1 }, uGridSize: { value: 2000 }, uContour: { value: 0 }, uContourStep: { value: 200 },
+  uShade: { value: 0.35 }, uLineBright: { value: 0.6 }, uLineGold: { value: 0 },
+};
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.6e6, 1.6e6, 480, 480),
+  terrainGeometry(),
   new THREE.ShaderMaterial({
-    uniforms: shared, vertexShader: CURVED_VERT,
-    fragmentShader: /* glsl */`
-      uniform vec3 uCam, uSun, uHaze; uniform float uHazeDist, uRelief; varying vec2 vXZ; varying float vDist;
-      ${NOISE}
-      // Height 0..1: broad landmasses, domain-warped so valleys wander, ridged ranges on high ground.
-      float height(vec2 p){
-        vec2 q = p / 42000.0;
-        vec2 w = vec2(fbm(q + vec2(3.1, 7.7), 4), fbm(q + vec2(9.2, 1.4), 4));
-        float base = fbm(q + 1.6 * w, 6);
-        float mtn = ridged(q * 2.6 + w, 6);
-        return base * 0.65 + mtn * 0.45 * smoothstep(0.40, 0.58, base);
-      }
+    uniforms: { ...shared, ...terrainU },
+    vertexShader: /* glsl */`
+      uniform vec3 uCam; uniform float uEarthR, uWidth, uTexel, uExag, uGroundY; uniform vec2 uOffset; uniform sampler2D uHeight;
+      varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
+      float hAt(vec2 uv){ return texture2D(uHeight, uv).r; }
       void main(){
-        vec2 p = vXZ;
-        float h = height(p);
-        float e = 700.0;
-        float relief = uRelief * 9000.0 / (1.0 + vDist / 90000.0);  // flatten far relief so the horizon doesn't shimmer
-        float dx = height(p + vec2(e, 0)) - height(p - vec2(e, 0));
-        float dz = height(p + vec2(0, e)) - height(p - vec2(0, e));
-        vec3 n = normalize(vec3(-dx * relief, 2.0 * e, -dz * relief));
+        vec2 xz = position.xz;                          // camera stays within ~1 km of the origin
+        vec2 data = xz + uOffset;
+        vec2 uv = data / uWidth + 0.5;
+        float h = hAt(uv);
+        float d = uTexel, m = uWidth * uTexel;
+        float hx = hAt(uv + vec2(d, 0)) - hAt(uv - vec2(d, 0));
+        float hz = hAt(uv + vec2(0, d)) - hAt(uv - vec2(0, d));
+        vN = normalize(vec3(-hx * uExag, 2.0 * m, -hz * uExag));
+        vec3 w = vec3(xz.x, uGroundY + h * uExag, xz.y);
+        vec2 rel = xz - uCam.xz;
+        w.y -= dot(rel, rel) / (2.0 * uEarthR);
+        vXZ = data; vH = h; vDist = distance(w, uCam);
+        gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uSun, uHaze; uniform float uHazeDist, uMaxH, uGrid, uGridSize, uContour, uContourStep, uShade, uLineBright, uLineGold;
+      varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
+      // anti-aliased lines that fade out before they get denser than a couple of pixels
+      float lines2(vec2 c){ vec2 fw = fwidth(c); vec2 g = abs(fract(c - 0.5) - 0.5) / max(fw, 1e-6);
+        return (1.0 - min(min(g.x, g.y), 1.0)) * (1.0 - smoothstep(0.12, 0.45, max(fw.x, fw.y))); }
+      float lines1(float c){ float fw = fwidth(c); float g = abs(fract(c - 0.5) - 0.5) / max(fw, 1e-6);
+        return (1.0 - min(g, 1.0)) * (1.0 - smoothstep(0.12, 0.45, fw)); }
+      void main(){
+        vec3 n = normalize(vN);
+        float grid = max(lines2(vXZ / uGridSize) * 0.55, lines2(vXZ / (uGridSize * 5.0)));
+        float contour = max(lines1(vH / uContourStep) * 0.55, lines1(vH / (uContourStep * 5.0)));
+        float ink = clamp(grid * uGrid + contour * uContour, 0.0, 1.0);
         float lit = clamp(dot(n, uSun), 0.0, 1.0);
-        float water = smoothstep(0.255, 0.24, h);
-        vec3 land = mix(vec3(0.09, 0.10, 0.10), vec3(0.30, 0.29, 0.27), smoothstep(0.25, 0.62, h));
-        land *= 0.3 + 1.2 * lit;
-        land *= 0.85 + 0.3 * fbm(p / 2200.0, 4) * (1.0 - smoothstep(30000.0, 120000.0, vDist));
-        vec3 view = normalize(uCam - vec3(p.x, uCam.y - vDist * 0.5, p.y));
-        vec3 sea = vec3(0.04, 0.05, 0.07) + vec3(0.35) * pow(max(dot(reflect(-uSun, vec3(0, 1, 0)), view), 0.0), 60.0);
-        vec3 c = mix(land, sea, water);
+        float rise = clamp(vH / uMaxH, 0.0, 1.0);
+        vec3 shaded = vec3(0.10, 0.11, 0.12) * (0.25 + 1.6 * lit) * (0.7 + 0.6 * rise);
+        vec3 c = mix(vec3(0.028, 0.032, 0.04) * (0.8 + 0.5 * rise), shaded, uShade);
+        c += vec3(uLineBright) * ink * (0.75 + 0.5 * rise);
         float fog = 1.0 - exp(-vDist / uHazeDist);
         c = mix(c, uHaze, fog * fog * 0.9 + fog * 0.1);
-        gl_FragColor = vec4(c, 1.0);
+        gl_FragColor = vec4(c, ink * uLineGold * (1.0 - fog));   // alpha marks lines the final pass may turn gold
       }`,
   }),
 );
-ground.rotation.x = -Math.PI / 2;
+ground.frustumCulled = false;
+ground.visible = false;
 farScene.add(ground);
+
+const REGIONS = {};
+const regionList = fetch('terrain/regions.json').then((r) => r.json()).then((list) => { for (const r of list) REGIONS[r.id] = r; return list; });
+const heightCache = {};
+async function loadRegion(id) {
+  const list = await regionList;
+  const r = REGIONS[id] || list[0];
+  if (!heightCache[r.id]) {
+    heightCache[r.id] = (async () => {
+      const blob = await (await fetch(`terrain/${r.id}.png`)).blob();
+      const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+      const cv = document.createElement('canvas'); cv.width = bmp.width; cv.height = bmp.height;
+      const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0);
+      const px = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
+      const half = new Uint16Array(bmp.width * bmp.height);
+      for (let i = 0; i < half.length; i++) {
+        half[i] = THREE.DataUtils.toHalfFloat(px[i * 4] * 256 + px[i * 4 + 1] + px[i * 4 + 2] / 256 - 32768);
+      }
+      const tex = new THREE.DataTexture(half, bmp.width, bmp.height, THREE.RedFormat, THREE.HalfFloatType);
+      tex.wrapS = tex.wrapT = THREE.MirroredRepeatWrapping;
+      tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
+      return tex;
+    })();
+  }
+  const tex = await heightCache[r.id];
+  terrainU.uHeight.value = tex;
+  terrainU.uWidth.value = r.metersPerPixel * r.size;
+  terrainU.uTexel.value = 1 / r.size;
+  terrainU.uMaxH.value = r.maxM;
+  ground.visible = true;
+  document.getElementById('credit').textContent = `${r.label} · ${r.lat.toFixed(2)}°, ${r.lon.toFixed(2)}° · ${r.widthKm} km of real elevation, mirrored past the edges. Terrain: AWS Terrain Tiles (SRTM, USGS 3DEP, GMTED and others).`;
+  dirty = true;
+  return r;
+}
 
 // Scattered cumulus about 7 km up: parallax against the ground as the view moves.
 const clouds = new THREE.Mesh(
   new THREE.PlaneGeometry(1.2e6, 1.2e6, 240, 240),
   new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, uniforms: shared, vertexShader: CURVED_VERT,
+    blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
     fragmentShader: /* glsl */`
       uniform vec3 uHaze; uniform float uHazeDist, uCover; varying vec2 vXZ; varying float vDist;
       ${NOISE}
@@ -181,6 +265,9 @@ const plane = new THREE.Group(); nearScene.add(plane);
 const skin = new THREE.MeshStandardMaterial({ color: 0x1d2027, roughness: 0.55, metalness: 0.25 });
 const glass = new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.25, metalness: 0.6 });
 const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
+for (const m of [skin, glass, nozzleMat]) {   // the jet never takes the line highlight
+  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.a = 0.0;'); };
+}
 const add = (g, m = skin) => { const o = new THREE.Mesh(g, m); plane.add(o); return o; };
 const body = add(new THREE.SphereGeometry(1, 32, 16)); body.scale.set(1.25, 0.7, 10.5);
 const nose = add(new THREE.ConeGeometry(1.23, 7, 24)); nose.rotation.x = -Math.PI / 2; nose.position.z = -10;
@@ -223,7 +310,8 @@ const post = new THREE.Mesh(
       float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
       vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
       void main(){
-        vec3 c = texture2D(tColor, vUv).rgb * uExposure;
+        vec4 src = texture2D(tColor, vUv);
+        vec3 c = src.rgb * uExposure;
         float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
         l = l / (1.0 + l);                       // soft rolloff on the sun and horizon limb
         l = pow(clamp(l * 1.55, 0.0, 1.0), 0.85);
@@ -232,7 +320,7 @@ const post = new THREE.Mesh(
         vec3 ramp = l < uMidPoint ? mix(uShadow, uMid, l / uMidPoint) : mix(uMid, uLight, (l - uMidPoint) / (1.0 - uMidPoint));
         // gold only on the brightest values: sun, limb, glints
         float hl = smoothstep(uHlStart, min(uHlStart + 0.18, 1.0), l) * uHlAmount;
-        ramp = mix(ramp, uHigh, hl);
+        ramp = mix(ramp, uHigh, max(hl, clamp(src.a, 0.0, 1.0)));
         // mono = 1 is pure tone mapping; lower lets the original colour back in
         vec3 orig = pow(clamp(c / (1.0 + c) * 1.55, 0.0, 1.0), vec3(2.2 * 0.85 / 2.2));
         vec3 m = mix(orig, ramp, uMono);
@@ -261,6 +349,7 @@ let userBusy = false;
 
 // ---------- apply settings ----------
 let dirty = true;
+let loadedRegion = null;
 function apply() {
   postU.uShadow.value.copy(col(S.shadow)); postU.uMid.value.copy(col(S.mid));
   postU.uLight.value.copy(col(S.light)); postU.uHigh.value.copy(col(S.highlight));
@@ -270,13 +359,20 @@ function apply() {
   const az = THREE.MathUtils.degToRad(S.sunAz), el = THREE.MathUtils.degToRad(S.sunEl);
   sunDir.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize();
   sunLight.position.copy(sunDir).multiplyScalar(100);
-  ground.position.y = -S.altitude;
-  clouds.position.y = -S.altitude + 7000;
-  clouds.visible = S.altitude > 8000;
-  shared.uDip.value = Math.acos(EARTH_R / (EARTH_R + Math.max(S.altitude, 1)));
+  const altitude = S.altitudeFt * 0.3048;
+  terrainU.uGroundY.value = -altitude;
+  terrainU.uExag.value = +S.exag;
+  for (const k of ['grid', 'gridSize', 'contour', 'contourStep', 'shade', 'lineBright', 'lineGold']) {
+    terrainU['u' + k[0].toUpperCase() + k.slice(1)].value = +S[k];
+  }
+  const reg = REGIONS[S.region];
+  if (reg) terrainU.uOffset.value.set((S.offsetX ?? reg.peakKm[0]) * 1000, (S.offsetZ ?? reg.peakKm[1]) * 1000);
+  if (loadedRegion !== S.region) { loadedRegion = S.region; loadRegion(S.region).then(() => { apply(); sync(); }); }
+  clouds.position.y = -altitude + 7000;
+  clouds.visible = altitude > 8000;
+  shared.uDip.value = Math.acos(EARTH_R / (EARTH_R + Math.max(altitude, 1)));
   shared.uHazeDist.value = S.haze * 1000;
   shared.uCover.value = +S.clouds;
-  shared.uRelief.value = +S.relief;
   controls.autoRotate = !!S.drift;
   controls.autoRotateSpeed = +S.driftSpeed;
   resize();
@@ -365,13 +461,26 @@ const SPEC = [
     ['grain', 'range', { label: 'Grain', min: 0, max: 0.08, step: 0.001 }],
   ]],
   ['Scene', [
-    ['altitude', 'range', { label: 'Altitude (m)', min: 3000, max: 30000, step: 100 }],
+    ['region', 'select', { label: 'Region', options: [['sierra', 'Sierra Nevada'], ['alps', 'Alps, Valais'], ['himalaya', 'Himalaya, Everest'], ['grandcanyon', 'Grand Canyon'], ['denali', 'Alaska Range, Denali']] }],
+    ['altitudeFt', 'range', { label: 'Altitude (ft)', min: 20000, max: 100000, step: 500 }],
+    ['exag', 'range', { label: 'Vertical exaggeration', min: 1, max: 5, step: 0.05 }],
+    ['offsetX', 'range', { label: 'Jet position E–W (km)', min: -140, max: 140, step: 0.5 }],
+    ['offsetZ', 'range', { label: 'Jet position N–S (km)', min: -140, max: 140, step: 0.5 }],
     ['sunAz', 'range', { label: 'Sun direction (°)', min: 0, max: 360, step: 1 }],
     ['sunEl', 'range', { label: 'Sun height (°)', min: -4, max: 70, step: 0.5 }],
     ['haze', 'range', { label: 'Visibility (km)', min: 40, max: 600, step: 5 }],
     ['clouds', 'range', { label: 'Cloud cover', min: 0, max: 1, step: 0.01 }],
-    ['relief', 'range', { label: 'Terrain relief', min: 0, max: 3, step: 0.05 }],
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
+  ]],
+  ['Ground', [
+    ['style', 'select', { label: 'Style', options: [['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid']] }],
+    ['grid', 'range', { label: 'Grid lines', min: 0, max: 1, step: 0.01 }],
+    ['gridSize', 'range', { label: 'Grid spacing (m)', min: 250, max: 10000, step: 250 }],
+    ['contour', 'range', { label: 'Contour lines', min: 0, max: 1, step: 0.01 }],
+    ['contourStep', 'range', { label: 'Contour interval (m)', min: 25, max: 1000, step: 25 }],
+    ['shade', 'range', { label: 'Shaded relief', min: 0, max: 1, step: 0.01 }],
+    ['lineBright', 'range', { label: 'Line brightness', min: 0, max: 2, step: 0.01 }],
+    ['lineGold', 'range', { label: 'Lines in highlight color', min: 0, max: 1, step: 0.01 }],
   ]],
   ['Camera', [
     ['drift', 'check', { label: 'Slow drift' }],
@@ -411,6 +520,8 @@ function build() {
         const v = type === 'check' ? input.checked : type === 'range' ? +input.value : input.value;
         S[key] = v;
         if (key === 'preset' && PRESETS[v]) Object.assign(S, PRESETS[v]);
+        if (key === 'style' && STYLES[v]) Object.assign(S, STYLES[v]);
+        if (key === 'region') { S.offsetX = null; S.offsetZ = null; }
         if (['shadow', 'mid', 'light', 'highlight'].includes(key)) S.preset = 'custom';
         sync(); apply();
       });
@@ -422,9 +533,11 @@ function build() {
 }
 function sync() {
   for (const [key, { input, out, type }] of Object.entries(inputs)) {
-    if (type === 'check') input.checked = !!S[key];
-    else input.value = S[key];
-    if (out) out.textContent = Number(S[key]).toLocaleString(undefined, { maximumFractionDigits: 3 });
+    let val = S[key];
+    if ((key === 'offsetX' || key === 'offsetZ') && val == null) val = REGIONS[S.region]?.peakKm[key === 'offsetX' ? 0 : 1] ?? 0;
+    if (type === 'check') input.checked = !!val;
+    else input.value = val;
+    if (out) out.textContent = Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 });
   }
   const custom = inputs.preset.input.querySelector('option[value="custom"]');
   custom.hidden = S.preset !== 'custom';

@@ -43,6 +43,8 @@ export default function (eleventyConfig) {
       [`${lab}/vendor/three.module.js`]: "lab/sr71/vendor/three.module.js",
       [`${lab}/vendor/three.core.js`]: "lab/sr71/vendor/three.core.js",
       [`${lab}/vendor/OrbitControls.js`]: "lab/sr71/vendor/OrbitControls.js",
+      [`${lab}/terrain/regions.json`]: "lab/sr71/terrain/regions.json",
+      [`${lab}/terrain/*.png`]: "lab/sr71/terrain",
     });
   }
 
