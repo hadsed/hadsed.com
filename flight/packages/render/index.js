@@ -18,7 +18,11 @@ export function createRenderer({ canvas, manifest, labels }) {
   const pal = manifest.palette;
   const sky = new THREE.Color(pal.sky), gold = new THREE.Color(pal.gold);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
+  // On a software rasterizer (SwiftShader, llvmpipe: no usable GPU, or a blocklisted one) every
+  // pixel costs CPU. MSAA alone halves the frame rate there and the cloud deck's fbm is the next
+  // biggest cost, so drop both. Phones and laptops with a GPU keep the full look.
+  const software = isSoftwareGL();
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !software, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setClearColor(sky);
 
@@ -40,7 +44,8 @@ export function createRenderer({ canvas, manifest, labels }) {
   // rig: full in the backdrop orbit, fading to natural color as Fly glides into the chase cam.
   world.setLook({ ...WORLD_DEFAULTS });
   world.uniforms.uDirect.value = 1;
-  scene.add(world.sky, world.terrain, world.clouds);
+  scene.add(world.sky, world.terrain);
+  if (!software) scene.add(world.clouds);
   sun.position.copy(world.sunDir);
   const shift = new THREE.Vector2();
 
@@ -154,4 +159,17 @@ export function createRenderer({ canvas, manifest, labels }) {
       labels?.(camera, remotes);
     },
   };
+}
+
+// True when WebGL is drawn by a CPU rasterizer. Asked on a throwaway context, because antialias has
+// to be chosen before the real one exists.
+export function isSoftwareGL() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
+    if (!gl) return false;
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  } catch { return false; }
 }
