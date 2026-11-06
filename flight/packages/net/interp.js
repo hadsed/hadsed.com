@@ -20,6 +20,7 @@ export function createRemotes({ delay = 120, maxDelay = 2000, keep = 1500, coast
   const fwd = [0, 0, 0];
   const lags = [];             // recent { at, lag } with lag = arrival - server time
   let offset = 0, spread = 0, synced = false, lastNow = null;
+  let shift = null;            // the offset actually applied; eases toward `offset` like the delays do
   let wrap = 0, lastRaw = null;   // server time is a u32 of ms; it wraps every ~49 days
 
   const blank = (callsign = '') => ({ callsign, buf: [], view: null, seen: 0, ages: [], late: 0, cur: null });
@@ -58,7 +59,7 @@ export function createRemotes({ delay = 120, maxDelay = 2000, keep = 1500, coast
       else remotes.set(id, blank(callsign));
     },
     remove(id) { remotes.delete(id); },
-    clear() { remotes.clear(); lags.length = 0; synced = false; lastNow = null; wrap = 0; lastRaw = null; },
+    clear() { remotes.clear(); lags.length = 0; synced = false; lastNow = null; shift = null; wrap = 0; lastRaw = null; },
     // t is the client clock when the snapshot arrived (ms). serverTime is the
     // snapshot's own timestamp; without it we fall back to arrival times.
     push(t, entries, serverTime) {
@@ -80,13 +81,18 @@ export function createRemotes({ delay = 120, maxDelay = 2000, keep = 1500, coast
     sample(now) {
       const step = lastNow === null ? Infinity : Math.max(0, now - lastNow) * rate;
       lastNow = now;
+      // The clock offset moves when the fastest recent snapshot changes (a new best
+      // arrives, or the old best ages out of the window, or the server re-anchors
+      // its clock). Applied raw, that jumps every jet's playhead at once; eased, the
+      // render clock just runs a touch fast or slow for a moment.
+      if (synced) shift = shift === null ? offset : shift + Math.max(-step, Math.min(step, offset - shift));
       for (const [id, r] of remotes) {
         const b = r.buf;
         if (!b.length) continue;
         if (now - r.seen > keep * 4) { remotes.delete(id); continue; }
         const target = Math.min(maxDelay, delay + spread * 1.1 + r.late);
         r.cur = r.cur == null ? target : r.cur + Math.max(-step, Math.min(step, target - r.cur));
-        const at = now - r.cur - (synced ? offset : 0);
+        const at = now - r.cur - (synced ? shift : 0);
         r.view ??= cloneJet(b[0].jet);
         // Hide a jet once we have stopped hearing about it (it left our nearest
         // set) and the short coast is over, instead of leaving it frozen in the sky.
