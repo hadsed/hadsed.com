@@ -8,17 +8,22 @@
 // that way, this hard": the jet banks into the turn on its own, and the
 // moment you let go it rolls wings level and holds the heading it has. There
 // is no hidden aim point to chase, so a correction always takes effect at once.
-import { forwardOf, rightOf, rotate, clamp } from './index.js';
+import { forwardOf, rightOf, upOf, rotate, clamp } from './index.js';
 
-const f = [0, 0, 0], r = [0, 0, 0], loc = [0, 0, 0];
+const f = [0, 0, 0], r = [0, 0, 0], u = [0, 0, 0], loc = [0, 0, 0];
+const DIVE = 1.45;   // rad: the full-forward dive, about 83 degrees
+
+// Full roll angle, + banked right, +-PI upside down (asin alone can't tell
+// upright from inverted).
+export function bankOf(q) { rightOf(q, r); upOf(q, u); return Math.atan2(-r[1], u[1]); }
 
 export function steerTo(intent, jet, tx, ty, tz, aggressive = 1, maxNose = 0.35) {
   // Target direction in the jet's own frame (inverse rotation).
   const q = jet.q;
   const inv = [-q[0], -q[1], -q[2], q[3]];
   rotate(inv, tx - jet.pos[0], ty - jet.pos[1], tz - jet.pos[2], loc);
-  forwardOf(q, f); rightOf(q, r);
-  const bank = Math.asin(clamp(-r[1], -1, 1));
+  forwardOf(q, f);
+  const bank = bankOf(q);
   const nose = Math.asin(clamp(f[1], -1, 1));
   const ahead = -loc[2], side = loc[0];
   const heading = Math.atan2(side, ahead);                 // + means target is to the right
@@ -29,7 +34,10 @@ export function steerTo(intent, jet, tx, ty, tz, aggressive = 1, maxNose = 0.35)
   // in every hard turn).
   const dx = tx - jet.pos[0], dy = ty - jet.pos[1], dz = tz - jet.pos[2];
   const wantNose = clamp(Math.atan2(dy, Math.hypot(dx, dz)), -maxNose, maxNose);
-  intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
+  // Past a steep bank, pulling no longer moves the nose up (and inverted it moves
+  // it down), so roll upright first and pitch as the wings come level.
+  const ab = Math.abs(bank), pitchWorks = ab < 1.1 ? 1 : Math.max(0, Math.cos(ab)) / Math.cos(1.1);
+  intent.pitch = clamp((wantNose - nose) * 3 * pitchWorks, -1, 1);
   return intent;
 }
 
@@ -48,7 +56,26 @@ export function createAssist({ maxTurn = 0.75, maxPitch = 0.85, gain = 1.1 } = {
   const api = {
     aim,
     reset(jet) { aim.yaw = headingOf(jet.q); aim.pitch = 0; },
+    loop: 0,   // +1 pulling, -1 pushing: stick held all the way up or down
     update(intent, jet, ax = 0, ay = 0, dt = 1 / 60) {
+      // Stick all the way back: hand over the raw pitch rate, so you can pull a
+      // full loop. All the way forward: push over into a near-vertical dive and
+      // hold it. Let go and the assist rolls you upright and levels out on
+      // whatever heading you have.
+      if (api.loop === 0 && Math.abs(ay) > 0.92) api.loop = Math.sign(ay);
+      else if (api.loop !== 0 && (Math.abs(ay) < 0.8 || Math.sign(ay) !== api.loop)) api.loop = 0;
+      if (api.loop > 0) {
+        intent.pitch = 1; intent.roll = clamp(ax * 0.8, -1, 1); intent.yaw = 0;
+        aim.yaw = headingOf(jet.q); aim.pitch = 0;
+        return intent;
+      }
+      if (api.loop < 0) {
+        aim.yaw = headingOf(jet.q) - ax * 0.4; aim.pitch = -DIVE;
+        const d = api.direction(dir);
+        steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, gain, DIVE);
+        intent.yaw = 0;
+        return intent;
+      }
       // Turns get a soft center (small drags do little); climbs and dives are
       // nearly linear, so up and down answer as readily as left and right.
       const soft = (v, k) => Math.sign(v) * Math.abs(v) ** k;

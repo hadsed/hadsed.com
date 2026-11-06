@@ -2,18 +2,20 @@
 // -> render and runs the loop. Everything interesting lives in packages/.
 import { createControls, keyboard, pointerStick, gamepad, tilt, scripted } from './packages/controls/index.js';
 import { createAssist } from './packages/sim/assist.js';
-import { createJet, step, cloneJet, copyJet, lerpJet, STEP } from './packages/sim/index.js';
+import { createJet, step, cloneJet, copyJet, lerpJet, forwardOf, LIMITS, STEP } from './packages/sim/index.js';
 import { connect } from './packages/net/client.js';
 import { createRemotes } from './packages/net/interp.js';
 import { FLAG } from './packages/net/protocol.js';
 import { loadManifest } from './packages/assets/index.js';
 import { createRenderer } from './packages/render/index.js';
 import { escort } from './packages/bots/pilot.js';
+import { createLog } from './packages/hud/log.js';
 import { createAttractPilot, SLOTS } from './attract.js';
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
 const base = new URL('./', import.meta.url);
+const log = createLog($('log'));
 const params = new URLSearchParams(location.search);
 // ?attract: the site backdrop. The jet flies itself, the HUD is hidden, and the
 // socket only watches (no seat, so the aloft count stays honest) until fly().
@@ -113,7 +115,11 @@ const net = connect({
       for (const id of m.remove || []) { roster.delete(id); remotes.remove(id); }
     }
   },
-  onStatus: (s) => { $('status').textContent = s === 'online' ? 'shared sky' : s === 'solo' ? 'solo flight' : s; },
+  onStatus: (s) => {
+    $('status').textContent = s === 'online' ? 'shared sky' : s === 'solo' ? 'solo flight' : s;
+    if (!attract && s === 'reconnecting') log.post('net', 'connection lost: reconnecting', 8000);
+    else if (!attract && s === 'online') log.post('net', 'joined the shared sky');
+  },
 });
 if (!serverUrl) $('status').textContent = 'solo flight';
 
@@ -172,7 +178,7 @@ renderer.setWorld(world).then(() => { readyAt = performance.now(); });
 
 // ---- loop: fixed 60 Hz sim, render interpolated, send at 10 Hz ----
 const remoteList = [];
-let acc = 0, last = performance.now(), sendAcc = 0, helpHidden = false;
+let acc = 0, last = performance.now(), sendAcc = 0, helpHidden = false, lastIntent = null;
 const stickDot = $('stick'), thr = $('thr').firstChild, reticle = $('reticle');
 const aimDir = [0, 0, -1];
 
@@ -186,6 +192,7 @@ function frame(nowMs) {
     if (input.pressed.waggle) waggleLeft = 1.2;
     copyJet(prev, jet);
     const it = attract ? attractPilot.think(jet, remoteList, STEP) : flyIntent(input);
+    lastIntent = it;
     step(jet, it, STEP);
     if (attract) attractPilot.hold(jet, STEP);
     waggleLeft = Math.max(0, waggleLeft - STEP);
@@ -214,6 +221,7 @@ function frame(nowMs) {
   thr.style.width = `${Math.round(jet.throttle * 100)}%`;
   const others = net.state.status === 'online' ? roster.size : 0;
   $('aloft').textContent = `${others} other${others === 1 ? '' : 's'} in flight`;
+  if (!attract) statusLog();
   const st = stick.state;
   stickDot.style.display = st ? 'block' : 'none';
   if (st) { stickDot.style.left = `${st.cur.x}px`; stickDot.style.top = `${st.cur.y}px`; }
@@ -226,6 +234,22 @@ function frame(nowMs) {
   if (showReticle) reticle.style.transform = `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
 }
 requestAnimationFrame(frame);
+
+// ---- status log: what the jet is doing on its own, and why ----
+const ft = (m) => `${Math.round(m * 3.281 / 100) * 100}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+function statusLog() {
+  const r = Math.hypot(jet.pos[0], jet.pos[2]), nose = Math.asin(Math.max(-1, Math.min(1, aimDirOf(jet)[1])));
+  log.hold('edge', r > LIMITS.radius ? 'autopilot: turning you back toward the middle of the map'
+    : r > LIMITS.radius * 0.88 ? `nearing the edge of the map · ${range(LIMITS.radius - r)} to go` : null);
+  const alt = jet.pos[1];
+  log.hold('floor', alt < LIMITS.minAlt + 3000 && nose < -0.05 ? `hard deck ${ft(LIMITS.minAlt)} ft: pulling up` : null);
+  log.hold('ceiling', alt > LIMITS.maxAlt - 3000 && nose > 0.05 ? `ceiling ${ft(LIMITS.maxAlt)} ft: leveling off` : null);
+  log.hold('rejoin', follow && lastIntent?.boost && lastIntent === followIntent ? 'boost: rejoining formation' : null);
+  log.hold('loop', assist.loop > 0 && !follow ? 'full back: looping' : assist.loop < 0 && !follow ? 'full forward: diving' : null);
+  log.tick();
+}
+const _f = [0, 0, 0];
+function aimDirOf(j) { return forwardOf(j.q, _f); }
 
 
 // ---- BOOST button (touch devices): hold to dash ----
@@ -291,10 +315,12 @@ function pickJet(x, y) {
 
 function startFollow(id) {
   follow = { id, side: Math.random() < 0.5 ? -1 : 1 };
+  log.post('follow', `autopilot: taking you to ${remotes.remotes.get(id)?.callsign || 'their'}'s wing`);
   window.__flight.follow = follow;
 }
 
 function stopFollow() {
+  if (follow) log.post('follow', 'autopilot off: you have the jet');
   follow = null;
   window.__flight.follow = null;
   $('following').hidden = true;
