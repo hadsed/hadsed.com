@@ -19,8 +19,7 @@
 // to cheat: hold() pulls it toward its slot directly, at most a few hundred
 // m/s, which at 60,000 ft barely moves the ground but keeps the other jet
 // framed even while its interpolated position is still settling after load.
-import { steerTo } from './packages/sim/assist.js';
-import { createJet, forwardOf, clamp } from './packages/sim/index.js';
+import { createJet, forwardOf, rightOf, clamp } from './packages/sim/index.js';
 
 // The backdrop lab's spot: 79 km east, 69.1 km north of the tile centre, 85,000 ft, nose north.
 export const HOME = { x: 79000, y: 25908, z: -69100, heading: 0 };
@@ -35,10 +34,30 @@ export const SLOTS = {
   tall: { right: 400, ahead: 410, up: 14 },
 };
 const NEAR = 60000;   // only bother with jets this close
-const PULL = 1.2;     // seconds to close most of the gap to the slot
-const MAX_PULL = 600; // m/s of correction, so a far-off slot is reached by flying, not sliding
+// The backdrop sits behind text people are reading, so it keeps company only with
+// jets flying calmly: not boosting, turning under 2.5 deg/s. Anyone busier is left alone.
+const CALM_TURN = 2.5 * Math.PI / 180;
+const BOOST = 2;
+const PULL = 4;       // seconds to close most of the gap to the slot
+const MAX_PULL = 200; // m/s of correction, so a far-off slot is reached by flying, not sliding
 
-const f = [0, 0, 0];
+const f = [0, 0, 0], rt = [0, 0, 0];
+const MAX_BANK = 10 * Math.PI / 180;   // a slow lean, never a hard turn
+
+// Turn toward a compass heading and hold an altitude, gently: bank at most
+// MAX_BANK, nose within a degree or two of level.
+function ease(intent, jet, heading, alt) {
+  forwardOf(jet.q, f); rightOf(jet.q, rt);
+  const h = Math.atan2(-f[0], -f[2]);
+  const err = Math.atan2(Math.sin(heading - h), Math.cos(heading - h));   // + means turn left
+  const bank = Math.asin(clamp(-rt[1], -1, 1));                          // + banked right
+  const want = clamp(-err * 0.8, -MAX_BANK, MAX_BANK);
+  intent.roll = clamp((want - bank) * 2, -1, 1);
+  const nose = Math.asin(clamp(f[1], -1, 1));
+  const wantNose = clamp((alt - jet.pos[1]) / 4000, -0.03, 0.03);
+  intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
+  intent.yaw = 0;
+}
 
 export function createAttractPilot({ home = HOME, rng = Math.random, slot: SLOT = SLOTS.wide } = {}) {
   const intent = { pitch: 0, roll: 0, yaw: 0, throttle: 0, boost: false };
@@ -55,10 +74,26 @@ export function createAttractPilot({ home = HOME, rng = Math.random, slot: SLOT 
     return out;
   }
 
+  // Heading rate per jet, smoothed, to tell a calm jet from a busy one.
+  const turn = new Map();   // id -> { h, rate }
+  function watchTurns(remotes, dt) {
+    for (const r of remotes) {
+      if (!r.view || !r.visible) continue;
+      forwardOf(r.view.q, f);
+      const h = Math.atan2(-f[0], -f[2]);
+      const t = turn.get(r.id);
+      if (!t) { turn.set(r.id, { h, rate: 0 }); continue; }
+      const d = Math.atan2(Math.sin(h - t.h), Math.cos(h - t.h)) / Math.max(dt, 1e-3);
+      t.rate += (Math.abs(d) - t.rate) * (1 - Math.exp(-dt / 1.5));
+      t.h = h;
+    }
+  }
+  const calm = (r) => !((r.rawFlags ?? r.view.flags) & BOOST) && (turn.get(r.id)?.rate ?? 0) < CALM_TURN;
+
   function nearest(jet, remotes, within = NEAR) {
     let best = null, bestD = within;
     for (const r of remotes) {
-      if (!r.view || !r.visible) continue;
+      if (!r.view || !r.visible || !calm(r)) continue;
       const d = Math.hypot(r.view.pos[0] - jet.pos[0], r.view.pos[2] - jet.pos[2]);
       if (d < bestD) { bestD = d; best = r; }
     }
@@ -67,7 +102,7 @@ export function createAttractPilot({ home = HOME, rng = Math.random, slot: SLOT 
 
   const slot = [0, 0, 0];
   let current = null;   // the lead's view this tick, for hold()
-  return {
+  const api = {
     me,
     // Meters from our slot (Infinity with nobody to keep company with).
     gap(jet) {
@@ -97,7 +132,11 @@ export function createAttractPilot({ home = HOME, rng = Math.random, slot: SLOT 
     think(jet, remotes, dt) {
       me.wobble += dt;
       me.leadFor -= dt;
+      watchTurns(remotes, dt);
       let lead = me.lead !== null ? remotes.find((r) => r.id === me.lead && r.view && r.visible) : null;
+      // Its attitude is drawn eased and its boost not at all, so a busy moment is fine;
+      // only let it go once it has pulled well away from the slot.
+      if (lead && api.gap(jet) > 5000) { lead = null; me.lead = null; me.leadFor = 0; }
       if (!lead || me.leadFor <= 0) {
         const n = nearest(jet, remotes);
         if (n && n !== lead) { lead = n; me.lead = n.id; me.leadFor = 90 + rng() * 120; }
@@ -110,26 +149,28 @@ export function createAttractPilot({ home = HOME, rng = Math.random, slot: SLOT 
         const l = lead.view;
         slotOf(l, jet, slot);
         forwardOf(l.q, f);
-        // Ease toward the other jet's heading: aim far down its line, gently. hold() does
-        // the positioning, so the steering only keeps the two roughly parallel.
-        steerTo(intent, jet, slot[0] + f[0] * 20000, slot[1], slot[2] + f[2] * 20000, 0.45);
+        // Ease toward the other jet's heading. hold() does the positioning, so the
+        // steering only keeps the two roughly parallel, with shallow banks.
+        ease(intent, jet, Math.atan2(-f[0], -f[2]), slot[1]);
         const dx = slot[0] - jet.pos[0], dz = slot[2] - jet.pos[2];
         forwardOf(jet.q, f);
         const along = dx * f[0] + dz * f[2];
         const want = l.speed + clamp(along * 0.08, -150, 250);
         intent.throttle = clamp((want - jet.speed) / 40, -1, 1);
-        intent.boost = Math.hypot(dx, dz) > 3000 && along > 0;
+        intent.boost = false;   // never in the backdrop
       } else {
-        // Nobody about: loiter over the backdrop's patch, in long lazy curves.
+        // Nobody about: carry on straight, and drift back toward the backdrop's patch
+        // in a long shallow curve only once well away from it.
         forwardOf(jet.q, f);
+        const h = Math.atan2(-f[0], -f[2]);
         const away = Math.hypot(home.x - jet.pos[0], home.z - jet.pos[2]);
-        if (away > 15000) steerTo(intent, jet, home.x, home.y, home.z, 0.4);
-        else steerTo(intent, jet, jet.pos[0] + f[0] * 8000, home.y, jet.pos[2] + f[2] * 8000, 0.4);
-        intent.roll = clamp(intent.roll + Math.sin(me.wobble * 0.05) * 0.04, -1, 1);
+        const toHome = Math.atan2(-(home.x - jet.pos[0]), -(home.z - jet.pos[2]));
+        ease(intent, jet, away > 40000 ? toHome : h, home.y);
         intent.throttle = clamp(0.7 - jet.throttle, -1, 1);
         intent.boost = false;
       }
       return intent;
     },
   };
+  return api;
 }

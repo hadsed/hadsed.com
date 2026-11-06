@@ -76,7 +76,7 @@ export function createCameraRig(camera, {
 
     // ---- orbit pose, in the jet's (smoothed) heading frame ----
     const h = Math.atan2(-fwd.x, -fwd.z);
-    heading = heading === null || !ready ? h : heading + wrap(h - heading) * (1 - Math.exp(-dt / 2.5));
+    heading = heading === null || !ready ? h : heading + wrap(h - heading) * (1 - Math.exp(-dt / 8));   // slow: the backdrop pans, never swings
     ready = true;
     rig.orbit.spin += drift * dt;
     const yaw = heading + rig.orbit.spin + rig.orbit.yaw;

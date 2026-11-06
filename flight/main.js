@@ -202,6 +202,7 @@ function frame(nowMs) {
   remotes.sample(nowMs);
   remoteList.length = 0;
   for (const [id, r] of remotes.remotes) { r.id = id; remoteList.push(r); }
+  if (attract) calmRemotes(dt);
 
   if (attract && !window.__flight.ready && readyAt) placeBackdrop(nowMs);
   renderer.draw({ self: view, remotes: remoteList, time: nowMs / 1000, dt });
@@ -366,7 +367,26 @@ function land() {
   stopFollow();
   document.body.classList.add('attract');
   net.watch();
+  calmQ.clear();
   renderer.rig.target = 0;
 }
 Object.assign(window.__flight, { fly, land, attractPilot });
 Object.defineProperty(window.__flight, 'attract', { get: () => attract });
+
+// Behind the site's text the sky stays quiet: other jets' attitude is eased (a hard
+// bank reads as a slow lean) and their boost and wave are not drawn. Positions are
+// untouched. Off once you fly, when you see everything as it is.
+const calmQ = new Map(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+function calmRemotes(dt) {
+  const k = 1 - Math.exp(-dt / 1.5);
+  for (const r of remoteList) {
+    if (!r.view) continue;
+    const q = r.view.q;
+    let c = calmQ.get(r.id);
+    if (!c) { calmQ.set(r.id, (c = [q[0], q[1], q[2], q[3]])); }
+    qa.set(c[0], c[1], c[2], c[3]).slerp(qb.set(q[0], q[1], q[2], q[3]), k);
+    c[0] = q[0] = qa.x; c[1] = q[1] = qa.y; c[2] = q[2] = qa.z; c[3] = q[3] = qa.w;
+    r.rawFlags = r.view.flags; r.view.flags = 0;
+  }
+  if (calmQ.size > remoteList.length + 16) for (const id of calmQ.keys()) if (!remotes.remotes.has(id)) calmQ.delete(id);
+}
