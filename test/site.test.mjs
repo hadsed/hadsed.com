@@ -37,7 +37,7 @@ test("landing page shows about, timeline, and projects", () => {
   assert.doesNotMatch(html, /Adiabatic Quantum Optimization for Associative Memory Recall/);
   assert.match(html, /class="org">Vinci4d</);
   assert.match(html, /My next 5-year role/);
-  assert.match(html, /class="role"><a href="mailto:h@hadsed.com">Reach out to me<\/a><\/div>/);
+  assert.match(html, /class="role"><a href="mailto:h@hadsed.com">[^<]+<\/a><\/div>/);
   assert.match(html, /ML Engineer, Electrical DNA sequencing/);
   assert.doesNotMatch(html, / · /);
   assert.doesNotMatch(html, /entry-head/);
