@@ -41,11 +41,14 @@ export function createRenderer({ canvas, manifest, labels }) {
   const coarse = matchMedia('(pointer: coarse)').matches;
   // 256 x 256 with a uniform 350 m core: a quarter of the backdrop's vertices (software GL and weak
   // phones are vertex-bound here).
-  const world = createWorld({ segments: 256, cell: 350, flat: 0.375 });
+  const world = createWorld({ segments: software ? 256 : 320, cell: 350, flat: 0.375, lite: software });
   // The backdrop's look (navy monotone, ground color showing through). The monotone follows the camera
   // rig: full in the backdrop orbit, fading to natural color as Fly glides into the chase cam.
   world.setLook({ ...WORLD_DEFAULTS });
   world.uniforms.uDirect.value = 1;
+  // Per-pixel relief (three height reads a pixel) is free on a GPU but halves the frame rate on a CPU
+  // rasterizer; there the per-vertex relief is enough.
+  if (software) world.terrainUniforms.uPixelRelief.value = 0;
   scene.add(world.sky, world.terrain);
   if (!software) scene.add(world.clouds);
   sun.position.copy(world.sunDir);
@@ -140,11 +143,11 @@ export function createRenderer({ canvas, manifest, labels }) {
       wind.update(dt, me.position, tmpQ, self.speed, rig.boosting ? 1 : 0, Math.min(1, Math.max(0, rig.blend * 2 - 1)));
       const camPos = camera.position;
 
-      // The ground grid slides with the camera continuously. Each vertex reads heights pre-filtered to
-      // its own spacing (world module), so nothing snaps. (Snapping the grid a cell at a time only kept
-      // the uniform core still; everything past it, which is nearly all you see from altitude, re-meshed
-      // on every snap: a visible jump about twice a second at Mach 3.) groundOffset (the site backdrop)
-      // slides the whole world under the jets, so the ground can drift slower than the jets really fly.
+      // The ground grid follows the camera (world.frame): its core moves in whole heightmap texels, so
+      // the ground near you holds still, and the rest slides smoothly over pre-filtered heights.
+      // (Snapping everything a cell at a time re-meshed the far ground on every snap, a visible jump
+      // twice a second at Mach 3; sliding everything made nearby ridges swim.) groundOffset (the site
+      // backdrop) slides the whole world under the jets, so the ground can drift slower than they fly.
       const go = this.groundOffset;
       const ox = go ? go[0] : 0, oz = go ? go[2] : 0;
       shift.set(camPos.x, camPos.z);
