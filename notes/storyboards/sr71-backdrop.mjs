@@ -4,8 +4,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
-import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS, DAY_LOOK, NIGHT_LOOK } from './world/index.js';
-const STORE = 'sr71-backdrop-v6';   // v6: night flight (stars, afterglow, city lights)
+import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS, DAY_LOOK, NIGHT_LOOK, NIGHT_DEFAULTS } from './world/index.js';
+const STORE = 'sr71-backdrop-v7';   // v7: night jigs (stars, horizon, city lights, night colors)
 
 // ---------- settings ----------
 const PRESETS = {
@@ -30,8 +30,15 @@ const STYLES = {
 // Defaults = the look Had landed on 2026-11-05 (iPad), with altitude at the SR-71's ~85k ft ceiling.
 // The look itself (tone, scene, ground) lives in the shared world module, so the flight lab matches.
 const TIMES = { night: NIGHT_LOOK, day: DAY_LOOK };
+// Starting points for the night jigs. Each is applied on top of the night defaults.
+const NIGHT_PRESETS = {
+  sparse: { ...NIGHT_DEFAULTS, mono: 1, chroma: 0.7, milky: 0.45, city: 1, afterglow: 1 },
+  natural: { ...NIGHT_DEFAULTS, mono: 0.2, chroma: 1, milky: 0.45, city: 1, afterglow: 1, nightGround: '#1d222b' },
+  rich: { ...NIGHT_DEFAULTS, starDensity: 0.8, starVar: 0.5, milky: 1, mono: 1, chroma: 0.7, afterglow: 1, city: 1 },
+  quiet: { ...NIGHT_DEFAULTS, starDensity: 0.2, starBright: 0.8, milky: 0, seamBright: 0.6, seamAround: 0.5, glowBright: 0.6, city: 0.6, cityDensity: 0.6, cityGlow: 0.5, mono: 1, chroma: 0.5 },
+};
 const DEFAULTS = {
-  preset: 'site', ...WORLD_DEFAULTS, ...NIGHT_LOOK, style: 'navycolor', time: 'night',
+  preset: 'site', ...WORLD_DEFAULTS, ...NIGHT_LOOK, style: 'navycolor', time: 'night', nightPreset: 'sparse',
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -327,12 +334,49 @@ const SPEC = [
   ['Night', [
     ['time', 'select', { label: 'Time of day', options: [['night', 'Night flight'], ['day', 'Day']] }],
     ['night', 'range', { label: 'Night', min: 0, max: 1, step: 0.01 }],
-    ['stars', 'range', { label: 'Stars', min: 0, max: 3, step: 0.01 }],
-    ['milky', 'range', { label: 'Milky Way', min: 0, max: 2, step: 0.01 }],
-    ['afterglow', 'range', { label: 'Afterglow at the horizon', min: 0, max: 3, step: 0.01 }],
-    ['city', 'range', { label: 'City lights', min: 0, max: 3, step: 0.01 }],
     ['moonAz', 'range', { label: 'Moon direction (°)', min: 0, max: 360, step: 1 }],
     ['moonEl', 'range', { label: 'Moon height (°)', min: 0, max: 80, step: 1 }],
+    ['nightPreset', 'select', { label: 'Night starting point', options: [['sparse', 'Sparse white stars'], ['natural', 'Natural color'], ['rich', 'Rich sky, Milky Way'], ['quiet', 'Quiet'], ['custom', 'Custom']] }],
+  ]],
+  ['Stars', [
+    ['stars', 'range', { label: 'Overall', min: 0, max: 3, step: 0.01 }],
+    ['milky', 'range', { label: 'Milky Way', min: 0, max: 2, step: 0.01 }],
+    ['starDensity', 'range', { label: 'Density', min: 0, max: 2, step: 0.01 }],
+    ['starBright', 'range', { label: 'Brightness', min: 0, max: 3, step: 0.01 }],
+    ['starSize', 'range', { label: 'Size', min: 0.4, max: 3, step: 0.01 }],
+    ['starScale', 'range', { label: 'Pattern scale (finer →)', min: 0.3, max: 2.5, step: 0.01 }],
+    ['starSeed', 'range', { label: 'Pattern (reshuffle)', min: 0, max: 50, step: 1 }],
+    ['starFade', 'range', { label: 'Fade out near horizon (°)', min: 0.5, max: 30, step: 0.5 }],
+    ['starColor', 'color', { label: 'Star color' }],
+    ['starVar', 'range', { label: 'Color variety (blue ↔ amber)', min: 0, max: 1, step: 0.01 }],
+  ]],
+  ['Horizon', [
+    ['afterglow', 'range', { label: 'Overall', min: 0, max: 3, step: 0.01 }],
+    ['seamColor', 'color', { label: 'Seam color' }],
+    ['seamWidth', 'range', { label: 'Seam thickness (°)', min: 0.02, max: 3, step: 0.01 }],
+    ['seamBright', 'range', { label: 'Seam brightness', min: 0, max: 4, step: 0.01 }],
+    ['seamAround', 'range', { label: 'Toward the sun ↔ all around', min: 0, max: 1, step: 0.01 }],
+    ['glowColor', 'color', { label: 'Glow above it' }],
+    ['glowHeight', 'range', { label: 'Glow height (°)', min: 0.2, max: 20, step: 0.1 }],
+    ['glowBright', 'range', { label: 'Glow brightness', min: 0, max: 4, step: 0.01 }],
+    ['groundGlow', 'range', { label: 'Warm haze on far ground', min: 0, max: 3, step: 0.01 }],
+  ]],
+  ['City lights', [
+    ['city', 'range', { label: 'Overall', min: 0, max: 3, step: 0.01 }],
+    ['cityColor', 'color', { label: 'Color' }],
+    ['cityBright', 'range', { label: 'Brightness', min: 0, max: 4, step: 0.01 }],
+    ['cityDensity', 'range', { label: 'Lights per town', min: 0, max: 3, step: 0.01 }],
+    ['cityCover', 'range', { label: 'How much land is town', min: 0, max: 1, step: 0.01 }],
+    ['cityTown', 'range', { label: 'Town spacing (km)', min: 3, max: 80, step: 0.5 }],
+    ['cityDot', 'range', { label: 'Light size (m)', min: 2, max: 40, step: 0.5 }],
+    ['cityGlow', 'range', { label: 'Glow of distant towns', min: 0, max: 3, step: 0.01 }],
+    ['cityMaxAlt', 'range', { label: 'Highest town (m)', min: 300, max: 4000, step: 50 }],
+  ]],
+  ['Night colors', [
+    ['nightZenith', 'color', { label: 'Sky overhead' }],
+    ['nightHorizon', 'color', { label: 'Sky at the horizon' }],
+    ['nightGround', 'color', { label: 'Haze over the ground' }],
+    ['moonLight', 'range', { label: 'Moonlight on the ground', min: 0, max: 1, step: 0.01 }],
   ]],
   ['Scene', [
     ['region', 'select', { label: 'Region', options: [['sierra', 'Sierra Nevada'], ['alps', 'Alps, Valais'], ['himalaya', 'Himalaya, Everest'], ['grandcanyon', 'Grand Canyon'], ['denali', 'Alaska Range, Denali']] }],
@@ -413,6 +457,8 @@ function build() {
         if (key === 'preset' && PRESETS[v]) Object.assign(S, PRESETS[v]);
         if (key === 'style' && STYLES[v]) Object.assign(S, STYLES[v]);
         if (key === 'time' && TIMES[v]) Object.assign(S, TIMES[v]);
+        if (key === 'nightPreset' && NIGHT_PRESETS[v]) Object.assign(S, NIGHT_PRESETS[v]);
+        else if (key in NIGHT_DEFAULTS || ['stars', 'milky', 'afterglow', 'city'].includes(key)) S.nightPreset = 'custom';
         if (key === 'region') { S.offsetX = null; S.offsetZ = null; }
         if (['shadow', 'mid', 'light', 'highlight'].includes(key)) S.preset = 'custom';
         sync(); apply();
@@ -433,6 +479,7 @@ function sync() {
   }
   const custom = inputs.preset.input.querySelector('option[value="custom"]');
   custom.hidden = S.preset !== 'custom';
+  inputs.nightPreset.input.querySelector('option[value="custom"]').hidden = S.nightPreset !== 'custom';
 }
 build(); sync();
 

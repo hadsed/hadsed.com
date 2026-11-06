@@ -26,6 +26,7 @@ export const EARTH_R = 6371000;
 // The backdrop look Had landed on (2026-11-05/06): Sierra, 85k ft, grid 250 m, contours 175 m.
 // 2026-11-06: navy monotone stays dominant, natural ground color bleeds through it (chroma). Chroma 0 +
 // color 0 is the original navy terrain grid; mono 0 is full natural color.
+const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
 export const WORLD_DEFAULTS = {
   shadow: '#07090e', mid: '#1c2433', light: '#c8cdd5', highlight: '#e4c56f',
   midPoint: 0.56, hlStart: 0.61, hlAmount: 0.85, mono: 1, chroma: 0.7, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
@@ -37,11 +38,27 @@ export const WORLD_DEFAULTS = {
   // horizon, dark ground with city lights). Off by default while it's tuned in the lab: NIGHT_LOOK turns it on.
   night: 0, stars: 1, afterglow: 1, milky: 0.45, city: 1, moonAz: 200, moonEl: 32,
 };
+// The night's finer controls (the lab's Stars, Horizon, City lights and Night colors groups).
+// Angles in degrees, distances in meters, colors as sRGB hex.
+export const NIGHT_DEFAULTS = {
+  starDensity: 0.35, starSize: 1, starBright: 1, starScale: 1, starSeed: 0, starFade: 6, starColor: '#f2eee6', starVar: 0.3,
+  seamColor: '#ffb45a', seamWidth: 0.26, seamBright: 1, seamAround: 0.1, glowColor: '#4a5566', glowHeight: 2.6, glowBright: 1, groundGlow: 1,
+  nightZenith: '#080c16', nightHorizon: '#282d38', nightGround: '#282d38', moonLight: 0.16,
+  cityDensity: 1, cityTown: 22, cityCover: 0.4, cityColor: '#ffb35c', cityGlow: 1, cityDot: 9, cityBright: 1, cityMaxAlt: 2200,
+};
+Object.assign(WORLD_DEFAULTS, NIGHT_DEFAULTS);
+const NIGHT_U = ['starDensity', 'starSize', 'starBright', 'starScale', 'starSeed', 'starFade', 'starVar', 'seamWidth', 'seamBright', 'seamAround', 'glowHeight', 'glowBright', 'groundGlow', 'moonLight'];
+const NIGHT_UC = ['starColor', 'seamColor', 'glowColor', 'nightZenith', 'nightHorizon', 'nightGround'];
+const NIGHT_TU = ['cityDensity', 'cityTown', 'cityCover', 'cityGlow', 'cityDot', 'cityBright', 'cityMaxAlt'];
+const NIGHT_TUC = ['cityColor'];
+const nightUniforms = (num, cols) => Object.fromEntries([
+  ...num.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: +NIGHT_DEFAULTS[k] }]),
+  ...cols.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: col(NIGHT_DEFAULTS[k]) }]),
+]);
 // The daytime look, for presets: the sun up at 18 degrees, no stars.
 export const DAY_LOOK = { night: 0, sunEl: 18, sunAz: 41, exposure: 1.12 };
 export const NIGHT_LOOK = { night: 1, sunEl: -5, sunAz: 245, stars: 1, afterglow: 1, milky: 0.45, city: 1, exposure: 2.2 };
 
-const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
 
 export const NOISE = /* glsl */`
 float whash(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 34.23); return fract(p.x * p.y); }
@@ -100,26 +117,32 @@ vec4 finishSky(vec3 c){
 // seam right on the horizon, strongest toward the sun, with a cool grey-blue glow just above it.
 export const STARS = /* glsl */`
 uniform float uStars, uAfterglow, uMilky;
+uniform float uStarDensity, uStarSize, uStarBright, uStarScale, uStarSeed, uStarFade, uStarVar;
+uniform float uSeamWidth, uSeamBright, uSeamAround, uGlowHeight, uGlowBright;
+uniform vec3 uStarColor, uSeamColor, uGlowColor;
 vec3 shash3(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
 float starLayer(vec3 d, float n, float keep, float pix, out vec3 tint){
-  vec3 g = d * n, id = floor(g), r = shash3(id);
+  n *= uStarScale;
+  vec3 g = d * n, id = floor(g), r = shash3(id + uStarSeed * 13.7);
+  keep *= uStarDensity;
   tint = vec3(0.0);
   // a grid finer than a few pixels would read as noise: fade the layer out as its cells shrink on screen
   float fit = 1.0 - smoothstep(0.12, 0.3, pix * n);
   if (r.x > keep || fit <= 0.0) return 0.0;
-  vec3 s = normalize(id + 0.2 + 0.6 * shash3(id + 17.0)) ;
+  vec3 s = normalize(id + 0.2 + 0.6 * shash3(id + 17.0 + uStarSeed * 13.7));
   float a = length(d - s);                              // radians, near enough at these sizes
-  float sig = pix * 0.75;
+  float sig = pix * 0.75 * uStarSize;
   float b = pow(r.y, 5.0) * 1.6 + 0.08;                 // most faint, a few bright
-  tint = mix(vec3(0.70, 0.80, 1.0), vec3(1.0, 0.86, 0.70), r.z);
-  return b * fit * exp(-a * a / (2.0 * sig * sig));
+  tint = uStarColor * mix(vec3(1.0), mix(vec3(0.70, 0.80, 1.0), vec3(1.0, 0.82, 0.62), r.z), uStarVar);
+  return uStarBright * b * fit * exp(-a * a / (2.0 * sig * sig));
 }
 vec3 nightSky(vec3 d, float el, vec3 base){
   vec3 e = vec3(0.0);
   float pix = max(length(fwidth(d)), 2e-5);
   // stars live in the dark: none in the bright band at the horizon, and they thin out where the sky is lit
   float dark = 1.0 - smoothstep(0.004, 0.03, dot(base, vec3(0.2126, 0.7152, 0.0722)));
-  float up = smoothstep(0.012, 0.09, el);
+  float fade = radians(max(uStarFade, 0.05));
+  float up = smoothstep(fade * 0.15, fade, el);
   if (uStars > 0.0 && up > 0.0) {
     // the Milky Way: a soft band on a tilted great circle, more stars inside it
     vec3 ax = normalize(vec3(0.42, 0.55, -0.72));
@@ -137,9 +160,10 @@ vec3 nightSky(vec3 d, float el, vec3 base){
     vec2 h = normalize(d.xz + 1e-6), sh = normalize(uSun.xz + 1e-6);
     float toward = smoothstep(-0.6, 1.0, dot(h, sh));
     float x = max(el, 0.0);
-    float seam = exp(-x / 0.0045) * smoothstep(-0.012, 0.0, el);
-    e += vec3(1.0, 0.6, 0.24) * seam * (0.2 + 1.8 * toward) * 1.1 * uAfterglow;
-    e += vec3(0.10, 0.12, 0.15) * exp(-x / 0.045) * smoothstep(-0.01, 0.0, el) * (0.5 + 0.8 * toward) * uAfterglow;
+    float w = radians(max(uSeamWidth, 0.01)), gh = radians(max(uGlowHeight, 0.05));
+    float seam = exp(-x / w) * smoothstep(-2.7 * w, 0.0, el);
+    e += uSeamColor * seam * mix(0.2 + 1.8 * toward, 1.0, uSeamAround) * 1.1 * uSeamBright * uAfterglow;
+    e += uGlowColor * 0.5 * exp(-x / gh) * smoothstep(-0.01, 0.0, el) * mix(0.5 + 0.8 * toward, 1.0, uSeamAround) * uGlowBright * uAfterglow;
   }
   return e;
 }`;
@@ -264,6 +288,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uMidPoint: { value: 0.56 }, uHlStart: { value: 0.61 }, uHlAmount: { value: 0.85 },
     uMono: { value: 1 }, uExposure: { value: 1.12 }, uContrast: { value: 1.13 }, uDirect: { value: 0 }, uChroma: { value: 0.6 },
     uNight: { value: 0 }, uStars: { value: 1 }, uAfterglow: { value: 1 }, uMilky: { value: 0.45 }, uMoon: { value: new THREE.Vector3(0, 1, 0) },
+    ...nightUniforms(NIGHT_U, NIGHT_UC),
   };
 
   // ---- sky: thin bright air at the horizon, near-space navy overhead, a sun and the limb ----
@@ -275,14 +300,14 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     new THREE.ShaderMaterial({ defines,
       side: THREE.DoubleSide, depthWrite: false, depthTest: false, uniforms: U,
       vertexShader: /* glsl */`
-        uniform vec3 uSun, uHaze; uniform float uDip, uSkyK, uNight;
+        uniform vec3 uSun, uHaze, uNightZenith, uNightHorizon; uniform float uDip, uSkyK, uNight;
         varying vec3 vDir; varying vec4 vSky; varying vec3 vBase;
         ${TONE}
         void main(){
           vec3 d = normalize(position); vDir = d;
           float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;       // angle above the true horizon
-          vec3 zenith = mix(vec3(0.010, 0.020, 0.055), vec3(0.0025, 0.0035, 0.008), uNight);   // near-space dark blue; at night near black
-          vec3 haze = mix(uHaze, vec3(0.020, 0.026, 0.040), uNight);
+          vec3 zenith = mix(vec3(0.010, 0.020, 0.055), uNightZenith, uNight);   // near-space dark blue; at night near black
+          vec3 haze = mix(uHaze, uNightHorizon, uNight);
           // high up most of the air is below you: a thin bright band at the horizon, navy by ~20 degrees up.
           // Lower down (uSkyK smaller) the bright band widens.
           vec3 c = mix(haze, zenith, 1.0 - exp(-max(el, 0.0) * uSkyK));
@@ -335,6 +360,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uColor: { value: 1 }, uTexture: { value: 1 }, uCity: { value: 1 },
     uFiltered: { value: 0 }, uMaxLod: { value: 0 }, uPixelRelief: { value: 1 },
     uSlide: { value: new THREE.Vector2() }, uCell: { value: cell }, uLodBias: { value: 0.5 },
+    ...nightUniforms(NIGHT_TU, NIGHT_TUC),
   };
   const terrain = new THREE.Mesh(
     terrainGeometry(segments, 750000, cell, flat),
@@ -402,7 +428,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         #include <logdepthbuf_pars_fragment>
         uniform vec3 uSun, uHaze; uniform float uHazeDist, uMaxH, uGrid, uGridSize, uContour, uContourStep, uShade, uLineBright, uLineGold;
         uniform float uTint, uTintContrast, uTintPivot, uSlope, uColor, uTexture, uSnowM, uArid, uNight, uCity;
-        uniform vec3 uMoon, uCam, uOrigin; uniform float uAfterglow;
+        uniform vec3 uMoon, uCam, uOrigin, uNightGround, uSeamColor, uCityColor; uniform float uAfterglow, uGroundGlow, uMoonLight;
+        uniform float uCityDensity, uCityTown, uCityCover, uCityGlow, uCityDot, uCityBright, uCityMaxAlt;
         varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
         uniform sampler2D uHeight; uniform float uWidth, uTexel, uFiltered, uMaxLod, uExag, uPixelRelief;
         float H;   // height here: per vertex, or per pixel from the filtered heightmap
@@ -441,19 +468,20 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         // once the dots get smaller than a pixel they fade into the glow they average to, so distant towns
         // read as soft patches and nothing sparkles as the camera drifts.
         vec3 cityLights(vec3 n){
-          float low = smoothstep(2200.0, 700.0, H) * smoothstep(2.5, 6.0, H) * smoothstep(0.9, 0.97, n.y);
+          float low = smoothstep(uCityMaxAlt, uCityMaxAlt * 0.32, H) * smoothstep(2.5, 6.0, H) * smoothstep(0.9, 0.97, n.y);
           if (low <= 0.0) return vec3(0.0);
           float pm = max(length(fwidth(vXZ)), 1.0);                     // meters per pixel here
-          float town = fbm(vXZ / 22000.0 + 9.1, 3);
-          float urban = smoothstep(0.44, 0.64, town);
-          float density = 0.03 + 0.7 * urban;
+          float town = fbm(vXZ / (uCityTown * 1000.0) + 9.1, 3);
+          float th = mix(0.72, 0.36, clamp(uCityCover, 0.0, 1.0));   // more cover: more of the land counts as town
+          float urban = smoothstep(th, th + 0.2, town);
+          float density = (0.03 + 0.7 * urban) * uCityDensity;
           const float CELL = 160.0;
           float l = urban * 0.003;
           // two scales: street lights up close, and brighter clusters (town centers, junctions) that
           // still read as points from far away
           for (int k = 0; k < 2; k++) {
-            float cell = k == 0 ? CELL : CELL * 6.0, size = k == 0 ? 9.0 : 30.0, gain = k == 0 ? 1.0 : 2.2;
-            float dens = k == 0 ? density : 0.02 + 0.55 * urban;
+            float cell = k == 0 ? CELL : CELL * 6.0, size = (k == 0 ? 1.0 : 3.33) * uCityDot, gain = k == 0 ? 1.0 : 2.2;
+            float dens = k == 0 ? density : (0.02 + 0.55 * urban) * uCityDensity;
             vec2 id = floor(vXZ / cell) + float(k) * 91.7;
             float r = whash(id), r2 = whash(id + 7.31), r3 = whash(id + 3.17);
             float sig = max(pm * 0.6, size);
@@ -462,9 +490,9 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
             float dots = step(r, dens) * exp(-dist * dist / (2.0 * sig * sig)) * (0.35 + 1.3 * r3) * min(1.0, size * size / (sig * sig) * 2.5);
             float avg = dens * 0.95 * 6.2832 * size * size / (cell * cell);   // what the dots average to
             float far = smoothstep(0.7 * cell, 1.6 * cell, pm);
-            l += mix(dots, avg * 1.2 * (0.4 + 1.2 * fbm(vXZ / 2500.0, 2)), far) * gain;
+            l += mix(dots, avg * 1.2 * uCityGlow * (0.4 + 1.2 * fbm(vXZ / 2500.0, 2)), far) * gain;
           }
-          return vec3(1.0, 0.60, 0.28) * l * low * 4.5;
+          return uCityColor * l * low * 4.5 * uCityBright;
         }
         #endif
         void main(){
@@ -487,7 +515,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           float grid = max(lines2(vXZ / uGridSize) * 0.55, lines2(vXZ / (uGridSize * 5.0)));
           float contour = max(lines1(H / uContourStep) * 0.55, lines1(H / (uContourStep * 5.0)));
           float ink = clamp(grid * uGrid + contour * uContour, 0.0, 1.0);
-          float lit = mix(clamp(dot(n, uSun), 0.0, 1.0), clamp(dot(n, uMoon), 0.0, 1.0) * 0.16, uNight);
+          float lit = mix(clamp(dot(n, uSun), 0.0, 1.0), clamp(dot(n, uMoon), 0.0, 1.0) * uMoonLight, uNight);
           float rise = clamp(H / uMaxH, 0.0, 1.0);
           // the drafted look: dark sheet, optional relief and height tint
           vec3 shaded = vec3(0.10, 0.11, 0.12) * (0.25 + 1.6 * lit) * (0.7 + 0.6 * rise);
@@ -502,12 +530,12 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           c = mix(c, vec3(uLineBright) * (0.75 + 0.5 * rise) * (1.0 - 0.72 * uNight), ink * (1.0 - 0.45 * uColor * (1.0 - uMono)));
           float fog = 1.0 - exp(-vDist / uHazeDist);
           vec3 haze = mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono);
-          vec3 nightHaze = vec3(0.020, 0.026, 0.040);
+          vec3 nightHaze = uNightGround;
           #ifndef WORLD_LITE
           if (uNight > 0.0) {   // the far ground near the horizon catches the afterglow, warmest toward the sun
             vec2 look = normalize(vXZ - uCam.xz - uOrigin.xz + 1e-3);
             float toward = smoothstep(-0.6, 1.0, dot(look, normalize(uSun.xz + 1e-6)));
-            nightHaze += vec3(0.22, 0.10, 0.04) * pow(fog, 120.0) * toward * uAfterglow;
+            nightHaze += uSeamColor * 0.22 * pow(fog, 120.0) * toward * uAfterglow * uGroundGlow;
           }
           #endif
           haze = mix(haze, nightHaze, uNight);
@@ -588,6 +616,10 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       U.uMoon.value.set(Math.sin(maz) * Math.cos(mel), Math.sin(mel), Math.cos(maz) * Math.cos(mel)).normalize();
       for (const k of ['night', 'stars', 'afterglow', 'milky']) U[uName(k)].value = +(look[k] ?? 0);
       TU.uCity.value = +(look.city ?? 0);
+      for (const k of NIGHT_U) if (look[k] != null) U[uName(k)].value = +look[k];
+      for (const k of NIGHT_UC) if (look[k]) U[uName(k)].value.copy(col(look[k]));
+      for (const k of NIGHT_TU) if (look[k] != null) TU[uName(k)].value = +look[k];
+      for (const k of NIGHT_TUC) if (look[k]) TU[uName(k)].value.copy(col(look[k]));
       U.uHazeDist.value = look.haze * 1000;
       U.uCover.value = +look.clouds;
       if (look.cloudM) cloudM = +look.cloudM;
