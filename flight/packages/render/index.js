@@ -48,6 +48,7 @@ export function createRenderer({ canvas, manifest, labels }) {
   if (!software) scene.add(world.clouds);
   sun.position.copy(world.sunDir);
   const shift = new THREE.Vector2();
+  const groundO = new THREE.Vector3();
 
   // ---- jets ----
   const geo = jetGeometry(manifest.jet);
@@ -125,13 +126,19 @@ export function createRenderer({ canvas, manifest, labels }) {
 
       rig.boosting = (self.flags & FLAG.BOOST) !== 0;
       rig.update(me.position, tmpQ, dt, camera.aspect);
+      // Gold outlines are for flying; the calm site backdrop shows plain black jets.
+      meLine.visible = ghostLines.visible = rig.blend > 0.5;
       const camPos = camera.position;
 
       // Ground follows the camera one grid cell at a time: the core vertices land exactly on their
-      // neighbors' spots, so the terrain under you never visibly changes.
-      const snap = world.cellSize;
-      shift.set(Math.round(camPos.x / snap) * snap, Math.round(camPos.z / snap) * snap);
-      world.frame(camera, null, shift);
+      // neighbors' spots, so the terrain under you never visibly changes. groundOffset (the site
+      // backdrop) slides the whole world under the jets, so the ground can drift slower than the
+      // jets really fly; the snap stays on the world's own grid.
+      const snap = world.cellSize, go = this.groundOffset;
+      const ox = go ? go[0] : 0, oz = go ? go[2] : 0;
+      shift.set(Math.round((camPos.x + ox) / snap) * snap - ox, Math.round((camPos.z + oz) / snap) * snap - oz);
+      groundO.set(ox, 0, oz);
+      world.frame(camera, go ? groundO : null, shift);
       world.uniforms.uMono.value = 1 - Math.min(Math.max(rig.blend, 0), 1);
 
       // Ghosts

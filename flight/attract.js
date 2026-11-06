@@ -42,7 +42,7 @@ const PULL = 4;       // seconds to close most of the gap to the slot
 const MAX_PULL = 200; // m/s of correction, so a far-off slot is reached by flying, not sliding
 
 const f = [0, 0, 0], rt = [0, 0, 0];
-const MAX_BANK = 10 * Math.PI / 180;   // a slow lean, never a hard turn
+const MAX_BANK = 4 * Math.PI / 180;    // a slow lean, never a turn you notice
 
 // Turn toward a compass heading and hold an altitude, gently: bank at most
 // MAX_BANK, nose within a degree or two of level.
@@ -159,13 +159,10 @@ export function createAttractPilot({ home = HOME, rng = Math.random, slot: SLOT 
         intent.throttle = clamp((want - jet.speed) / 40, -1, 1);
         intent.boost = false;   // never in the backdrop
       } else {
-        // Nobody about: carry on straight, and drift back toward the backdrop's patch
-        // in a long shallow curve only once well away from it.
+        // Nobody about: carry on straight and level. (Heading home from wherever we
+        // started meant a long turn at full lean; the sim keeps us inside the world.)
         forwardOf(jet.q, f);
-        const h = Math.atan2(-f[0], -f[2]);
-        const away = Math.hypot(home.x - jet.pos[0], home.z - jet.pos[2]);
-        const toHome = Math.atan2(-(home.x - jet.pos[0]), -(home.z - jet.pos[2]));
-        ease(intent, jet, away > 40000 ? toHome : h, home.y);
+        ease(intent, jet, Math.atan2(-f[0], -f[2]), Math.min(Math.max(jet.pos[1], 18000), 27000));
         intent.throttle = clamp(0.7 - jet.throttle, -1, 1);
         intent.boost = false;
       }
