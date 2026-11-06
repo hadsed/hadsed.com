@@ -132,6 +132,15 @@
   .sw-notes input { accent-color: var(--glow); }
   .sw-places { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
   .sw-places label { margin-top: 6px; color: var(--text); }
+  .sw-blink { display: grid; grid-template-columns: 5.5rem 1fr 3.2rem; align-items: center; gap: 4px 8px; margin-top: 6px; }
+  .sw-blink span { color: var(--muted); }
+  .sw-blink output { text-align: right; font: 11px var(--mono); color: var(--text); }
+  .sw-blink input[type=range] { width: 100%; accent-color: var(--glow); }
+  .sw-blink select { font: inherit; color: var(--text); background: #141a25; border: 1px solid rgba(200, 205, 213, .2); border-radius: 4px; padding: 2px; grid-column: 2 / 4; }
+  .sw-blink-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .sw-blink-row button { border: 1px solid rgba(200, 205, 213, .25); border-radius: 6px; padding: 4px 10px; color: var(--text); }
+  .sw-blink-row button:hover { border-color: var(--glow); }
+  .sw-blink-row small { color: var(--muted); font: 10px var(--mono); letter-spacing: .06em; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 10px var(--mono); letter-spacing: .2em; color: var(--muted); z-index: 7; background: var(--bg); transition: opacity .6s; }
   #loading.done { opacity: 0; pointer-events: none; }
   @media (max-width: 640px) {
@@ -374,6 +383,58 @@ function placeFly() {
   li.style.setProperty('margin-top', Math.max(0, target - now) + 'px', 'important');
 }
 
+// ---------- Fly blink ----------
+// A slow swell toward the gold of the "next role" orb (--glow, #e4c56f, with the same soft halo),
+// then back to muted. Runs with the Web Animations API so period and length stay independent.
+const MUTED = [138, 145, 156], GOLD = [228, 197, 111];
+const CURVES = {
+  sine: ['Sine swell', [[0, 0], [0.5, 1], [1, 0]], 'cubic-bezier(.37,0,.63,1)'],
+  rise: ['Quick rise, slow fade', [[0, 0], [0.22, 1], [1, 0]], 'cubic-bezier(.25,.1,.25,1)'],
+  hold: ['Rise, hold, fade', [[0, 0], [0.3, 1], [0.6, 1], [1, 0]], 'cubic-bezier(.37,0,.63,1)'],
+  wink: ['Double wink', [[0, 0], [0.22, 1], [0.44, 0.35], [0.66, 1], [1, 0]], 'cubic-bezier(.37,0,.63,1)'],
+};
+const num = (k, d) => (params.has(k) && !isNaN(+params.get(k)) ? +params.get(k) : d);
+const B = { every: num('every', 30), len: num('len', 2), str: num('str', 0.9), glow: num('glow', 6),
+  curve: CURVES[params.get('curve')] ? params.get('curve') : 'sine' };
+let lastBlink = performance.now() - (B.every - 3) * 1000;   // first blink ~3s after load, so you see it
+const mix = (k) => `rgb(${MUTED.map((m, i) => Math.round(m + (GOLD[i] - m) * k)).join(',')})`;
+function blinkFrames() {
+  const [, stops, easing] = CURVES[B.curve];
+  return stops.map(([offset, v]) => ({ offset, easing,
+    color: mix(v * B.str),
+    filter: `drop-shadow(0 0 ${(v * B.glow).toFixed(2)}px rgba(228,197,111,${(v * B.str * 0.55).toFixed(3)}))` }));
+}
+function blinkNow() {
+  const doc = siteDoc(); const a = doc && doc.querySelector('.edge-menu a');
+  lastBlink = performance.now();
+  if (!a || CONCEPTS[ci].id !== 'menu' || state !== 'site' || a.matches(':hover')) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  a.animate(blinkFrames(), { duration: B.len * 1000, easing: 'linear' });
+}
+setInterval(() => {
+  const left = B.every - (performance.now() - lastBlink) / 1000;
+  const out = document.getElementById('sw-next-blink'); if (out) out.textContent = `next in ${Math.max(0, Math.ceil(left))}s`;
+  if (left <= 0) blinkNow();
+}, 250);
+function blinkJig() {
+  const row = (k, label, min, max, step, unit) =>
+    `<span>${label}</span><input type="range" data-b="${k}" min="${min}" max="${max}" step="${step}" value="${B[k]}"><output data-bo="${k}">${B[k]}${unit}</output>`;
+  return `<p><span class="k">Blink</span></p><div class="sw-blink">
+    ${row('every', 'Every', 5, 60, 1, 's')}${row('len', 'Length', 0.4, 5, 0.1, 's')}
+    ${row('str', 'Strength', 0.1, 1, 0.05, '')}${row('glow', 'Halo', 0, 14, 0.5, 'px')}
+    <span>Curve</span><select data-b="curve">${Object.entries(CURVES).map(([id, [name]]) => `<option value="${id}" ${id === B.curve ? 'selected' : ''}>${name}</option>`).join('')}</select>
+  </div><div class="sw-blink-row"><button id="blink-now">Blink now</button><small id="sw-next-blink"></small></div>`;
+}
+function wireJig() {
+  for (const el of $$('[data-b]')) el.oninput = () => {
+    const k = el.dataset.b; B[k] = k === 'curve' ? el.value : +el.value;
+    const o = document.querySelector(`[data-bo="${k}"]`); if (o) o.textContent = B[k] + ({ every: 's', len: 's', glow: 'px' }[k] || '');
+    if (k !== 'every') blinkNow(); else lastBlink = Math.min(lastBlink, performance.now());
+    writeUrl();
+  };
+  const b = $('#blink-now'); if (b) b.onclick = blinkNow;
+}
+
 // ---------- instruments ----------
 function heading() {
   const lab = L(); if (!lab) return 274;
@@ -566,15 +627,16 @@ function setConcept(i) {
     <p style="color:var(--muted)">Inside the world: drag to look, scroll or swipe up for the next world, Esc or Back to return.</p>
     ${c.id === 'menu' ? `<p><span class="k">Placement</span></p><div class="sw-places">${PLACES.map(([id, name, what]) =>
       `<label title="${what}"><input type="radio" name="place" value="${id}" ${id === place ? 'checked' : ''}> ${name}</label>`).join('')}</div>
-      <p class="sw-place-note" style="color:var(--muted);margin-top:4px">${PLACES.find((p) => p[0] === place)[2]}</p>` : ''}
+      <p class="sw-place-note" style="color:var(--muted);margin-top:4px">${PLACES.find((p) => p[0] === place)[2]}</p>${blinkJig()}` : ''}
     <label><input type="checkbox" id="sw-plain" ${plain ? 'checked' : ''}> Plain site (no backdrop behind it, like today)</label>`;
   for (const r of $$('input[name="place"]')) r.onchange = () => { place = r.value; placeFly(); setConcept(ci); };
   $('#sw-plain').onchange = (e) => { plain = e.target.checked; applyBg(); writeUrl(); };
+  wireJig();
   const d = siteDoc(); if (d && d.documentElement) d.documentElement.dataset.c = c.id;
   writeUrl();
 }
 function writeUrl() {
-  const q = new URLSearchParams({ c: CONCEPTS[ci].id }); if (CONCEPTS[ci].id === 'menu') q.set('place', place); if (plain) q.set('bg', 'plain'); if (!notesOpen) q.set('notes', '0');
+  const q = new URLSearchParams({ c: CONCEPTS[ci].id }); if (CONCEPTS[ci].id === 'menu') { q.set('place', place); for (const k of ['every', 'len', 'str', 'glow', 'curve']) q.set(k, B[k]); } if (plain) q.set('bg', 'plain'); if (!notesOpen) q.set('notes', '0');
   history.replaceState(null, '', `?${q}`);
 }
 $('#sw-prev').onclick = () => setConcept(ci - 1);
