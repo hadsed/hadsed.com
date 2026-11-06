@@ -86,6 +86,10 @@ export default function (eleventyConfig) {
     value instanceof Date ? String(value.getUTCFullYear()) : String(value).slice(0, 4)
   );
   eleventyConfig.addFilter("roleSlug", roleSlug);
+  // Profile links (GitHub, LinkedIn, Scholar) for the Person schema's sameAs.
+  eleventyConfig.addFilter("profileUrls", (links = []) =>
+    links.map((link) => link.url).filter((url) => url.startsWith("http"))
+  );
   eleventyConfig.addFilter("readableDate", (date) =>
     new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(date)
   );
