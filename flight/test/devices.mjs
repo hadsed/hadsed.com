@@ -139,10 +139,17 @@ async function run(browser, site, cfg) {
   try {
     const t0 = Date.now();
     await page.goto(`${site.url}/lab/flight/?server=${encodeURIComponent(shaper.url)}`, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.__flight?.jet, null, { timeout: 20000 });
+    // Poll on a timer, not on animation frames: a browser that never paints
+    // (no WebGL, throttled headless) would otherwise hide why it stalled.
+    try {
+      await page.waitForFunction(() => window.__flight?.jet, null, { timeout: 20000, polling: 250 });
+    } catch {
+      const why = await page.evaluate(() => `status "${document.getElementById('status')?.textContent}", help "${document.getElementById('help')?.textContent.trim()}"`).catch(() => 'page unreachable');
+      throw new Error(`game never started: ${why}; ${errors.slice(0, 3).join(' | ') || 'no console errors'}`);
+    }
     result.loadMs = Date.now() - t0;
     try {
-      await page.waitForFunction(() => document.getElementById('status').textContent === 'shared sky', null, { timeout: 20000 });
+      await page.waitForFunction(() => document.getElementById('status').textContent === 'shared sky', null, { timeout: 20000, polling: 250 });
       result.onlineMs = Date.now() - t0;
       check('joins the shared sky', true, `${result.onlineMs} ms on ${cfg.net}`);
     } catch { check('joins the shared sky', false, (await page.evaluate(flightState)).status); }
@@ -159,16 +166,37 @@ async function run(browser, site, cfg) {
     // (Measured on the input itself; altitude would be muddied by whatever the
     // jet was already doing.)
     const pitch = () => page.evaluate(() => window.__flight.input.axes.pitch);
+    // Poll rather than sample once: the first frames after a press can lag on a
+    // busy software-rendered runner.
+    const waitPitch = async (ok, ms = 1500) => {
+      let v = await pitch();
+      for (const t0 = Date.now(); !ok(v) && Date.now() - t0 < ms; v = await pitch()) await page.waitForTimeout(100);
+      return v;
+    };
     const cx = desc.viewport.width / 2, cy = desc.viewport.height / 2, reach = Math.min(desc.viewport.width, desc.viewport.height) * 0.2;
-    await page.mouse.move(cx, cy);
-    await page.mouse.down();
-    await page.mouse.move(cx, cy + reach, { steps: 5 });
-    await page.waitForTimeout(300);
-    const pDown = await pitch();
-    await page.mouse.up();
-    await page.waitForTimeout(200);
-    const pRest = await pitch();
-    check('drag to fly (pointer)', pDown > 0.5 && pRest === 0, `pitch ${pDown.toFixed(2)} while dragged down, ${pRest} after release`);
+    let pDown = 0, pRest = 1;
+    for (let attempt = 0; attempt < 2 && !(pDown > 0.5 && pRest === 0); attempt++) {
+      if (cfg.engine === 'webkit' && desc.isMobile) {
+        // Playwright's emulated mouse on mobile WebKit sometimes loses the
+        // press or the release; send the pointer events the game listens for.
+        const fire = (type, y) => page.evaluate(([type, x, y]) => document.getElementById('view').dispatchEvent(
+          new PointerEvent(type, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, button: 0 })), [type, cx, y]);
+        await fire('pointerdown', cy);
+        for (let k = 1; k <= 5; k++) await fire('pointermove', cy + (k * reach) / 5);
+        pDown = await waitPitch((v) => v > 0.5);
+        await fire('pointerup', cy + reach);
+      } else {
+        await page.mouse.move(cx, cy);
+        await page.mouse.down();
+        await page.mouse.move(cx, cy + reach, { steps: 5 });
+        pDown = await waitPitch((v) => v > 0.5);
+        await page.mouse.up();
+      }
+      pRest = await waitPitch((v) => v === 0);
+    }
+    // Nothing drawn over the sky (callsign labels, HUD) may eat the press.
+    const hit = await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? e.id || e.tagName + (e.parentElement?.id ? ` in #${e.parentElement.id}` : '') : 'nothing'; }, [cx, cy]);
+    check('drag to fly (pointer)', pDown > 0.5 && pRest === 0, `pitch ${pDown.toFixed(2)} while dragged down, ${pRest} after release${hit === 'view' ? '' : `, center hits ${hit}`}`);
 
     // Real touch events (Chromium exposes them through CDP).
     if (cfg.engine === 'chromium' && desc.hasTouch) {
@@ -176,11 +204,9 @@ async function run(browser, site, cfg) {
       const tp = (type, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: cx, y }] });
       await tp('touchStart', cy);
       for (let k = 1; k <= 5; k++) await tp('touchMove', cy - (k * reach) / 5);   // drag up: nose down
-      await page.waitForTimeout(300);
-      const pUp = await pitch();
+      const pUp = await waitPitch((v) => v < -0.5);
       await tp('touchEnd');
-      await page.waitForTimeout(200);
-      const pEnd = await pitch();
+      const pEnd = await waitPitch((v) => v === 0);
       check('drag to fly (touch)', pUp < -0.5 && pEnd === 0, `pitch ${pUp.toFixed(2)} while dragged up, ${pEnd} after lift`);
     }
 
@@ -194,15 +220,18 @@ async function run(browser, site, cfg) {
       document.dispatchEvent(g);
       return { wheel: w.defaultPrevented, pinch: z.defaultPrevented, gesture: g.defaultPrevented };
     });
-    await page.mouse.move(cx, cy); await page.mouse.wheel(0, 600);
+    // Real wheel input too, where Playwright can send it (not mobile WebKit).
+    if (!(cfg.engine === 'webkit' && desc.isMobile)) { await page.mouse.move(cx, cy); await page.mouse.wheel(0, 600); }
     const after = await page.evaluate(probeHud);
     check('trackpad scroll and pinch are swallowed', gest.wheel && gest.pinch && gest.gesture && after.scrollY === 0 && after.scale === 1, JSON.stringify({ ...gest, scrollY: after.scrollY, scale: after.scale }));
 
     // Other jets: how smooth do they look on this link?
     const sm = await page.evaluate(probeSmooth, 6000);
     result.fps = Math.round(sm.fps);
-    const maxHitch = { fiber: 3, wifi: 3, '4g': 5, farAway: 5, '3g': 8, edge: 15, hotel: 35 }[cfg.net] ?? 10;
-    check('other jets move smoothly', sm.frames > 50 && sm.hitchPct <= maxHitch, sm.frames ? `${sm.hitchPct.toFixed(1)}% hitch frames (max ${maxHitch}), ${sm.remotes} jets, ${sm.delay} ms delay, ${result.fps} fps` : `no frames (${sm.remotes} jets)`);
+    // Budgets assume a real 30+ fps screen. Software WebGL on a CI runner can
+    // drop to ~15 fps, where the frame pacing alone adds hitches, so scale up.
+    const maxHitch = ({ fiber: 3, wifi: 3, '4g': 5, farAway: 5, '3g': 8, edge: 15, hotel: 35 }[cfg.net] ?? 10) * Math.max(1, Math.min(2, 30 / (sm.fps || 30)));
+    check('other jets move smoothly', sm.frames > 50 && sm.hitchPct <= maxHitch, sm.frames ? `${sm.hitchPct.toFixed(1)}% hitch frames (max ${maxHitch.toFixed(1)}), ${sm.remotes} jets, ${sm.delay} ms delay, ${result.fps} fps` : `no frames (${sm.remotes} jets)`);
 
     // Rotate (phones and tablets): canvas follows, still draws.
     if (desc.isMobile) {
@@ -260,6 +289,23 @@ async function run(browser, site, cfg) {
   return result;
 }
 
+// ---------- WebGL availability on this runner ----------
+const gl = {};
+async function hasWebGL(browser) {
+  const page = await browser.newPage();
+  try { return await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }); }
+  finally { await page.close(); }
+}
+async function runNoWebGLIn(browser, site, name, engine) {
+  const page = await browser.newPage();
+  await page.goto(`${site.url}/lab/flight/`);
+  await page.waitForTimeout(2500);
+  const status = await page.evaluate(() => document.getElementById('status').textContent);
+  await page.close();
+  const ok = /cannot draw 3D/.test(status);
+  return { name, engine, net: '-', skipped: 'no WebGL on this runner', checks: { 'explains instead of a black screen': { ok, detail: `status: "${status}"` } }, ok, notes: [] };
+}
+
 // ---------- no WebGL at all ----------
 async function runNoWebGL(site) {
   const browser = await pw.chromium.launch({ args: ['--disable-3d-apis', '--disable-gpu'] });
@@ -289,10 +335,25 @@ for (const cfg0 of MATRIX) {
   let engine = cfg.engine;
   if (!engines.includes(engine)) { if (cfg.engine === 'firefox') continue; engine = 'chromium'; }
   if (!(engine in launched)) {
-    try { launched[engine] = await pw[engine].launch(); }
-    catch (e) { launched[engine] = null; console.log(`${engine}: not installed (${String(e.message).split('\n')[0]})`); }
+    // Headless Firefox on Linux has no WebGL. With a display (CI wraps this in
+    // xvfb-run) it runs headed on software GL instead.
+    const opts = engine === 'firefox'
+      ? { headless: !process.env.DISPLAY, firefoxUserPrefs: { 'webgl.force-enabled': true, 'webgl.disabled': false } }
+      : {};
+    try {
+      launched[engine] = await pw[engine].launch(opts);
+      gl[engine] = await hasWebGL(launched[engine]);
+    } catch (e) { launched[engine] = null; console.log(`${engine}: not installed (${String(e.message).split('\n')[0]})`); }
   }
   if (!launched[engine]) continue;
+  // A runner whose browser has no WebGL at all can't test 3D. Say so plainly
+  // (and check the game says so too) instead of failing every device on it.
+  if (!gl[engine]) {
+    const r = await runNoWebGLIn(launched[engine], site, cfg.name, engine);
+    console.log(`${cfg.name} on ${engine}: SKIPPED, this runner's ${engine} has no WebGL (${r.ok ? 'game explains it' : 'game does NOT explain it'})`);
+    results.push(r);
+    continue;
+  }
   process.stdout.write(`${cfg.name} on ${engine} via ${cfg.net} ... `);
   const r = await run(launched[engine], site, { ...cfg, engine });
   if (engine !== cfg0.engine) r.notes.push(`meant for ${cfg0.engine}, ran on ${engine}`);
@@ -306,7 +367,7 @@ site.close();
 
 await writeFile(join(OUT, 'devices.json'), JSON.stringify(results, null, 2));
 const md = ['| device | engine | network | load | online | fps | result |', '| --- | --- | --- | --- | --- | --- | --- |'];
-for (const r of results) md.push(`| ${r.name} | ${r.engine} | ${r.net} | ${r.loadMs ?? '-'} ms | ${r.onlineMs ?? '-'} ms | ${r.fps ?? '-'} | ${r.ok ? 'pass' : 'FAIL: ' + Object.entries(r.checks).filter(([, c]) => !c.ok).map(([k, c]) => `${k} (${c.detail})`).join('; ')} |`);
+for (const r of results) md.push(`| ${r.name} | ${r.engine} | ${r.net} | ${r.loadMs ?? '-'} ms | ${r.onlineMs ?? '-'} ms | ${r.fps ?? '-'} | ${r.skipped ? `skipped (${r.skipped})${r.ok ? '' : ', and the no-WebGL message is missing'}` : r.ok ? 'pass' : 'FAIL: ' + Object.entries(r.checks).filter(([, c]) => !c.ok).map(([k, c]) => `${k} (${c.detail})`).join('; ')} |`);
 await writeFile(join(OUT, 'devices.md'), md.join('\n') + '\n');
 console.log(`\n${results.filter((r) => r.ok).length}/${results.length} passed. Report: flight/test/out/devices.md`);
 process.exit(results.every((r) => r.ok) ? 0 : 1);

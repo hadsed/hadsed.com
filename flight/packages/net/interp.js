@@ -88,7 +88,9 @@ export function createRemotes({ delay = 120, maxDelay = 2000, keep = 1500, coast
         r.cur = r.cur == null ? target : r.cur + Math.max(-step, Math.min(step, target - r.cur));
         const at = now - r.cur - (synced ? offset : 0);
         r.view ??= cloneJet(b[0].jet);
-        r.visible = now - r.seen < 1000 + r.cur;   // dropped out of our nearest set
+        // Hide a jet once we have stopped hearing about it (it left our nearest
+        // set) and the short coast is over, instead of leaving it frozen in the sky.
+        r.visible = now - r.seen < r.cur + coast + 150;
         let i = b.length - 1;
         while (i > 0 && b[i].t > at) i--;
         const a = b[i], c = b[i + 1];

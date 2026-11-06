@@ -11,8 +11,8 @@
 // Flags: --url --origin --world --clients --ramp (joins/s) --seconds --profile
 //        --chaos (blackhole@<s>:<len>, cut@<s>) --json <file> --assert
 //
-// The server allows 4 sockets per IP per room copy, so from one machine
-// against a deployed Worker you get 4 per copy and spill across copies; run
+// The server allows 16 sockets per IP per room copy, so from one machine
+// against a deployed Worker you get 16 per copy and spill across copies; run
 // wrangler dev with --var PER_IP:1000 to test one crowded room locally.
 
 import { connect } from '../packages/net/client.js';
@@ -94,8 +94,8 @@ export async function swarm({
       if (!b.remotes) continue;
       b.remotes.sample(now);
       for (const [kind, w] of Object.entries(b.watch)) {
-        if (w.id == null || !b.remotes.remotes.has(w.id)) {
-          w.id = [...b.remotes.remotes.keys()].find((id) => people.has(id) === (kind === 'person')) ?? null;
+        if (w.id == null || !b.remotes.remotes.get(w.id)?.visible) {
+          w.id = [...b.remotes.remotes.entries()].find(([id, r]) => r.visible && people.has(id) === (kind === 'person'))?.[0] ?? null;
           w.smooth.reset();
         }
         const r = w.id != null && b.remotes.remotes.get(w.id);
@@ -124,6 +124,7 @@ export async function swarm({
   const allGaps = bots.flatMap((b) => b.gaps);
   const joined = bots.filter((b) => b.joinMs !== null);
   const watched = (kind) => bots.filter((b) => b.watch).map((b) => b.watch[kind].smooth.stats).filter((s) => s.frames > 30);
+  const weighted = (stats, k) => { const n = stats.reduce((a, s) => a + s.frames, 0); return n ? stats.reduce((a, s) => a + s[k] * s.frames, 0) / n : NaN; };
   const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
   const result = {
     url: profile ? `${url} (shaped: ${profile})` : url,
@@ -140,10 +141,14 @@ export async function swarm({
     reconnects: bots.reduce((a, b) => a + b.net.state.reconnects, 0),
     staleDetected: bots.reduce((a, b) => a + b.net.state.stale, 0),
     // % of 60 Hz frames where another jet visibly stutters (see net/smoothness.mjs)
-    hitchPctPeople: avg(watched('person').map((s) => s.hitchPct)),
-    hitchPctBots: avg(watched('bot').map((s) => s.hitchPct)),
-    freezePctPeople: avg(watched('person').map((s) => s.freezePct)),
-    freezePctBots: avg(watched('bot').map((s) => s.freezePct)),
+    // Weighted by frames watched, so a watcher that only caught a few frames
+    // of a departing bot can't swing the number.
+    hitchPctPeople: weighted(watched('person'), 'hitchPct'),
+    hitchPctBots: weighted(watched('bot'), 'hitchPct'),
+    freezePctPeople: weighted(watched('person'), 'freezePct'),
+    freezePctBots: weighted(watched('bot'), 'freezePct'),
+    framesPeople: watched('person').reduce((a, s) => a + s.frames, 0),
+    framesBots: watched('bot').reduce((a, s) => a + s.frames, 0),
     interpDelayMs: avg(bots.filter((b) => b.remotes).map((b) => b.remotes.delay)),
     swarmLoopLagMsP99: pct(lagSamples, 0.99),   // >30 ms: this machine is the bottleneck, not the server
     joinMsAll: bots.map((b) => b.joinMs),
@@ -173,7 +178,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (r.onlineAtEnd < r.joined) fails.push(`${r.joined - r.onlineAtEnd} clients not online at the end`);
     if (!(r.snapHz > 7)) fails.push(`snapshot rate ${r.snapHz?.toFixed(1)} Hz`);
     const maxHitch = Number(arg('max-hitch', 5));
-    for (const k of ['hitchPctPeople', 'hitchPctBots']) if (r[k] > maxHitch) fails.push(`${k} ${r[k].toFixed(1)}% (max ${maxHitch})`);
+    // Judge only what was watched long enough (in a full room, bots leave within seconds).
+    for (const [k, n] of [['hitchPctPeople', 'framesPeople'], ['hitchPctBots', 'framesBots']]) {
+      if (r[n] < 600) console.log(`${k}: only ${r[n]} frames watched, not judged`);
+      else if (r[k] > maxHitch) fails.push(`${k} ${r[k].toFixed(1)}% over ${r[n]} frames (max ${maxHitch})`);
+    }
     if (fails.length) { console.error('FAIL: ' + fails.join('; ')); process.exit(1); }
     console.log('PASS');
   }

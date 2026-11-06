@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Flight lab</title>
+<!-- The import map must come before any module load or preload; Firefox ignores a late one. -->
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 <link rel="modulepreload" href="vendor/three.module.js">
 <style>
   :root { --sky: #0f1520; --gold: #e4c56f; --dim: #8592a8; }
@@ -19,12 +21,12 @@
   /* Phones: no keyboard, and the key list would run into the altimeter. */
   @media (max-width: 700px) { #help .keys { display: none; } }
   .dim { color: var(--dim); }
+  #labels, #labels span { pointer-events: none; }
   #labels span { position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
   #stick { position: fixed; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px solid var(--gold); pointer-events: none; display: none; }
   #thr { display: inline-block; width: 80px; height: 3px; background: #2a3448; vertical-align: middle; margin-left: 6px; }
   #thr i { display: block; height: 100%; background: var(--gold); }
 </style>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
 <canvas id="view"></canvas>

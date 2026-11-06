@@ -22,7 +22,7 @@ export function createRoom({
   near = 48,            // jets each person receives
   botFill = 6,          // keep at least this many jets in the sky while anyone flies
   maxBots = 8,
-  perIp = 4,
+  perIp = 16,           // sockets per IP per room copy; families, offices and carrier NAT share IPs
   idleMs = 120000,
 } = {}) {
   const ents = new Map();       // id -> { id, callsign, jet, human, conn, ip, ... }
