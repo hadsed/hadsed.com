@@ -23,11 +23,11 @@ const STYLES = {
   topo: { grid: 0.45, contour: 1, shade: 0.6, tint: 1, tintContrast: 1.3, tintPivot: 0.45, slope: 0.35, lineBright: 0.015, contourStep: 200 },
   topoglow: { grid: 0.6, contour: 0.9, shade: 0.5, tint: 0.6, tintContrast: 1.2, tintPivot: 0.6, slope: 0.2, lineBright: 0.7 },
 };
-// Defaults = the look Had landed on 2026-11-05 (iPad), with altitude maxed.
+// Defaults = the look Had landed on 2026-11-05 (iPad), with altitude at the SR-71's ~85k ft ceiling.
 const DEFAULTS = {
   preset: 'site', ...PRESETS.site,
   midPoint: 0.56, hlStart: 0.61, hlAmount: 0.85, mono: 1, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
-  region: 'sierra', altitudeFt: 100000, exag: 1, offsetX: 79, offsetZ: -69.1, sunAz: 41, sunEl: 18, haze: 130, clouds: 0.54, fov: 23,
+  region: 'sierra', altitudeFt: 85000, exag: 1, offsetX: 79, offsetZ: -69.1, sunAz: 41, sunEl: 18, haze: 130, clouds: 0.54, fov: 23,
   style: 'grid', grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   drift: true, driftSpeed: 0.02,
@@ -38,7 +38,9 @@ const load = () => {
   try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch {}
   let fromHash = {};
   try { if (location.hash.length > 1) fromHash = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch {}
-  return { ...DEFAULTS, ...saved, ...fromHash };
+  const out = { ...DEFAULTS, ...saved, ...fromHash };
+  out.altitudeFt = Math.min(+out.altitudeFt || DEFAULTS.altitudeFt, 85000);   // SR-71 ceiling
+  return out;
 };
 const S = load();
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch {} };
@@ -474,7 +476,7 @@ const SPEC = [
   ]],
   ['Scene', [
     ['region', 'select', { label: 'Region', options: [['sierra', 'Sierra Nevada'], ['alps', 'Alps, Valais'], ['himalaya', 'Himalaya, Everest'], ['grandcanyon', 'Grand Canyon'], ['denali', 'Alaska Range, Denali']] }],
-    ['altitudeFt', 'range', { label: 'Altitude (ft)', min: 20000, max: 100000, step: 500 }],
+    ['altitudeFt', 'range', { label: 'Altitude (ft)', min: 20000, max: 85000, step: 500 }],
     ['exag', 'range', { label: 'Vertical exaggeration', min: 1, max: 5, step: 0.05 }],
     ['offsetX', 'range', { label: 'Jet position E–W (km)', min: -140, max: 140, step: 0.5 }],
     ['offsetZ', 'range', { label: 'Jet position N–S (km)', min: -140, max: 140, step: 0.5 }],
