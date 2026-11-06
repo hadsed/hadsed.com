@@ -97,7 +97,9 @@ const probeHud = () => {
 };
 
 // Watch other jets for `ms` at the screen's frame rate; same metric as net/smoothness.mjs.
-const probeSmooth = (ms) => new Promise((resolve) => {
+// Watches for at least `ms`, and longer (up to `maxMs`) until `minFrames` jet-frames are in: a
+// software-rendered runner at a few fps needs more wall time for the same sample.
+const probeSmooth = ({ ms, minFrames = 300, maxMs = 20000 }) => new Promise((resolve) => {
   const last = new Map(); let frames = 0, hitches = 0, prevT = null, fps = 0;
   const t0 = performance.now();
   function f(t) {
@@ -113,7 +115,7 @@ const probeSmooth = (ms) => new Promise((resolve) => {
       last.set(id, [p[0], p[1], p[2]]);
     }
     prevT = t;
-    if (t - t0 < ms) requestAnimationFrame(f);
+    if (t - t0 < ms || (frames < minFrames && t - t0 < maxMs)) requestAnimationFrame(f);
     else resolve({ frames, hitchPct: frames ? (100 * hitches) / frames : null, fps: (fps * 1000) / (t - t0), remotes: R.size, delay: Math.round(window.__flight.remotes.delay) });
   }
   requestAnimationFrame(f);
@@ -226,7 +228,7 @@ async function run(browser, site, cfg) {
     check('trackpad scroll and pinch are swallowed', gest.wheel && gest.pinch && gest.gesture && after.scrollY === 0 && after.scale === 1, JSON.stringify({ ...gest, scrollY: after.scrollY, scale: after.scale }));
 
     // Other jets: how smooth do they look on this link?
-    const sm = await page.evaluate(probeSmooth, 6000);
+    const sm = await page.evaluate(probeSmooth, { ms: 6000 });
     result.fps = Math.round(sm.fps);
     // Budgets assume a real 30+ fps screen. Software WebGL on a CI runner can
     // drop to ~15 fps, where the frame pacing alone adds hitches, so scale up.
