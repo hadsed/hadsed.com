@@ -20,6 +20,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Previews point og:image at their own pages.dev alias (Cloudflare's slug:
+      # lowercase, non-alphanumerics to dashes, 28 chars) so a link preview can be
+      # tested before the image is live on hadsed.com.
+      - name: Set preview site URL
+        if: github.ref_name != 'main'
+        run: |
+          slug=$(echo "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-28 | sed 's/-*$//')
+          echo "SITE_URL=https://${slug}.hadsed-com.pages.dev" >> "$GITHUB_ENV"
       - run: npm run build
       - uses: cloudflare/wrangler-action@v3
         with:

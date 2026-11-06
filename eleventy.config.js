@@ -31,7 +31,7 @@ export default function (eleventyConfig) {
     eleventyConfig.ignores.add(path);
   }
 
-  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets" });
+  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
 
   const targets = wikilinkTargets();
   eleventyConfig.addTransform("wikilinks", function (content) {
@@ -43,6 +43,10 @@ export default function (eleventyConfig) {
       return `<a href="${hit.url}">${alias ? alias.trim() : hit.text}</a>`;
     });
   });
+
+  // Absolute URLs for link previews. Branch previews set SITE_URL to their own
+  // pages.dev alias so the share image resolves before it reaches production.
+  eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
 
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
 

@@ -75,3 +75,14 @@ test("current page is marked in the menu", () => {
   assert.doesNotMatch(read("blog/index.html"), /aria-current="page" href="\/"/);
   assert.match(read("blog/index.html"), /class="site-name"/);
 });
+
+test("pages carry link-preview tags and icons", () => {
+  const html = read("index.html");
+  assert.match(html, /<meta property="og:title" content="Had Seddiqi">/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/og\.jpg">/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+  assert.match(read("blog/index.html"), /<meta property="og:title" content="[^"]+ · Had Seddiqi">/);
+  for (const f of ["assets/og.jpg", "apple-touch-icon.png", "favicon.ico"]) {
+    assert.ok(existsSync(new URL(`../_site/${f}`, import.meta.url)), f);
+  }
+});
