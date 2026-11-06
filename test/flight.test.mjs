@@ -247,3 +247,20 @@ test('assist: a correction the other way takes effect at once', () => {
   for (let i = 0; i < 30; i++) step(j, a.update(it, j, -0.6, 0));
   assert.ok(rightOf(j.q, [0, 0, 0])[1] > 0.1, 'banked left within half a second');
 });
+
+test('follow: holding boost in formation rejoins the slot instead of overshooting the leader', () => {
+  const lead = createJet({ x: 0, z: 0, heading: 0, speed: 850, throttle: 0.75 });
+  const me = createJet({ x: -50, z: 1200, y: 25912, heading: 0, speed: 850 });   // a little behind the slot
+  const intent = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+  const F = [0, 0, 0];
+  let maxAhead = -Infinity, d = Infinity;
+  for (let i = 0; i < 60 * 30; i++) {
+    d = escort(intent, me, lead, -1, true);   // boost held the whole time
+    step(me, intent); step(lead);
+    forwardOf(lead.q, F);
+    const ahead = (me.pos[0] - lead.pos[0]) * F[0] + (me.pos[2] - lead.pos[2]) * F[2];
+    maxAhead = Math.max(maxAhead, ahead);
+  }
+  assert.ok(maxAhead < 0, `never passed the leader (got ${Math.round(maxAhead)} m ahead)`);
+  assert.ok(d < 400, `holding the slot (off by ${Math.round(d)} m)`);
+});

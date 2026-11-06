@@ -144,7 +144,7 @@ function labels(camera, list) {
     s.style.left = `${(proj.x * 0.5 + 0.5) * w}px`;
     s.style.top = `${(-proj.y * 0.5 + 0.5) * h}px`;
     s.textContent = `${r.callsign || ''} ${range(d)}`;
-    s.className = follow && r.id === follow.id ? 'on' : '';
+    s.className = `${follow && r.id === follow.id ? 'on' : ''}${hoverId === r.id ? ' hover' : ''}`;
     n++;
   }
   for (let i = n; i < spans.length; i++) spans[i].style.display = 'none';
@@ -267,6 +267,14 @@ document.body.addEventListener('pointerup', (e) => {
   if (follow?.id === id) stopFollow(); else startFollow(id);
 });
 
+// Mouse hover: box the name of the jet under the pointer, so you can see it's clickable.
+let hoverId = null;
+document.body.addEventListener('pointermove', (e) => {
+  const id = e.pointerType === 'mouse' && !e.buttons && !document.body.classList.contains('attract') && renderer ? pickJet(e.clientX, e.clientY) : null;
+  if (id !== hoverId) { hoverId = id; document.body.style.cursor = id === null ? '' : 'pointer'; }
+});
+document.body.addEventListener('pointerleave', () => { hoverId = null; document.body.style.cursor = ''; });
+
 function pickJet(x, y) {
   const cam = renderer.camera;
   let best = null, bestD = 56;   // px; generous so thumbs can hit a jet a few pixels wide
@@ -310,11 +318,13 @@ function flyIntent(input) {
   const a = input.axes;
   // Follow stays on through stick, throttle and boost; it ends only on purpose
   // (the leave button, X, or tapping the same jet again). While you steer, you
-  // fly; let go and the autopilot takes you back to your slot. Boost still works.
+  // fly; let go and the autopilot takes you back to your slot.
   if (follow) {
-    const it = followAxes();
+    // Boost here is a dash back into the slot (see escort): it cuts out as you
+    // arrive, so you settle in beside the leader instead of losing it behind you.
+    const it = followAxes(input.actions.boost);
     const steering = Math.abs(a.aimX) > 0.08 || Math.abs(a.aimY) > 0.08;
-    if (it && !steering) { it.boost = it.boost || input.actions.boost; assist.reset(jet); return it; }
+    if (it && !steering) { assist.reset(jet); return it; }
   }
   assist.update(aimIntent, jet, a.aimX, a.aimY, STEP);
   aimIntent.throttle = a.throttle;
@@ -322,10 +332,10 @@ function flyIntent(input) {
   return aimIntent;
 }
 
-function followAxes() {
+function followAxes(dash = false) {
   const r = remotes.remotes.get(follow.id);
   if (!r?.view || !r.visible) { stopFollow(); return null; }
-  const d = escort(followIntent, jet, r.view, follow.side);
+  const d = escort(followIntent, jet, r.view, follow.side, dash);
   const el = $('following');
   el.hidden = false;
   $('followText').textContent = `following ${r.callsign || ''}${d > 1500 ? ` · ${range(d)}` : ''}`;

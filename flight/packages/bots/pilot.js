@@ -14,7 +14,10 @@ const f = [0, 0, 0], r = [0, 0, 0];
 // Used by bots (escorting people) and by players (click a jet to follow it).
 export const SLOT = { out: 50, back: 150, up: 12 };
 
-export function escort(intent, jet, lead, side = 1) {
+// dash: the player is holding boost. It burns only while the slot is ahead and
+// cuts out as you arrive, so a boost while following rejoins the V instead of
+// blowing past the leader.
+export function escort(intent, jet, lead, side = 1, dash = false) {
   const lq = lead.q;
   forwardOf(lq, f); rightOf(lq, r);
   const lp = lead.pos;
@@ -34,7 +37,7 @@ export function escort(intent, jet, lead, side = 1) {
   intent.throttle = clamp((wantSpeed - jet.speed) / 40, -1, 1);
   intent.yaw = 0;
   const d = Math.hypot(dx, sy - jet.pos[1], dz);
-  intent.boost = d > 3000 && along > 0;   // dash to catch up; never to fall back
+  intent.boost = (d > 3000 || (dash && d > 120)) && along > 60;   // dash to catch up; never to fall back
   return d;           // distance to the slot
 }
 
