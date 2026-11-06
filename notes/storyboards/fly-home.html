@@ -48,15 +48,16 @@ let state = 'site';   // site | entering | flying | leaving
 
 // SR-71 climbing away, three-quarter view from above. Silhouette rendered from the
 // flight lab's jet (scripts/pack-jet.mjs output) and traced; nose up and to the right.
-const JET_SVG = '<svg class="fly-jet" viewBox="0 0 100 47.64" aria-hidden="true"><path fill="currentColor" d="M99.9 0.0 L93.7 1.7 L88.0 2.3 L81.5 3.6 L77.9 4.5 L75.8 4.5 L75.1 4.1 L71.9 4.4 L67.4 6.0 L57.5 10.2 L42.0 16.1 L41.4 16.1 L41.1 15.7 L42.8 15.0 L43.4 13.7 L45.5 12.1 L43.0 11.6 L42.7 11.0 L41.8 10.6 L38.6 11.3 L29.7 14.3 L26.1 13.8 L24.9 14.5 L23.6 15.7 L16.9 14.3 L14.3 15.1 L12.4 16.2 L15.3 19.2 L15.9 19.4 L17.8 19.3 L17.8 20.6 L18.4 21.9 L19.3 22.6 L19.3 22.8 L18.1 23.4 L15.2 25.2 L13.5 27.0 L10.0 28.8 L8.6 29.7 L5.5 27.8 L4.4 28.0 L3.0 28.4 L1.2 29.5 L3.2 34.8 L5.3 35.2 L4.8 36.6 L4.9 37.7 L6.3 39.6 L4.8 40.3 L3.2 41.5 L0.3 46.0 L0.0 46.8 L0.0 47.4 L0.5 47.5 L14.6 39.8 L20.0 38.1 L27.8 34.4 L29.6 33.9 L31.4 33.1 L32.1 32.5 L32.3 31.6 L34.8 29.8 L33.7 29.5 L32.3 29.3 L32.2 28.9 L39.4 24.4 L57.0 18.6 L70.3 13.7 L77.3 10.7 L87.0 6.2 L91.4 3.8 L93.9 2.0 L99.9 0.2 Z"/></svg>';
+// Jet icon: "Jet fighter" by Delapouite, game-icons.net, CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
+const JET_SVG = '<svg class="fly-jet" viewBox="24 24 464 464" aria-hidden="true"><path fill="currentColor" d="M461.5 31.85c-5 1.2-10.4 3.4-16.4 6.4c-12 6-26.7 15.3-42.1 26.1c-26.7 18.7-55.5 41.75-75 59.95l39.8 19.9l19.9 39.8c18.2-19.5 41.2-48.3 59.9-75c10.8-15.35 20.1-30.05 26.2-42.15c3-6 5.2-11.3 6.3-16.3c1.2-5 1.9-10.9-2.9-15.7c-4.8-4.56-10-4.25-15.7-3m-14.8 33.4c4.9 4.71 5.6 12.1 3.8 18.7s-6.1 13.3-12.9 20.15l-42.2 42.2l-29.6-29.7L408 74.45c6.8-6.8 13.5-11.06 20.1-12.9c6.1-1.71 14.3-.44 18.6 3.7M183.2 109.5l-21.3 21.2l45.6 5v-26.2zm129.9 25.2l-43.5 21.8l-153 200.1l13.7 13.8l97.5-97.5l11.3 11.3c-32.5 32.5-65 65.1-97.5 97.6l13.8 13.6l200.1-153l21.8-43.5l-21.4-42.8zm-256.59.4l7.4 22.2l120.99 83.5l64.5-84.3zm38.1 62.8l-13.1 13.2l24.39 24.3l17.6-17.5zm260.89 64.7l-84.3 64.5l83.5 121l22.2 7.3zm-190.9 4.8l-110.99 9.1l-22.6 22.6l82.39 35.4zm212.1 41.2l4.6 41.5l17.1-17.2v-24.3zm-132.1 38.8l-67 51.2l35.3 82.4l22.6-22.6zm-138.7 21.2l-13.09 13.1l37.49 37.4l13.1-13zm188.2 19.9l-17.5 17.6l24.3 24.3l13.2-13.1z"/></svg>';
 
 // The Fly item lives inside the site page: pinned sidebar on wide screens, end of the menu row on phones.
 const SITE_CSS = `
-  .fly-jet { width: 24px; height: 11.4px; vertical-align: -1px; margin-right: 8px; transition: transform .35s cubic-bezier(.2,.7,.2,1); }
+  .fly-jet { width: 15px; height: 15px; vertical-align: -2px; margin-right: 8px; transition: transform .35s cubic-bezier(.2,.7,.2,1); }
   .menu .fly-item { margin: 1.4rem 0 0; }
   .fly-item a { color: var(--muted); white-space: nowrap; }
   .fly-item a:hover, .fly-item a:focus-visible { color: var(--glow); text-decoration: none; }
-  .fly-item a:hover .fly-jet, .fly-item a:focus-visible .fly-jet { transform: translate(3px, -1.5px); }
+  .fly-item a:hover .fly-jet, .fly-item a:focus-visible .fly-jet { transform: translate(2.5px, -2.5px); }
   /* Fixed rather than sticky: on short pages the grid row is no taller than the menu. */
   @media (min-width: 641px) {
     .menu { position: fixed; top: 0; bottom: 0; z-index: 2; width: var(--menu-width);
