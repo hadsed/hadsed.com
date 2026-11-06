@@ -236,6 +236,7 @@ h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--acce
 
 /* Reading pages and lists */
 .prose { max-width: var(--measure); }
+.prose img { display: block; max-width: 100%; height: auto; }
 .prose p { margin: 0 0 1rem; }
 .prose a { text-decoration: underline; }
 .meta { color: var(--muted); font-size: 0.9rem; margin: 0 0 1.5rem; }
