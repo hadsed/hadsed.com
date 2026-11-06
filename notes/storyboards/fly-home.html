@@ -136,7 +136,7 @@ function enter() {
   }
   // Start loading the flight lab now, under the push-in, and fade it up once it has drawn a frame.
   flight = document.createElement('iframe');
-  flight.id = 'flight'; flight.title = 'Fly'; flight.allow = 'gamepad; fullscreen';
+  flight.id = 'flight'; flight.title = 'Fly'; flight.allow = 'gamepad; fullscreen; accelerometer; gyroscope';   // tilt steering
   flight.src = '../flight/';
   document.body.appendChild(flight);
   const t0 = performance.now();
