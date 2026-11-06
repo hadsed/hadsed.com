@@ -27,11 +27,19 @@ function wikilinkTargets() {
 }
 
 export default function (eleventyConfig) {
-  for (const path of ["notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
+  for (const path of ["flight/**", "notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
     eleventyConfig.ignores.add(path);
   }
 
   eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
+
+  // Flight lab (multiplayer jets) ships on branch previews only, like the other labs.
+  // The room server in flight/server deploys separately as a Cloudflare Worker.
+  if (process.env.SITE_URL || process.env.FLIGHT_LAB) {
+    for (const part of ["index.html", "main.js", "config.json", "packages", "assets", "vendor"]) {
+      eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
+    }
+  }
 
   const targets = wikilinkTargets();
   eleventyConfig.addTransform("wikilinks", function (content) {
