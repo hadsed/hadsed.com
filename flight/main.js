@@ -333,6 +333,7 @@ function fly() {
   attract = false;
   document.body.classList.remove('attract');
   assist.reset(jet);   // aim where the nose is, or the reticle swings to an old heading
+  jet.throttle = Math.max(jet.throttle, 0.85);   // the autopilot cruises slow; hand over at the normal setting
   if (net.state.watch) { upgrading = true; net.join(); }
   renderer.rig.target = 1;
   canvas.focus?.();
