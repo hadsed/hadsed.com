@@ -22,10 +22,11 @@
   #flight { opacity: 0; transition: opacity .9s ease; background: var(--sky); z-index: 2; }
   #flight.on { opacity: 1; }
   #exit { position: fixed; z-index: 3; right: calc(14px + env(safe-area-inset-right)); top: calc(54px + env(safe-area-inset-top));
-    font: 10px/1 var(--mono); letter-spacing: .16em; color: var(--muted); background: none; border: 0; padding: 10px 2px; cursor: pointer;
+    font: 10px/1 var(--mono); letter-spacing: .16em; color: var(--glow); background: none; border: 0; padding: 10px 2px; cursor: pointer;
     opacity: 0; pointer-events: none; transition: opacity .6s .6s, color .2s; -webkit-tap-highlight-color: transparent; }
-  #exit:hover, #exit:focus-visible { color: var(--glow); }
-  body.flying #exit { opacity: 1; pointer-events: auto; }
+  /* gold like the flight HUD, which has no gray text */
+  #exit:hover, #exit:focus-visible { opacity: 1 !important; }
+  body.flying #exit { opacity: .7; pointer-events: auto; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 10px var(--mono); letter-spacing: .2em; color: var(--muted);
     z-index: 4; background: var(--bg); transition: opacity .6s; }
   #loading.done { opacity: 0; pointer-events: none; }
