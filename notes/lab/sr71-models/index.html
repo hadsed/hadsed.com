@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>SR-71 model shootout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:wght@300&display=swap">
+<style>
+  :root {
+    --bg: #1c2433; --panel: #232c3d; --text: #c8cdd5; --muted: #8a919c;
+    --accent: #e6e9ed; --glow: #e4c56f; --rule: #34405a;
+    --font: Verdana, Geneva, system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); font: 14px/1.5 var(--font);
+    display: grid; grid-template-rows: auto 1fr; min-height: 100dvh;
+    -webkit-text-size-adjust: 100%;
+  }
+  header { padding: 14px 16px 6px; padding-top: max(14px, env(safe-area-inset-top)); }
+  h1 { font: 300 26px/1.1 Petrona, Georgia, serif; color: var(--accent); margin: 0; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+
+  main { display: grid; grid-template-columns: 1fr; gap: 0; min-height: 0; }
+  .stage { position: relative; height: 58dvh; min-height: 300px; background: #10151f; }
+  .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .55; }
+  .stage .loading { position: absolute; left: 12px; bottom: 10px; font-size: 11px; color: var(--muted); pointer-events: none; }
+
+  .side { padding: 12px 16px 24px; padding-bottom: max(24px, env(safe-area-inset-bottom)); min-width: 0; }
+  .strip {
+    display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory;
+    padding-bottom: 8px; margin: 0 -16px; padding-left: 16px; padding-right: 16px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .strip::-webkit-scrollbar { display: none; }
+  .card {
+    flex: 0 0 132px; scroll-snap-align: start; background: var(--panel); border: 1px solid var(--rule);
+    border-radius: 8px; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; overflow: hidden;
+    touch-action: manipulation;
+  }
+  .card img { display: block; width: 100%; aspect-ratio: 16/10; object-fit: cover; background: #10151f; }
+  .card span { display: block; padding: 6px 8px 7px; font-size: 11px; line-height: 1.3; }
+  .card b { display: block; color: var(--accent); font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card small { color: var(--muted); }
+  .card[aria-pressed="true"] { border-color: var(--glow); box-shadow: 0 0 0 1px var(--glow); }
+
+  .info h2 { font: 300 22px/1.2 Petrona, Georgia, serif; color: var(--accent); margin: 10px 0 2px; }
+  .info .by { color: var(--muted); margin: 0 0 10px; }
+  .info a { color: var(--glow); }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0 0 12px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; color: var(--accent); }
+  .note { margin: 0 0 10px; }
+  .tip { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
+  .nav { display: flex; gap: 8px; margin-top: 8px; }
+  .nav button {
+    flex: 1; min-height: 44px; background: var(--panel); color: var(--accent); border: 1px solid var(--rule);
+    border-radius: 8px; font: inherit; touch-action: manipulation;
+  }
+
+  @media (min-width: 900px) {
+    main { grid-template-columns: 1fr 380px; }
+    .stage { height: auto; min-height: 0; }
+    .side { overflow-y: auto; border-left: 1px solid var(--rule); }
+    .strip { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+    .card { flex: 0 0 calc(50% - 4px); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>SR-71 model shootout</h1>
+  <p>Every free, downloadable SR-71 on Sketchfab worth a look. Drag to orbit, pinch to zoom, two fingers to pan.</p>
+</header>
+<main>
+  <div class="stage" id="stage">
+    <img class="poster" id="poster" alt="">
+    <div class="loading" id="loading">Loading model…</div>
+  </div>
+  <section class="side">
+    <div class="strip" id="strip" role="list"></div>
+    <div class="info" id="info"></div>
+    <div class="nav">
+      <button id="prev" type="button">← Previous</button>
+      <button id="next" type="button">Next →</button>
+    </div>
+    <p class="tip">GLB size is the uncompressed file Sketchfab hands out. Draco or meshopt compression usually cuts geometry 5 to 10 times, so treat it as an upper bound. Viewer here is Sketchfab's own, so lighting and materials will look different once the jet sits in our scene.</p>
+  </section>
+</main>
+<script>
+const fmtMB = (b) => b ? (b / 1e6).toFixed(1) + " MB" : "n/a";
+const fmtK = (n) => n >= 1000 ? Math.round(n / 1000) + "k" : String(n);
+const $ = (id) => document.getElementById(id);
+let models = [], current = -1;
+
+function embedUrl(uid) {
+  const p = new URLSearchParams({
+    autostart: 1, preload: 1, dnt: 1, ui_theme: "dark", ui_infos: 0, ui_hint: 0,
+    ui_watermark_link: 0, ui_help: 0, ui_settings: 0, ui_vr: 0, ui_ar: 0, ui_annotations: 0,
+    ui_inspector: 0, ui_stop: 0, ui_controls: 1, ui_fullscreen: 1, scrollwheel: 1,
+  });
+  return `https://sketchfab.com/models/${uid}/embed?${p}`;
+}
+
+function show(i) {
+  i = (i + models.length) % models.length;
+  if (i === current) return;
+  current = i;
+  const m = models[i];
+  const stage = $("stage");
+  // One live WebGL context at a time keeps iOS happy. Blank the old frame first so
+  // its context is actually torn down before the next viewer asks for one.
+  const old = stage.querySelector("iframe");
+  if (old) { old.src = "about:blank"; old.remove(); }
+  $("poster").src = m.thumb;
+  $("loading").hidden = false;
+  clearTimeout(show.t);
+  show.t = setTimeout(() => mount(m, i), old ? 400 : 0);
+  paint(m, i);
+}
+
+function mount(m, i) {
+  if (i !== current) return;
+  const stage = $("stage");
+  const f = document.createElement("iframe");
+  f.title = m.name;
+  f.allow = "autoplay; fullscreen; xr-spatial-tracking";
+  f.setAttribute("allowfullscreen", "");
+  f.src = embedUrl(m.uid);
+  f.addEventListener("load", () => setTimeout(() => ($("loading").hidden = true), 1500));
+  stage.append(f);
+}
+
+function paint(m, i) {
+  for (const c of $("strip").children) c.setAttribute("aria-pressed", String(+c.dataset.i === i));
+  $("strip").children[i].scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+
+  $("info").innerHTML = `
+    <h2>${m.name}</h2>
+    <p class="by">by <a href="${m.authorUrl}" target="_blank" rel="noopener">${m.author}</a> · ${m.year} · <a href="${m.url}" target="_blank" rel="noopener">Sketchfab page</a></p>
+    <dl>
+      <dt>License</dt><dd><a href="${m.licenseUrl}" target="_blank" rel="noopener">${m.license}</a></dd>
+      <dt>Credit</dt><dd>${m.terms}</dd>
+      <dt>GLB size</dt><dd>${fmtMB(m.glb)}${m.textures ? ` · ${m.textures} textures` : " · no textures"}</dd>
+      <dt>Geometry</dt><dd>${fmtK(m.faces)} faces · ${fmtK(m.verts)} vertices</dd>
+    </dl>
+    <p class="note">${m.note}</p>`;
+  history.replaceState(null, "", "#" + (i + 1));
+}
+
+fetch("models.json").then((r) => r.json()).then((list) => {
+  models = list;
+  $("strip").innerHTML = list.map((m, i) => `
+    <button class="card" role="listitem" data-i="${i}" aria-pressed="false" type="button">
+      <img src="${m.thumb}" alt="" loading="lazy">
+      <span><b>${i + 1}. ${m.author}</b><small>${m.license.replace(" (free)", "")} · ${fmtMB(m.glb)}</small></span>
+    </button>`).join("");
+  $("strip").addEventListener("click", (e) => {
+    const c = e.target.closest(".card");
+    if (c) show(+c.dataset.i);
+  });
+  $("prev").onclick = () => show(current - 1);
+  $("next").onclick = () => show(current + 1);
+  const start = parseInt(location.hash.slice(1), 10);
+  show(start >= 1 && start <= list.length ? start - 1 : 0);
+});
+</script>
+</body>
+</html>
