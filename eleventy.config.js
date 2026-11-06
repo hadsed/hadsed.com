@@ -41,6 +41,23 @@ export default function (eleventyConfig) {
     }
   }
 
+  // Branch previews (SITE_URL set) also carry the SR-71 backdrop lab at /lab/sr71/,
+  // so it can be explored on any device. Production builds never include it.
+  if (process.env.SITE_URL || process.env.LAB) {
+    const lab = "notes/storyboards";
+    eleventyConfig.addPassthroughCopy({
+      [`${lab}/sr71-backdrop.html`]: "lab/sr71/index.html",
+      [`${lab}/sr71-backdrop.mjs`]: "lab/sr71/sr71-backdrop.mjs",
+      [`${lab}/vendor/three.module.js`]: "lab/sr71/vendor/three.module.js",
+      [`${lab}/vendor/three.core.js`]: "lab/sr71/vendor/three.core.js",
+      [`${lab}/vendor/OrbitControls.js`]: "lab/sr71/vendor/OrbitControls.js",
+      [`${lab}/terrain/regions.json`]: "lab/sr71/terrain/regions.json",
+      [`${lab}/terrain/*.png`]: "lab/sr71/terrain",
+      // edge-affordance mockups that sit on top of the lab
+      [`${lab}/edge-affordances.html`]: "lab/edge/index.html",
+    });
+  }
+
   const targets = wikilinkTargets();
   eleventyConfig.addTransform("wikilinks", function (content) {
     if (!(this.page.outputPath || "").endsWith(".html")) return content;
