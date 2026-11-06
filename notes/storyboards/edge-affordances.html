@@ -394,7 +394,8 @@ const CURVES = {
   wink: ['Double wink', [[0, 0], [0.22, 1], [0.44, 0.35], [0.66, 1], [1, 0]], 'cubic-bezier(.37,0,.63,1)'],
 };
 const num = (k, d) => (params.has(k) && !isNaN(+params.get(k)) ? +params.get(k) : d);
-const B = { every: num('every', 30), len: num('len', 2), str: num('str', 0.9), glow: num('glow', 6),
+// Defaults = Had's tuned values (2026-11-06).
+const B = { every: num('every', 5), len: num('len', 2), str: num('str', 0.95), glow: num('glow', 2),
   curve: CURVES[params.get('curve')] ? params.get('curve') : 'sine' };
 let lastBlink = performance.now() - (B.every - 3) * 1000;   // first blink ~3s after load, so you see it
 const mix = (k) => `rgb(${MUTED.map((m, i) => Math.round(m + (GOLD[i] - m) * k)).join(',')})`;
