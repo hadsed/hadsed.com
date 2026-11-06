@@ -37,6 +37,11 @@ export function createRoom({
   const watchers = new Map();   // 'w<n>' -> { conn, ip, pos, lastSeen, tokens }
   let nextId = 1, nextWatch = 1;
   let botTimer = 0;
+  // Bots advance in whole sim steps. The leftover fraction carries to the next
+  // tick, and snapshots are stamped with the moment the sim has reached, so a late
+  // tick never puts 100 ms of flight into a 130 ms gap (a client would draw that
+  // as every jet stuttering at once).
+  let carry = 0, simAt = null;
   const fwd = [0, 0, 0];
 
   const humans = () => [...ents.values()].filter((e) => e.human);
@@ -131,7 +136,7 @@ export function createRoom({
       list.push({ id: e.id, jet: e.human ? e.jet : e.view || e.jet, age: e.ageNow || 0, d: dx * dx + dy * dy + dz * dz });
     }
     if (list.length > near) { list.sort((a, b) => a.d - b.d); list.length = near; }
-    return encodeSnapshot(now(), list);
+    return encodeSnapshot(simAt ?? now(), list);
   }
 
   return {
@@ -257,20 +262,22 @@ export function createRoom({
     tick(dt = 0.1) {
       manageBots(dt);
       const others = [...ents.values()].map((e) => ({ id: e.id, jet: e.jet, human: e.human }));
-      const steps = Math.max(1, Math.round(dt / STEP));
+      carry += dt;
+      const steps = Math.floor(carry / STEP + 1e-6);
+      carry = Math.max(0, carry - steps * STEP);
       for (const e of ents.values()) {
         if (e.human) continue;
         const intent = e.pilot.think(e.jet, { dt, others });
         for (let i = 0; i < steps; i++) step(e.jet, intent, STEP);
       }
-      const t = now();
+      const t = simAt = now() - carry * 1000;
       // Every jet goes out with its age: how long before this snapshot its
       // state was true. People's reports land out of phase with this tick and
       // through links that bunch packets up, so they are 0 to several hundred
       // ms old. Bots are fresh, so they get a made-up age in the same range and
       // are wound back to match; no field on the wire tells the two apart.
       for (const e of ents.values()) {
-        if (e.human) { e.ageNow = e.placed ? Math.min(2000, t - e.lastAt + (e.age || 0)) : 0; continue; }
+        if (e.human) { e.ageNow = e.placed ? Math.max(0, Math.min(2000, t - e.lastAt + (e.age || 0))) : 0; continue; }
         e.phase ??= 20 + rng() * 90;
         e.ageNow = Math.round(e.phase + rng() * 25);
         e.view = copyJet(e.view || cloneJet(e.jet), e.jet);
@@ -279,11 +286,11 @@ export function createRoom({
       }
       for (const e of [...ents.values()]) {
         if (!e.human) continue;
-        if (t - e.lastAt > idleMs) { e.conn.close(4000, 'idle'); drop(e.id); continue; }
+        if (now() - e.lastAt > idleMs) { e.conn.close(4000, 'idle'); drop(e.id); continue; }
         e.conn.send(snapshotFor(e));
       }
       for (const w of [...watchers.values()]) {
-        if (t - w.lastSeen > idleMs) { watchers.delete(w.id); w.conn.close(4000, 'idle'); continue; }
+        if (now() - w.lastSeen > idleMs) { watchers.delete(w.id); w.conn.close(4000, 'idle'); continue; }
         w.conn.send(snapshotFor(null, w.pos));
       }
     },

@@ -93,7 +93,7 @@ export class FlightRoom extends DurableObject {
     let last = Date.now();
     this.timer = setInterval(() => {
       const t = Date.now();
-      this.room.tick(Math.min(0.25, (t - last) / 1000));
+      this.room.tick(Math.min(1, (t - last) / 1000));   // a busy isolate can run a tick late; catch up in full
       last = t;
       this.idle();
     }, 100);

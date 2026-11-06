@@ -106,7 +106,7 @@ const probeSmooth = ({ ms, minFrames = 300, maxMs = 20000 }) => new Promise((res
     fps++;
     const R = window.__flight.remotes.remotes;
     if (prevT !== null) for (const [id, r] of R) {
-      if (!r.view || !r.visible || r.buf.length < 2) continue;
+      if (!r.view || !r.visible || r.buf.length < 2) { last.delete(id); continue; }   // re-entering jets start fresh
       const p = r.view.pos, l = last.get(id);
       if (l) {
         const d = Math.hypot(p[0] - l[0], p[1] - l[1], p[2] - l[2]), want = r.view.speed * (t - prevT) / 1000;

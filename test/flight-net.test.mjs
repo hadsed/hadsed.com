@@ -233,3 +233,36 @@ test('client: against a server that cannot watch, a watcher hangs up instead of 
   assert.doesNotMatch(socks[1].url, /watch=1/);
   net.close();
 });
+
+test('bots stay smooth when the server ticks late or stalls', async () => {
+  const { createRoom } = await import('../flight/server/room.js');
+  const { decodeSnapshot } = await import('../flight/packages/net/protocol.js');
+  const { createSmoothness } = await import('../flight/test/net/smoothness.mjs');
+  let s = 11; const rng = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  let clock = 1_000_000;
+  const room = createRoom({ now: () => clock, rng });
+  const inbox = [];
+  room.join({ send: (m) => { if (typeof m !== 'string') inbox.push({ at: clock + 15 + rng() * 10, buf: m }); }, ip: 'x' });
+  const remotes = createRemotes();
+  const smooth = new Map();
+  let nextTick = clock + 100, lastTick = clock, prev = null;
+  for (let t = 0; t < 60000; t += 40) {
+    const end = clock + 40;
+    while (nextTick <= end) {   // a busy isolate: ticks wander, and now and then one is 300 ms late
+      clock = nextTick; room.tick(Math.min(1, (clock - lastTick) / 1000)); lastTick = clock;
+      nextTick += 100 + (rng() * 2 - 1) * 40 + (rng() < 0.03 ? 300 : 0);
+    }
+    clock = end;
+    while (inbox.length && inbox[0].at <= clock) { const m = inbox.shift(); const snap = decodeSnapshot(m.buf); remotes.push(m.at, snap.entries, snap.time); }
+    for (const [id, r] of remotes.sample(clock)) {
+      if (t < 5000 || !r.visible || r.buf.length < 2) { smooth.get(id)?.reset(); continue; }
+      if (!smooth.has(id)) smooth.set(id, createSmoothness());
+      smooth.get(id).sample(r.view.pos, r.view.speed, prev === null ? 0 : clock - prev);
+    }
+    prev = clock;
+  }
+  let frames = 0, hitches = 0;
+  for (const m of smooth.values()) { frames += m.stats.frames; hitches += m.stats.hitchPct * m.stats.frames / 100; }
+  assert.ok(frames > 3000, `${frames} frames`);
+  assert.ok(100 * hitches / frames < 0.5, `${(100 * hitches / frames).toFixed(2)}% hitch frames`);
+});
