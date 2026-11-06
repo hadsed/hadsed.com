@@ -44,12 +44,16 @@ export default {
 export class FlightRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    this.room = createRoom({ capacity: Number(env.ROOM_CAPACITY || 200) });
+    this.room = createRoom({ capacity: Number(env.ROOM_CAPACITY || 200), perIp: Number(env.PER_IP || 4) });
     this.timer = null;
   }
 
   async fetch(req) {
     const [client, server] = Object.values(new WebSocketPair());
+    // Since compatibility date 2026-ish (websocket_standard_binary_type), binary
+    // frames arrive as Blob unless we ask for ArrayBuffer. As Blobs, every
+    // player's position report failed to decode and other people saw them frozen.
+    server.binaryType = 'arraybuffer';
     server.accept();
     const seat = this.room.join({
       send: (d) => { try { server.send(d); } catch {} },

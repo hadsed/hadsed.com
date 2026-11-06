@@ -163,6 +163,7 @@ test('room: rejects teleports, caps per IP, people bump bots when full', () => {
   const a = fakeConn();
   const sa = room.join({ send: a.send, ip: 'x' });
   const jet = cloneJet(room.ents.get(sa.id).jet);
+  assert.equal(room.receive(sa.id, encodeState(jet)), true, 'first report places the seat');
   t += 100;
   jet.pos[0] += 90000;
   assert.equal(room.receive(sa.id, encodeState(jet)), false, 'teleport refused');
@@ -172,6 +173,19 @@ test('room: rejects teleports, caps per IP, people bump bots when full', () => {
   assert.equal(room.join({ send: () => {}, ip: 'x' }), null, 'third socket from one IP refused');
   for (let i = 0; i < 3; i++) assert.ok(room.join({ send: () => {}, ip: `p${i}` }), 'person admitted over a bot');
   assert.equal(room.join({ send: () => {}, ip: 'last' }), null, 'full of people');
+});
+
+test('room: a reconnecting client keeps its position (first report is trusted, then checked)', () => {
+  let t = 0;
+  const room = createRoom({ now: () => t, rng: seeded(5) });
+  const s = room.join({ send: () => {}, ip: 'r' });
+  const jet = cloneJet(room.ents.get(s.id).jet);
+  jet.pos[0] += 80000; jet.pos[2] = 500000;   // far from spawn, and outside the world
+  assert.equal(room.receive(s.id, encodeState(jet)), true);
+  assert.ok(Math.abs(room.ents.get(s.id).jet.pos[2]) <= 120000, 'clamped to the world');
+  t += 100;
+  jet.pos[0] += 50000;
+  assert.equal(room.receive(s.id, encodeState(jet)), false, 'later jumps still refused');
 });
 
 test('room: only the nearest jets are sent', () => {

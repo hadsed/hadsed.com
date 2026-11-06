@@ -7,7 +7,7 @@
 // room.tick(0.1);                                // 10 Hz: steps bots, sends snapshots
 // room.leave(seat.id);
 
-import { createJet, step, LIMITS, STEP, forwardOf } from '../packages/sim/index.js';
+import { createJet, step, LIMITS, STEP, forwardOf, copyJet, cloneJet } from '../packages/sim/index.js';
 import { decodeState, encodeSnapshot } from '../packages/net/protocol.js';
 import { createPilot } from '../packages/bots/pilot.js';
 
@@ -114,7 +114,7 @@ export function createRoom({
     for (const e of ents.values()) {
       if (e === me || !e.jet) continue;
       const dx = e.jet.pos[0] - p[0], dy = e.jet.pos[1] - p[1], dz = e.jet.pos[2] - p[2];
-      list.push({ id: e.id, jet: e.jet, d: dx * dx + dy * dy + dz * dz });
+      list.push({ id: e.id, jet: e.human ? e.jet : e.view || e.jet, age: e.ageNow || 0, d: dx * dx + dy * dy + dz * dz });
     }
     if (list.length > near) { list.sort((a, b) => a.d - b.d); list.length = near; }
     return encodeSnapshot(now(), list);
@@ -163,11 +163,26 @@ export function createRoom({
       e.tokens -= 1;
       const jet = decodeState(buf);
       if (!jet) return false;
-      const dt = Math.max(0.05, (t - e.lastAt) / 1000);
-      const jump = Math.hypot(jet.pos[0] - e.jet.pos[0], jet.pos[1] - e.jet.pos[1], jet.pos[2] - e.jet.pos[2]);
-      if (jump > LIMITS.maxSpeed * 1.5 * dt + 3000) return false;
+      // The first report from a new seat may be anywhere in the world: a
+      // reconnecting client keeps flying where it was, not at our spawn point.
+      if (e.placed) {
+        const dt = Math.max(0.05, (t - e.lastAt) / 1000);
+        const jump = Math.hypot(jet.pos[0] - e.jet.pos[0], jet.pos[1] - e.jet.pos[1], jet.pos[2] - e.jet.pos[2]);
+        if (jump > LIMITS.maxSpeed * 1.5 * dt + 3000) return false;
+      }
+      jet.pos[0] = clampR(jet.pos[0]);
+      jet.pos[2] = clampR(jet.pos[2]);
+      e.placed = true;
       jet.pos[1] = Math.min(LIMITS.maxAlt, Math.max(LIMITS.minAlt, jet.pos[1]));
       jet.speed = Math.min(LIMITS.maxSpeed * 1.1, Math.max(0, jet.speed));
+      // How much later than usual did this report land? Compare its client
+      // timestamp with our clock; the fastest recent report sets "usual".
+      const raw = (t - jet.sent) & 0xffff;
+      e.lagBase ??= raw;
+      const lag = ((raw - e.lagBase + 32768) & 0xffff) - 32768;
+      (e.lags ||= []).push(lag);
+      if (e.lags.length > 50) e.lags.shift();
+      e.age = Math.min(500, lag - Math.min(...e.lags));
       e.jet = jet;
       e.lastAt = t;
       return true;
@@ -184,6 +199,19 @@ export function createRoom({
         for (let i = 0; i < steps; i++) step(e.jet, intent, STEP);
       }
       const t = now();
+      // Every jet goes out with its age: how long before this snapshot its
+      // state was true. People's reports land out of phase with this tick and
+      // through links that bunch packets up, so they are 0 to several hundred
+      // ms old. Bots are fresh, so they get a made-up age in the same range and
+      // are wound back to match; no field on the wire tells the two apart.
+      for (const e of ents.values()) {
+        if (e.human) { e.ageNow = e.placed ? Math.min(2000, t - e.lastAt + (e.age || 0)) : 0; continue; }
+        e.phase ??= 20 + rng() * 90;
+        e.ageNow = Math.round(e.phase + rng() * 25);
+        e.view = copyJet(e.view || cloneJet(e.jet), e.jet);
+        forwardOf(e.jet.q, fwd);
+        for (let k = 0; k < 3; k++) e.view.pos[k] -= fwd[k] * e.jet.speed * (e.ageNow / 1000);
+      }
       for (const e of [...ents.values()]) {
         if (!e.human) continue;
         if (t - e.lastAt > idleMs) { e.conn.close(4000, 'idle'); drop(e.id); continue; }

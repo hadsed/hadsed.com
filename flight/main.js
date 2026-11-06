@@ -46,16 +46,22 @@ let waggleLeft = 0;
 // ---- net ----
 const remotes = createRemotes();
 const roster = new Map();
+let welcomed = false;
 const config = await fetch(new URL('config.json', base)).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 const serverUrl = params.get('server') ?? config.server ?? null;
 const net = connect({
   url: serverUrl,
   world: world.id,
-  onSnapshot: (snap, t) => remotes.push(t, snap.entries),
+  onSnapshot: (snap, t) => remotes.push(t, snap.entries, snap.time),
   onMessage: (m) => {
     if (m.t === 'welcome') {
-      jet = createJet({ x: m.spawn.x, y: m.spawn.y, z: m.spawn.z, heading: m.spawn.heading });
-      copyJet(prev, jet);
+      // First welcome places the jet. After a reconnect, keep flying where you
+      // were; the server takes the first position it hears from a new seat.
+      if (!welcomed) {
+        jet = createJet({ x: m.spawn.x, y: m.spawn.y, z: m.spawn.z, heading: m.spawn.heading });
+        copyJet(prev, jet);
+        welcomed = true;
+      }
       remotes.clear(); roster.clear();
       $('callsign').textContent = m.callsign;
     }
