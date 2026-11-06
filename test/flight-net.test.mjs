@@ -123,3 +123,11 @@ test('room: snapshot ages for bots look like ages for people', async () => {
   assert.ok(Math.max(...bots) < 200 && Math.max(...people) < 200);
   void seat;
 });
+
+test('lab page: import map comes before any module preload (Firefox ignores a late one)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const html = await readFile(new URL('../flight/index.html', import.meta.url), 'utf8');
+  const map = html.indexOf('type="importmap"');
+  const firstModule = Math.min(...['rel="modulepreload"', 'type="module"'].map((k) => html.indexOf(k)).filter((i) => i >= 0));
+  assert.ok(map >= 0 && map < firstModule);
+});
