@@ -194,7 +194,9 @@ async function run(browser, site, cfg) {
       }
       pRest = await waitPitch((v) => v === 0);
     }
-    check('drag to fly (pointer)', pDown > 0.5 && pRest === 0, `pitch ${pDown.toFixed(2)} while dragged down, ${pRest} after release`);
+    // Nothing drawn over the sky (callsign labels, HUD) may eat the press.
+    const hit = await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? e.id || e.tagName + (e.parentElement?.id ? ` in #${e.parentElement.id}` : '') : 'nothing'; }, [cx, cy]);
+    check('drag to fly (pointer)', pDown > 0.5 && pRest === 0, `pitch ${pDown.toFixed(2)} while dragged down, ${pRest} after release${hit === 'view' ? '' : `, center hits ${hit}`}`);
 
     // Real touch events (Chromium exposes them through CDP).
     if (cfg.engine === 'chromium' && desc.hasTouch) {

@@ -21,6 +21,7 @@
   /* Phones: no keyboard, and the key list would run into the altimeter. */
   @media (max-width: 700px) { #help .keys { display: none; } }
   .dim { color: var(--dim); }
+  #labels, #labels span { pointer-events: none; }
   #labels span { position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
   #stick { position: fixed; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px solid var(--gold); pointer-events: none; display: none; }
   #thr { display: inline-block; width: 80px; height: 3px; background: #2a3448; vertical-align: middle; margin-left: 6px; }

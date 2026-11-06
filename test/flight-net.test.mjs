@@ -131,3 +131,9 @@ test('lab page: import map comes before any module preload (Firefox ignores a la
   const firstModule = Math.min(...['rel="modulepreload"', 'type="module"'].map((k) => html.indexOf(k)).filter((i) => i >= 0));
   assert.ok(map >= 0 && map < firstModule);
 });
+
+test('lab page: callsign labels never swallow a press on the sky', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const html = await readFile(new URL('../flight/index.html', import.meta.url), 'utf8');
+  assert.match(html, /#labels[^{]*\{[^}]*pointer-events:\s*none/);
+});
