@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 
 const EARTH_R = 6371000;
-const STORE = 'sr71-backdrop-v2';
+const STORE = 'sr71-backdrop-v3';
 
 // ---------- settings ----------
 const PRESETS = {
@@ -23,14 +23,15 @@ const STYLES = {
   topo: { grid: 0.45, contour: 1, shade: 0.6, tint: 1, tintContrast: 1.3, tintPivot: 0.45, slope: 0.35, lineBright: 0.015, contourStep: 200 },
   topoglow: { grid: 0.6, contour: 0.9, shade: 0.5, tint: 0.6, tintContrast: 1.2, tintPivot: 0.6, slope: 0.2, lineBright: 0.7 },
 };
+// Defaults = the look Had landed on 2026-11-05 (iPad), with altitude maxed.
 const DEFAULTS = {
   preset: 'site', ...PRESETS.site,
-  midPoint: 0.42, hlStart: 0.74, hlAmount: 0.85, mono: 1, exposure: 1.0, contrast: 1.0, grain: 0.018, vignette: 0.45,
-  region: 'sierra', altitudeFt: 60000, exag: 1.5, offsetX: null, offsetZ: null, sunAz: 215, sunEl: 18, haze: 260, clouds: 0, fov: 34,
-  style: 'grid', grid: 1, gridSize: 2000, contour: 0, contourStep: 200, shade: 0.35, lineBright: 0.6, lineGold: 0,
+  midPoint: 0.56, hlStart: 0.61, hlAmount: 0.85, mono: 1, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
+  region: 'sierra', altitudeFt: 100000, exag: 1, offsetX: 79, offsetZ: -69.1, sunAz: 41, sunEl: 18, haze: 130, clouds: 0.54, fov: 23,
+  style: 'grid', grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
-  drift: true, driftSpeed: 0.2,
-  site: false, sitePath: '/', siteOpacity: 1, siteBg: 0.35, siteClick: false,
+  drift: true, driftSpeed: 0.02,
+  site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
 };
 const load = () => {
   let saved = {};
