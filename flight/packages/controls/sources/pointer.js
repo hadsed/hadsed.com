@@ -7,7 +7,7 @@ export function pointerStick({ element, x, y, radius = 80, invertY = false, dead
     if (pointerId !== null || e.button > 0) return;
     pointerId = e.pointerId;
     origin = cur = { x: e.clientX, y: e.clientY };
-    element.setPointerCapture?.(e.pointerId);
+    try { element.setPointerCapture?.(e.pointerId); } catch { /* synthetic or already gone */ }
   };
   const onMove = (e) => { if (e.pointerId === pointerId) cur = { x: e.clientX, y: e.clientY }; };
   const onUp = (e) => { if (e.pointerId === pointerId) { pointerId = null; origin = cur = null; } };
@@ -22,12 +22,16 @@ export function pointerStick({ element, x, y, radius = 80, invertY = false, dead
       element.addEventListener('pointermove', onMove);
       element.addEventListener('pointerup', onUp);
       element.addEventListener('pointercancel', onUp);
+      // iOS can drop the pointerup (system gesture, finger slides off the
+      // edge); losing capture is the last word, so the stick never sticks.
+      element.addEventListener('lostpointercapture', onUp);
     },
     detach() {
       element.removeEventListener('pointerdown', onDown);
       element.removeEventListener('pointermove', onMove);
       element.removeEventListener('pointerup', onUp);
       element.removeEventListener('pointercancel', onUp);
+      element.removeEventListener('lostpointercapture', onUp);
     },
     poll(sink) {
       if (!origin) return;
