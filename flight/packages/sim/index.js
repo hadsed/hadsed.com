@@ -14,7 +14,7 @@ export const LIMITS = {
   radius: 120000,       // m from origin before the jet steers itself home
 };
 
-const RATE = { roll: 1.6, pitch: 0.7, yaw: 0.25, turn: 0.7, level: 0.8, nose: 0.25, home: 0.2, throttle: 0.5 };
+const RATE = { roll: 1.6, pitch: 0.95, yaw: 0.25, turn: 0.7, level: 0.8, nose: 0.25, home: 0.2, throttle: 0.5 };
 
 export function createJet({ x = 0, y = 25900, z = 0, heading = 0, speed = 900, throttle = 0.85 } = {}) {
   const q = [0, 0, 0, 1];

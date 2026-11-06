@@ -12,13 +12,18 @@ const f = [0, 0, 0], r = [0, 0, 0];
 
 // Fly to a slot off the leader's wing and hold it: 180 m out, 60 m back, 20 m up.
 // Used by bots (escorting people) and by players (click a jet to follow it).
+export const SLOT = { out: 50, back: 150, up: 12 };
+
 export function escort(intent, jet, lead, side = 1) {
   const lq = lead.q;
   forwardOf(lq, f); rightOf(lq, r);
   const lp = lead.pos;
-  const sx = lp[0] + r[0] * 180 * side - f[0] * 60;
-  const sy = lp[1] + 20;
-  const sz = lp[2] + r[2] * 180 * side - f[2] * 60;
+  // A V-formation slot: 50 m out to one side and 150 m back, a touch high.
+  // From the chase cam behind it, the leader sits about 14 degrees off the
+  // nose, so it stays on screen even on a phone held upright.
+  const sx = lp[0] + r[0] * SLOT.out * side - f[0] * SLOT.back;
+  const sy = lp[1] + SLOT.up;
+  const sz = lp[2] + r[2] * SLOT.out * side - f[2] * SLOT.back;
   // Aim at a point ahead of the slot so we converge instead of circling it.
   const ahead = 1500;
   steer(intent, jet, sx + f[0] * ahead, sy + f[1] * ahead, sz + f[2] * ahead, 1.2);
