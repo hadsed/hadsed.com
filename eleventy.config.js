@@ -55,6 +55,8 @@ export default function (eleventyConfig) {
       [`${lab}/terrain/*.png`]: "lab/sr71/terrain",
       // edge-affordance mockups that sit on top of the lab
       [`${lab}/edge-affordances.html`]: "lab/edge/index.html",
+      // staging home: site + backdrop + Fly, which hands over to the flight lab
+      [`${lab}/fly-home.html`]: "lab/home/index.html",
     });
   }
 

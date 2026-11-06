@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Had Seddiqi</title>
+<!--
+  Staging home: the website over the SR-71 backdrop, with Fly pinned at the foot of the sidebar.
+  Clicking Fly pushes the camera in, fades the site, and hands over to the shared-sky flight lab.
+  This is the edge-affordance mockup (/lab/edge/) with Had's picks baked in and every jig removed:
+  menu concept, pinned sidebar, blink every 5s for 2s (sine swell, strength 0.95, 2px halo).
+  Layers: #lab iframe = backdrop lab (?clean, which hides its panel) with the site in its own iframe;
+  #flight iframe = /lab/flight/, created on click so nobody joins the room until they choose to fly.
+-->
+<style>
+  :root { --bg: #1c2433; --muted: #8a919c; --glow: #e4c56f; --sky: #0f1520;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); }
+  /* 100% rather than 100vh: on iPad Safari 100vh is the height with the toolbars hidden, which
+     pushes the pinned Fly under the visible edge. */
+  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  #flight { opacity: 0; transition: opacity .9s ease; background: var(--sky); z-index: 2; }
+  #flight.on { opacity: 1; }
+  #exit { position: fixed; z-index: 3; right: calc(14px + env(safe-area-inset-right)); top: calc(54px + env(safe-area-inset-top));
+    font: 10px/1 var(--mono); letter-spacing: .16em; color: var(--muted); background: none; border: 0; padding: 10px 2px; cursor: pointer;
+    opacity: 0; pointer-events: none; transition: opacity .6s .6s, color .2s; -webkit-tap-highlight-color: transparent; }
+  #exit:hover, #exit:focus-visible { color: var(--glow); }
+  body.flying #exit { opacity: 1; pointer-events: auto; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 10px var(--mono); letter-spacing: .2em; color: var(--muted);
+    z-index: 4; background: var(--bg); transition: opacity .6s; }
+  #loading.done { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<iframe id="lab" title="Had Seddiqi" src="../sr71/?clean"></iframe>
+<button id="exit" aria-label="Back to the website">ESC · BACK</button>
+<div id="loading">LOADING</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const labFrame = $('#lab');
+const L = () => labFrame.contentWindow && labFrame.contentWindow.__lab;
+const labDoc = () => labFrame.contentDocument;
+const siteFrame = () => labDoc() && labDoc().getElementById('site');
+const siteDoc = () => { try { return siteFrame().contentDocument; } catch { return null; } };
+let state = 'site';   // site | entering | flying | leaving
+
+// SR-71 planform, nose to the right. Traced from the public-domain USAF 3-view
+// (commons.wikimedia.org/wiki/File:Lockheed_SR-71A_3view.svg), mirrored for symmetry.
+const JET_SVG = '<svg class="fly-jet" viewBox="0 0 100 52.46" aria-hidden="true"><path fill="currentColor" d="M0.1 26.2 L0.1 25.7 L0.9 25.7 L4.0 24.8 L5.7 18.2 L8.7 16.6 L8.9 15.8 L8.0 14.8 L7.9 14.4 L8.2 14.1 L9.1 13.8 L9.1 11.3 L10.1 10.8 L8.0 9.8 L7.7 9.4 L9.3 2.1 L10.3 0.7 L11.9 0.0 L13.6 0.3 L27.0 7.5 L31.7 7.6 L36.8 8.3 L40.3 9.2 L45.1 11.1 L45.5 11.9 L49.5 13.6 L49.7 14.2 L49.4 14.5 L45.5 15.2 L45.0 16.4 L43.7 16.6 L51.3 20.6 L74.5 20.7 L80.6 21.2 L90.0 22.7 L95.5 24.3 L98.5 25.7 L100.0 25.7 L99.8 26.1 L97.4 27.3 L93.3 28.8 L88.1 30.1 L81.8 31.1 L74.5 31.7 L51.3 31.8 L43.7 35.8 L45.0 36.0 L45.5 37.2 L49.4 37.9 L49.7 38.2 L49.5 38.7 L45.5 40.5 L45.1 41.3 L40.3 43.2 L36.8 44.1 L31.7 44.8 L27.0 44.9 L14.6 51.6 L12.4 52.4 L10.9 52.1 L9.6 50.8 L7.7 43.8 L7.7 43.0 L8.0 42.6 L10.1 41.6 L9.1 41.1 L9.1 38.5 L8.2 38.3 L7.9 37.9 L8.0 37.5 L8.9 36.6 L8.7 35.8 L5.7 34.2 L4.0 27.6 L0.6 26.6 Z"/></svg>';
+
+// The Fly item lives inside the site page: pinned sidebar on wide screens, end of the menu row on phones.
+const SITE_CSS = `
+  .fly-jet { width: 22px; height: 11.5px; vertical-align: -1px; margin-right: 8px; transition: transform .35s cubic-bezier(.2,.7,.2,1); }
+  .menu .fly-item { margin: 1.4rem 0 0; }
+  .fly-item a { color: var(--muted); white-space: nowrap; }
+  .fly-item a:hover, .fly-item a:focus-visible { color: var(--glow); text-decoration: none; }
+  .fly-item a:hover .fly-jet, .fly-item a:focus-visible .fly-jet { transform: translateX(3px); }
+  /* Fixed rather than sticky: on short pages the grid row is no taller than the menu. */
+  @media (min-width: 641px) {
+    .menu { position: fixed; top: 0; bottom: 0; z-index: 2; width: var(--menu-width);
+      left: max(1.5rem, calc((100% - 64rem) / 2 + 1.5rem)); padding: 3rem 0 max(2rem, calc(env(safe-area-inset-bottom) + 1rem)); display: flex; flex-direction: column; }
+    main { grid-column: 2; }
+    .menu ul { flex: 1; display: flex; flex-direction: column; }
+    .menu .fly-item { margin: auto 0 0; }
+  }
+  @media (max-width: 640px) { .menu .fly-item { margin: 0 0 0 auto; } }
+`;
+function decorateSite() {
+  const doc = siteDoc(); if (!doc || !doc.head) return;
+  if (!doc.getElementById('fly-css')) {
+    const st = doc.createElement('style'); st.id = 'fly-css'; st.textContent = SITE_CSS; doc.head.appendChild(st);
+  }
+  const ul = doc.querySelector('.menu ul');
+  if (ul && !doc.querySelector('.fly-item')) {
+    const li = doc.createElement('li'); li.className = 'fly-item';
+    li.innerHTML = `<a href="#fly">${JET_SVG}Fly</a>`;
+    ul.appendChild(li);
+  }
+  for (const a of doc.querySelectorAll('a[href="#fly"]')) a.onclick = (e) => { e.preventDefault(); enter(); };
+  // Keep the address bar in step with the page shown inside, so a reload lands on the same page.
+  try { const p = doc.location.pathname; if (p && !p.startsWith('/lab/')) history.replaceState(null, '', `?p=${encodeURIComponent(p)}`); } catch {}
+}
+
+function prepLab() {
+  const doc = labDoc();
+  if (!doc.getElementById('fly-lab')) {
+    const st = doc.createElement('style'); st.id = 'fly-lab';
+    st.textContent = '#site{transition:opacity .9s ease} #site,#backdrop{width:100%!important;height:100%!important}';
+    doc.head.appendChild(st);
+  }
+  const lab = L();
+  const p = new URLSearchParams(location.search).get('p');
+  if (p && p.startsWith('/') && !p.startsWith('//')) { lab.S.sitePath = p; lab.apply(); }
+  const f = siteFrame();
+  if (f && !f.__fly) { f.__fly = true; f.addEventListener('load', decorateSite); }
+  decorateSite();
+  labFrame.contentWindow.addEventListener('keydown', onKey);
+}
+const waitLab = setInterval(() => {
+  if (!L()) return;
+  clearInterval(waitLab);
+  prepLab();
+  setTimeout(() => $('#loading').classList.add('done'), 500);
+}, 100);
+
+// ---------- Fly blink: a slow swell to the gold of the "next role" orb and back ----------
+const MUTED = [138, 145, 156], GOLD = [228, 197, 111];
+const EVERY = 5, LEN = 2, STR = 0.95, HALO = 2;
+const mix = (k) => `rgb(${MUTED.map((m, i) => Math.round(m + (GOLD[i] - m) * k)).join(',')})`;
+const FRAMES = [[0, 0], [0.5, 1], [1, 0]].map(([offset, v]) => ({ offset, easing: 'cubic-bezier(.37,0,.63,1)', color: mix(v * STR),
+  filter: `drop-shadow(0 0 ${(v * HALO).toFixed(2)}px rgba(228,197,111,${(v * STR * 0.55).toFixed(3)}))` }));
+if (!reduceMotion) setTimeout(function blink() {
+  const doc = siteDoc(), a = doc && doc.querySelector('.fly-item a');
+  if (a && state === 'site' && !a.matches(':hover')) a.animate(FRAMES, { duration: LEN * 1000, easing: 'linear' });
+  setTimeout(blink, EVERY * 1000);
+}, 3000);   // first blink ~3s after load
+
+// ---------- enter / leave ----------
+let anim = null, home = null, flight = null;
+function animate(ms, fn) {
+  cancelAnimationFrame(anim);
+  const t0 = performance.now();
+  const step = (now) => { const t = Math.min(1, (now - t0) / ms); fn(t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2); if (t < 1) anim = requestAnimationFrame(step); };
+  anim = requestAnimationFrame(step);
+}
+function enter() {
+  const lab = L(); if (state !== 'site' || !lab) return;
+  state = 'entering';
+  home = { pos: lab.camera.position.clone(), yaw: lab.G.sideYaw };
+  lab.S.siteOpacity = 0; lab.S.driftSpeed = 0.15; lab.apply();
+  if (!reduceMotion) {
+    const p0 = lab.camera.position.clone(), t = lab.controls.target.clone(), off = p0.clone().sub(t), y0 = lab.G.sideYaw;
+    animate(2600, (k) => { lab.camera.position.copy(t).add(off.clone().multiplyScalar(1 - 0.28 * k)); lab.G.sideYaw = y0 + 0.45 * k; });
+  }
+  // Start loading the flight lab now, under the push-in, and fade it up once it has drawn a frame.
+  flight = document.createElement('iframe');
+  flight.id = 'flight'; flight.title = 'Fly'; flight.allow = 'gamepad; fullscreen';
+  flight.src = '../flight/';
+  document.body.appendChild(flight);
+  const t0 = performance.now();
+  const ready = setInterval(() => {
+    let ok = false;
+    try { const f = flight.contentWindow.__flight; ok = !!(f && f.renderer); } catch {}
+    if (!ok && performance.now() - t0 < 8000) return;
+    clearInterval(ready);
+    setTimeout(() => {
+      if (state !== 'entering') return;
+      flight.classList.add('on');
+      document.body.classList.add('flying');
+      state = 'flying';
+      try { flight.contentWindow.addEventListener('keydown', onKey); } catch {}
+      flight.focus();
+      lab.S.site = false; lab.apply();
+    }, Math.max(0, 1300 - (performance.now() - t0)));
+  }, 100);
+}
+function leave() {
+  if (state !== 'flying') return;
+  const lab = L(); state = 'leaving';
+  document.body.classList.remove('flying');
+  flight.classList.remove('on');
+  lab.S.driftSpeed = 0.02; lab.S.siteOpacity = 0; lab.S.site = true; lab.apply();
+  requestAnimationFrame(() => requestAnimationFrame(() => { lab.S.siteOpacity = 1; lab.apply(); }));
+  if (home && !reduceMotion) {
+    const p0 = lab.camera.position.clone(), y0 = lab.G.sideYaw, h = home;
+    animate(1400, (k) => { lab.camera.position.lerpVectors(p0, h.pos, k); lab.G.sideYaw = y0 + (h.yaw - y0) * k; });
+  }
+  const f = flight; flight = null;
+  setTimeout(() => { f.remove(); state = 'site'; }, 950);   // removing the frame closes its socket
+}
+function onKey(e) { if (e.key === 'Escape') leave(); }
+addEventListener('keydown', onKey);
+$('#exit').addEventListener('click', leave);
+</script>
+</body>
+</html>

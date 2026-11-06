@@ -34,9 +34,12 @@ const DEFAULTS = {
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
 };
+const CLEAN = new URLSearchParams(location.search).has('clean');
+if (CLEAN) document.documentElement.classList.add('clean');
 const load = () => {
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch {}
+  // ?clean: the lab as a plain backdrop (no panel, no saved tweaks), for the staging home page.
+  if (!CLEAN) try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch {}
   let fromHash = {};
   try { if (location.hash.length > 1) fromHash = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch {}
   const out = { ...DEFAULTS, ...saved, ...fromHash };
@@ -44,7 +47,7 @@ const load = () => {
   return out;
 };
 const S = load();
-const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch {} };
+const save = () => { if (CLEAN) return; try { localStorage.setItem(STORE, JSON.stringify(S)); } catch {} };
 
 // ---------- renderer ----------
 const canvas = document.getElementById('backdrop');
@@ -688,7 +691,7 @@ document.getElementById('shot').addEventListener('click', () => {
   });
 });
 addEventListener('keydown', (e) => {
-  if (e.target.closest('input, select')) return;
+  if (CLEAN || e.target.closest('input, select')) return;
   if (e.key === 'h') document.getElementById('toggle').click();
   if (e.key === ' ') { S.drift = !S.drift; sync(); apply(); e.preventDefault(); }
 });
@@ -699,6 +702,6 @@ if (S.view) {
 }
 
 apply();
-if (innerWidth < 640) document.getElementById('toggle').click();  // phones start with the panel tucked away
+if (innerWidth < 640 && !CLEAN) document.getElementById('toggle').click();  // phones start with the panel tucked away
 loop();
 window.__lab = { S, apply, sync, render, camera, controls, G };
