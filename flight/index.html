@@ -25,6 +25,7 @@
   #credit { text-transform: none; font-size: 9px; letter-spacing: 0; max-width: min(42vw, 260px); margin-top: 6px; opacity: 0.7; }
   /* Its own HUD item, set apart from "you are" above it. */
   #following { margin-top: 14px; }
+  #unfollow { pointer-events: auto; font: inherit; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; margin-left: 10px; padding: 3px 8px; opacity: 0.75; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #labels span.on { opacity: 1; }
   #reticle { position: fixed; left: -11px; top: -11px; width: 20px; height: 20px; border: 1.5px solid var(--gold); border-radius: 50%; pointer-events: none; display: none; opacity: 0.85; }
   #reticle::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px; background: var(--gold); border-radius: 50%; }
@@ -48,7 +49,7 @@
 <div id="labels"></div>
 <div id="stick"></div>
 <!-- Top left is only who you are. #status stays for tests and the no-WebGL notice. -->
-<div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div id="following" hidden></div><div class="dim" id="status" hidden>loading</div></div>
+<div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div id="following" hidden><span id="followText"></span><button id="unfollow" title="Stop following (X)">leave</button></div><div class="dim" id="status" hidden>loading</div></div>
 <div class="hud" id="tr"><div id="aloft"></div></div>
 <div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
 <!-- Model credit lives in the page source, not on screen; main.js fills it from the jet asset. -->
@@ -58,7 +59,7 @@
 <button id="tilt" type="button" hidden>tilt</button>
 <!-- Only shown when the browser cannot draw 3D. -->
 <div class="hud" id="help" hidden>
-  <span class="keys">WASD or arrows steer · R/F throttle · Space boost · E wave<br>or </span>drag to steer, let go to level out<span class="keys"> · gamepad works too</span>
+  <span class="keys">WASD or arrows steer · R/F throttle · Space boost · E wave<br>or </span>drag to steer, let go to level out · tap a jet to follow<span class="keys"> · gamepad works too</span>
 </div>
 <script type="module" src="main.js"></script>
 </body>

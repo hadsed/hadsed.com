@@ -33,7 +33,9 @@ const canvas = $('view');
 // Phones and tablets can also aim by tilting; off until TILT is tapped.
 const tilter = tilt({ x: 'aimX', y: 'aimY', range: 35 });
 // Drag toward where you want to go.
-const stick = pointerStick({ element: canvas, x: 'aimX', y: 'aimY', invertX: true, radius: Math.min(innerWidth, innerHeight) * 0.24 });
+// The stick takes a drag that starts anywhere on screen (HUD, labels, sky), except on a button.
+const onControl = (e) => !!e.target.closest?.('button, a, input, select');
+const stick = pointerStick({ element: document.body, x: 'aimX', y: 'aimY', invertX: true, radius: Math.min(innerWidth, innerHeight) * 0.17, ignore: onControl });
 const buttons = scripted('buttons');   // on-screen BOOST
 const controls = createControls({
   axes: ['aimX', 'aimY', 'throttle'],
@@ -250,14 +252,16 @@ Object.assign(window.__flight, { tilt: tilter });
 let follow = null;   // { id, side }
 const followIntent = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
 let press = null;
-canvas.addEventListener('pointerdown', (e) => { press = { x: e.clientX, y: e.clientY, t: performance.now() }; });
-canvas.addEventListener('pointerup', (e) => {
+// On the body, like the stick: the stick captures the pointer there, so the canvas never sees the release.
+document.body.addEventListener('pointerdown', (e) => { press = onControl(e) ? null : { x: e.clientX, y: e.clientY, t: performance.now() }; });
+document.body.addEventListener('pointerup', (e) => {
   if (!press) return;
   const tap = Math.hypot(e.clientX - press.x, e.clientY - press.y) < 8 && performance.now() - press.t < 350;
   press = null;
   if (!tap) return;
   const id = pickJet(e.clientX, e.clientY);
-  if (id !== null) startFollow(id); else stopFollow();
+  if (id === null) return;   // a tap on empty sky doesn't end follow; too easy to do by accident
+  if (follow?.id === id) stopFollow(); else startFollow(id);
 });
 
 function pickJet(x, y) {
@@ -301,10 +305,11 @@ function rumble(on) {
 // otherwise the Sabre assist chasing the aim point.
 function flyIntent(input) {
   const a = input.axes;
-  if (follow && (Math.abs(a.aimX) > 0.15 || Math.abs(a.aimY) > 0.15 || Math.abs(a.throttle) > 0.15 || input.actions.boost)) stopFollow();
+  // Follow stays on through stick, throttle and boost; it ends only on purpose
+  // (the leave button, X, or tapping the same jet again). Boost still works.
   if (follow) {
     const it = followAxes();
-    if (it) { assist.reset(jet); return it; }
+    if (it) { it.boost = it.boost || input.actions.boost; assist.reset(jet); return it; }
   }
   assist.update(aimIntent, jet, a.aimX, a.aimY, STEP);
   aimIntent.throttle = a.throttle;
@@ -318,9 +323,11 @@ function followAxes() {
   const d = escort(followIntent, jet, r.view, follow.side);
   const el = $('following');
   el.hidden = false;
-  el.textContent = `following ${r.callsign || ''}${d > 1500 ? ` · ${range(d)}` : ''}`;
+  $('followText').textContent = `following ${r.callsign || ''}${d > 1500 ? ` · ${range(d)}` : ''}`;
   return followIntent;
 }
+$('unfollow').addEventListener('click', () => stopFollow());
+addEventListener('keydown', (e) => { if (e.code === 'KeyX' && follow) stopFollow(); });
 Object.assign(window.__flight, { startFollow, stopFollow });
 
 // ---- attract <-> flying (the site backdrop's Fly and Back) ----

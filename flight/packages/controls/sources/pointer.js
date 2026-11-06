@@ -1,10 +1,11 @@
 // A virtual stick: press anywhere on the element and drag. Distance from the
 // press point, divided by `radius` pixels, becomes the axis value.
 // pointerStick({ element, x: 'roll', y: 'pitch', radius: 80, invertX: false, invertY: false })
-export function pointerStick({ element, x, y, radius = 80, invertX = false, invertY = false, deadzone = 0.06 } = {}) {
+// ignore(e): return true for presses the stick should leave alone (buttons, links).
+export function pointerStick({ element, x, y, radius = 80, invertX = false, invertY = false, deadzone = 0.06, ignore = null } = {}) {
   let origin = null, cur = null, pointerId = null;
   const onDown = (e) => {
-    if (pointerId !== null || e.button > 0) return;
+    if (pointerId !== null || e.button > 0 || ignore?.(e)) return;
     pointerId = e.pointerId;
     origin = cur = { x: e.clientX, y: e.clientY };
     try { element.setPointerCapture?.(e.pointerId); } catch { /* synthetic or already gone */ }

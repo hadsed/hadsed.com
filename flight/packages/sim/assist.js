@@ -12,7 +12,7 @@ import { forwardOf, rightOf, rotate, clamp } from './index.js';
 
 const f = [0, 0, 0], r = [0, 0, 0], loc = [0, 0, 0];
 
-export function steerTo(intent, jet, tx, ty, tz, aggressive = 1) {
+export function steerTo(intent, jet, tx, ty, tz, aggressive = 1, maxNose = 0.35) {
   // Target direction in the jet's own frame (inverse rotation).
   const q = jet.q;
   const inv = [-q[0], -q[1], -q[2], q[3]];
@@ -24,7 +24,9 @@ export function steerTo(intent, jet, tx, ty, tz, aggressive = 1) {
   const heading = Math.atan2(side, ahead);                 // + means target is to the right
   const wantBank = clamp(heading * 1.6 * aggressive, -1.0, 1.0);
   intent.roll = clamp((wantBank - bank) * 2.5, -1, 1);
-  const wantNose = clamp(Math.atan2(up, Math.hypot(side, ahead)), -0.35, 0.35);
+  // The target's elevation is measured from the nose (jet frame), so add the
+  // nose's own pitch to get the climb angle wanted, then cap it.
+  const wantNose = clamp(nose + Math.atan2(up, Math.hypot(side, ahead)), -maxNose, maxNose);
   intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
   return intent;
 }
@@ -38,19 +40,20 @@ export function headingOf(q) {
 // const assist = createAssist();
 // assist.update(intent, jet, aimX, aimY, dt)   // aimX + right, aimY + up, in [-1, 1]
 // assist.direction(out)                         // where the reticle points
-export function createAssist({ maxTurn = 0.45, maxPitch = 0.3, gain = 1.1 } = {}) {
+export function createAssist({ maxTurn = 0.45, maxPitch = 0.6, gain = 1.1 } = {}) {
   const aim = { yaw: null, pitch: 0 };
   const dir = [0, 0, 0];
   const api = {
     aim,
     reset(jet) { aim.yaw = headingOf(jet.q); aim.pitch = 0; },
     update(intent, jet, ax = 0, ay = 0, dt = 1 / 60) {
-      // Soft center: small deflections do very little, full stick turns hard.
-      const soft = (v) => Math.sign(v) * Math.abs(v) ** 1.6;
-      aim.yaw = headingOf(jet.q) - soft(ax) * maxTurn;
-      aim.pitch = soft(ay) * maxPitch;
+      // Turns get a soft center (small drags do little); climbs and dives are
+      // nearly linear, so up and down answer as readily as left and right.
+      const soft = (v, k) => Math.sign(v) * Math.abs(v) ** k;
+      aim.yaw = headingOf(jet.q) - soft(ax, 1.3) * maxTurn;
+      aim.pitch = soft(ay, 1.05) * maxPitch;
       const d = api.direction(dir);
-      steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, gain);
+      steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, gain, maxPitch);
       intent.yaw = 0;
       return intent;
     },
