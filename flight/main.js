@@ -120,11 +120,12 @@ try {
   $('status').hidden = false;
   $('help').textContent = 'try another browser, or turn on hardware acceleration';
   $('help').style.opacity = 1;
+  $('help').hidden = false;
   throw err;
 }
 Object.assign(window.__flight, { net, remotes, renderer, input: controls.read(0) });   // read() reuses one frame object
 Object.defineProperty(window.__flight, 'jet', { get: () => jet });
-renderer.setWorld(world).then(() => $('world').textContent = world.label);
+renderer.setWorld(world);
 
 // ---- loop: fixed 60 Hz sim, render interpolated, send at 10 Hz ----
 const remoteList = [];
