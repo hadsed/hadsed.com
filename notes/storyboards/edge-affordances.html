@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Edge affordances</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:wght@300&display=swap">
 <!--
   Mockups of small "edge" controls that take a visitor from the website into the 3D world,
   the first stop of a reels-style feed of worlds. The site and the SR-71 scene come from the
@@ -130,8 +131,13 @@
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 10px var(--mono); letter-spacing: .2em; color: var(--muted); z-index: 7; background: var(--bg); transition: opacity .6s; }
   #loading.done { opacity: 0; pointer-events: none; }
   @media (max-width: 640px) {
-    #switcher, body[data-c] #switcher { width: calc(100vw - 132px); bottom: auto; top: calc(8px + env(safe-area-inset-top)); }
-    body[data-c="tape"] #switcher { top: auto; bottom: calc(10px + env(safe-area-inset-bottom)); }
+    #switcher { width: calc(100vw - 132px); }
+    .w-hint { left: auto; right: calc(var(--edge) + env(safe-area-inset-right)); transform: none; }
+    /* Phones: a fixed bottom-left readout would sit on the text, so it rides in the empty
+       right end of the menu row instead and tucks away once the page scrolls. */
+    button.hud { left: auto; bottom: auto; right: calc(12px + env(safe-area-inset-right)); top: calc(16px + env(safe-area-inset-top)); text-align: right; padding: 6px 4px; }
+    button.hud .orb { margin: 0 6px 1px 0; }
+    body.scrolled button.hud { opacity: 0; pointer-events: none; }
     .sw-bar button { padding: 7px 8px; }
   }
 </style>
@@ -231,7 +237,7 @@ try { localStorage.removeItem('sr71-backdrop-v3'); } catch {}
 const params = new URLSearchParams(location.search);
 let ci = Math.max(0, CONCEPTS.findIndex((c) => c.id === params.get('c')));
 let plain = params.get('bg') === 'plain';
-let notesOpen = params.get('notes') !== '0';
+let notesOpen = params.has('notes') ? params.get('notes') !== '0' : innerWidth > 640;
 let state = 'site';   // site | entering | world | leaving
 let wi = 0;
 const labFrame = $('#lab');
@@ -383,6 +389,7 @@ function tick() {
   const id = CONCEPTS[ci].id;
   if (id === 'tape' || (state !== 'site' && id === 'tape')) drawTape(h);
   if (id === 'alt' && state === 'site') drawAlt(siteScroll());
+  { const d = siteDoc(), y = d && d.scrollingElement ? d.scrollingElement.scrollTop : 0; document.body.classList.toggle('scrolled', y > 24); }
 }
 tick();
 
@@ -472,6 +479,7 @@ function onKey(e) {
 addEventListener('keydown', onKey);
 addEventListener('wheel', onWheel, { passive: false });
 for (const b of $$('[data-enter]')) b.addEventListener('click', enter);
+if (matchMedia('(pointer: coarse)').matches) $('#hint').textContent = 'DRAG TO LOOK · SWIPE UP FOR NEXT';
 $('#exit').addEventListener('click', leave);
 $('#next').addEventListener('click', () => go(wi + 1));
 $('#prev').addEventListener('click', () => go(wi - 1));
