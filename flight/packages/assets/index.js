@@ -1,6 +1,6 @@
 // Assets: everything visual that comes from data. The renderer asks for a jet
-// geometry or a world's terrain; how they are made (procedural today, glTF
-// tomorrow) stays in here. Add a world by adding it to assets/manifest.json.
+// geometry or a world's terrain; how they are made (procedural, or a packed
+// licensed model with its paint) stays in here. Add a world by adding it to assets/manifest.json.
 import * as THREE from 'three';
 import { decodeJet } from './jet-pack.js';
 
@@ -28,10 +28,23 @@ async function packedJetGeometry(url) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(j.position, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(j.normal, 3));
+  if (j.uv) g.setAttribute('uv', new THREE.BufferAttribute(j.uv, 2));
   g.setIndex(new THREE.BufferAttribute(j.index, 1));
   g.computeBoundingSphere();
   g.userData.credit = j.credit;
+  if (j.texture) g.userData.map = await jetTexture(j.texture);
   return g;
+}
+
+// The paint (markings, panel lines) packed with the jet, as a texture for its skin.
+export async function jetTexture({ bytes, type }) {
+  const bmp = await createImageBitmap(new Blob([bytes], { type }));
+  const tex = new THREE.Texture(bmp);
+  tex.flipY = false;                       // glTF UVs: origin at the image's top left
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 // ---- jet ----

@@ -76,8 +76,12 @@ export function createRenderer({ canvas, manifest, labels }) {
 
   // ---- jets ----
   const geo = jetGeometry(manifest.jet);
-  // Every jet is gold, yours and everyone else's.
-  const skin = new THREE.MeshStandardMaterial({ color: gold, emissive: gold, emissiveIntensity: 0.12, roughness: 0.4, metalness: 0.55 });
+  // Every jet looks the same, yours and everyone else's. A packed jet brings its paint
+  // (geo.userData.map: markings, insignia, panel lines); the procedural one is plain gold.
+  const paint = geo.userData.map || null;
+  const skin = paint
+    ? new THREE.MeshStandardMaterial({ color: 0xffffff, map: paint, emissive: gold, emissiveIntensity: 0.06, roughness: 0.5, metalness: 0.3 })
+    : new THREE.MeshStandardMaterial({ color: gold, emissive: gold, emissiveIntensity: 0.12, roughness: 0.4, metalness: 0.55 });
   const me = new THREE.Mesh(geo, skin);
   scene.add(me);
 

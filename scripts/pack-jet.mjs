@@ -2,8 +2,9 @@
 //
 // Why: licensed models (e.g. Sketchfab Standard) may be used inside a project but
 // must not be served as a standalone, extractable file. So the site never ships
-// the GLB. This bakes it to one merged, quantized mesh (positions + normals, no
-// textures, no node tree), compresses it with meshopt + deflate, scrambles the
+// the GLB. This bakes it to one merged, quantized mesh (positions, normals and,
+// with --texture, UVs plus one base-color texture re-encoded as WebP; no node
+// tree, no materials), compresses it with meshopt + deflate, scrambles the
 // bytes, and writes it under a content-hashed name. The licensor credit rides
 // along in the header (license asks us to keep the licensor's name with it).
 // flight/packages/assets/jet-pack.js is the matching decoder.
@@ -15,12 +16,17 @@
 // --nose  which axis the nose points along in the source (+x -x +y -y +z -z);
 //         the output always has the nose down -Z, up +Y, like the sim.
 // --up    which axis is up in the source (default +y).
+// --texture mat    carry UVs and the base-color texture of the material named
+//         mat. Parts with any other material get --uv-fill (a texel of plain
+//         paint, default 0.75,0.08) so they read as the same skin.
+// --texture-size n  longest side of the packed texture (default 2048).
 // --drop-below y   also drop every connected part (welded by position) that
 //         reaches below this height, in source units after --nose/--up. Handy
 //         when gear and open doors are merged into the same meshes as the hull.
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer";
+import sharp from "sharp";
 import { createHash } from "node:crypto";
 import { deflateRawSync } from "node:zlib";
 import { writeFileSync, readdirSync, unlinkSync } from "node:fs";
@@ -50,7 +56,10 @@ if (flag("list")) {
 
 const drop = opt("drop") ? new RegExp(opt("drop"), "i") : null;
 const dropped = [];
-const pos = [], nor = [], idx = [];
+const pos = [], nor = [], uvs = [], idx = [];
+const texMat = opt("texture") || null;
+const uvFill = (opt("uv-fill", "0.75,0.08")).split(",").map(Number);
+let texImage = null;
 let base = 0;
 
 const mul = (a, b) => { // column-major 4x4
@@ -69,7 +78,10 @@ const visit = (node, parent) => {
   if (mesh) for (const prim of mesh.listPrimitives()) {
     if (prim.getMode() !== 4) continue; // triangles only
     const p = prim.getAttribute("POSITION"), n = prim.getAttribute("NORMAL");
-    const count = p.getCount(), v = [0, 0, 0], w = [0, 0, 0];
+    const count = p.getCount(), v = [0, 0, 0], w = [0, 0, 0], q = [0, 0];
+    const mat = prim.getMaterial();
+    const uv = texMat && mat?.getName() === texMat ? prim.getAttribute("TEXCOORD_0") : null;
+    if (uv && !texImage) texImage = mat.getBaseColorTexture()?.getImage() || null;
     for (let i = 0; i < count; i++) {
       p.getElement(i, v);
       pos.push(world[0] * v[0] + world[4] * v[1] + world[8] * v[2] + world[12],
@@ -82,6 +94,7 @@ const visit = (node, parent) => {
         const z = world[2] * w[0] + world[6] * w[1] + world[10] * w[2];
         const l = Math.hypot(x, y, z) || 1; nor.push(x / l, y / l, z / l);
       } else nor.push(NaN, NaN, NaN);
+      if (uv) { uv.getElement(i, q); uvs.push(q[0], q[1]); } else uvs.push(uvFill[0], uvFill[1]);
     }
     const ind = prim.getIndices();
     if (ind) for (let i = 0; i < ind.getCount(); i++) idx.push(base + ind.getScalar(i));
@@ -131,7 +144,9 @@ for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) pos[i + k] =
 
 // ---- weld, simplify ----
 await MeshoptSimplifier.ready; await MeshoptEncoder.ready;
-let P = new Float32Array(pos), N = new Float32Array(nor), X = new Uint32Array(idx);
+let P = new Float32Array(pos), N = new Float32Array(nor), U = new Float32Array(uvs), X = new Uint32Array(idx);
+const hasUV = !!texImage;
+if (texMat && !hasUV) throw new Error(`no base-color texture on material ${texMat}`);
 const target = Number(opt("triangles", 0));
 if (target && X.length / 3 > target) {
   [X] = MeshoptSimplifier.simplify(X, P, 3, target * 3, 0.002, ["LockBorder"]);
@@ -139,8 +154,11 @@ if (target && X.length / 3 > target) {
 // Drop unused vertices and fill any missing normals from faces.
 const remap = new Int32Array(P.length / 3).fill(-1); let vc = 0;
 for (const i of X) if (remap[i] < 0) remap[i] = vc++;
-const P2 = new Float32Array(vc * 3), N2 = new Float32Array(vc * 3), X2 = new Uint32Array(X.length);
-for (let i = 0; i < remap.length; i++) if (remap[i] >= 0) for (let k = 0; k < 3; k++) { P2[remap[i] * 3 + k] = P[i * 3 + k]; N2[remap[i] * 3 + k] = N[i * 3 + k]; }
+const P2 = new Float32Array(vc * 3), N2 = new Float32Array(vc * 3), U2 = new Float32Array(vc * 2), X2 = new Uint32Array(X.length);
+for (let i = 0; i < remap.length; i++) if (remap[i] >= 0) {
+  for (let k = 0; k < 3; k++) { P2[remap[i] * 3 + k] = P[i * 3 + k]; N2[remap[i] * 3 + k] = N[i * 3 + k]; }
+  for (let k = 0; k < 2; k++) U2[remap[i] * 2 + k] = U[i * 2 + k];
+}
 for (let i = 0; i < X.length; i++) X2[i] = remap[X[i]];
 if (N2.some(Number.isNaN)) {
   const acc = new Float32Array(N2.length);
@@ -153,26 +171,39 @@ if (N2.some(Number.isNaN)) {
   for (let i = 0; i < N2.length; i += 3) if (Number.isNaN(N2[i])) { const l = Math.hypot(acc[i], acc[i + 1], acc[i + 2]) || 1; for (let k = 0; k < 3; k++) N2[i + k] = acc[i + k] / l; }
 }
 
-// ---- quantize: int16 position (bbox), int8 normal; 12-byte stride ----
+// ---- quantize: int16 position (bbox), int8 normal, uint16 uv (bbox); 12 or 16-byte stride ----
 const bmin = [Infinity, Infinity, Infinity], bmax = [-Infinity, -Infinity, -Infinity];
 for (let i = 0; i < P2.length; i += 3) for (let k = 0; k < 3; k++) { bmin[k] = Math.min(bmin[k], P2[i + k]); bmax[k] = Math.max(bmax[k], P2[i + k]); }
-const vb = new DataView(new ArrayBuffer(vc * 12));
+const umin = [Infinity, Infinity], umax = [-Infinity, -Infinity];
+for (let i = 0; i < U2.length; i += 2) for (let k = 0; k < 2; k++) { umin[k] = Math.min(umin[k], U2[i + k]); umax[k] = Math.max(umax[k], U2[i + k]); }
+const stride = hasUV ? 16 : 12;
+const vb = new DataView(new ArrayBuffer(vc * stride));
 for (let i = 0; i < vc; i++) {
   for (let k = 0; k < 3; k++) {
     const t = (P2[i * 3 + k] - bmin[k]) / ((bmax[k] - bmin[k]) || 1);
-    vb.setInt16(i * 12 + k * 2, Math.round(t * 65535 - 32768), true);
-    vb.setInt8(i * 12 + 8 + k, Math.round(Math.max(-1, Math.min(1, N2[i * 3 + k])) * 127));
+    vb.setInt16(i * stride + k * 2, Math.round(t * 65535 - 32768), true);
+    vb.setInt8(i * stride + 8 + k, Math.round(Math.max(-1, Math.min(1, N2[i * 3 + k])) * 127));
+  }
+  if (hasUV) for (let k = 0; k < 2; k++) {
+    const t = (U2[i * 2 + k] - umin[k]) / ((umax[k] - umin[k]) || 1);
+    vb.setUint16(i * stride + 12 + k * 2, Math.round(t * 65535), true);
   }
 }
-const vEnc = MeshoptEncoder.encodeVertexBuffer(new Uint8Array(vb.buffer), vc, 12);
+const vEnc = MeshoptEncoder.encodeVertexBuffer(new Uint8Array(vb.buffer), vc, stride);
 const iEnc = MeshoptEncoder.encodeIndexBuffer(new Uint8Array(X2.buffer), X2.length, 4);
 
 const header = {
   credit: opt("credit", ""),
   vertexCount: vc, indexCount: X2.length, vertexBytes: vEnc.length, indexBytes: iEnc.length,
-  min: bmin, max: bmax,
+  min: bmin, max: bmax, stride,
 };
-const body = deflateRawSync(Buffer.concat([Buffer.from(vEnc), Buffer.from(iEnc)]), { level: 9 });
+let body = deflateRawSync(Buffer.concat([Buffer.from(vEnc), Buffer.from(iEnc)]), { level: 9 });
+if (hasUV) {
+  const size = Number(opt("texture-size", 2048));
+  const webp = await sharp(Buffer.from(texImage)).resize(size, size, { fit: "inside", withoutEnlargement: true }).webp({ quality: 85 }).toBuffer();
+  Object.assign(header, { uvMin: umin, uvMax: umax, bodyBytes: body.length, textureBytes: webp.length, textureType: "image/webp" });
+  body = Buffer.concat([body, webp]);
+}
 const seed = createHash("sha256").update(body).digest().readUInt32LE(0) || 1;
 header.seed = seed;
 const hjson = Buffer.from(JSON.stringify(header));
@@ -182,6 +213,6 @@ const dir = opt("out", "."), name = opt("name", "jet");
 for (const f of readdirSync(dir)) if (new RegExp(`^${name}\\.[0-9a-f]{10}\\.bin$`).test(f)) unlinkSync(join(dir, f));
 const file = `${name}.${hash}.bin`;
 writeFileSync(join(dir, file), out);
-console.log(JSON.stringify({ file, bytes: out.length, triangles: X2.length / 3, vertices: vc, dropped, size: bmax.map((x, k) => +(x - bmin[k]).toFixed(2)) }, null, 1));
+console.log(JSON.stringify({ file, bytes: out.length, textureBytes: header.textureBytes || 0, triangles: X2.length / 3, vertices: vc, dropped, size: bmax.map((x, k) => +(x - bmin[k]).toFixed(2)) }, null, 1));
 
 function u32(n) { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b; }

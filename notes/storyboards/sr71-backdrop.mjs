@@ -321,8 +321,14 @@ plane.position.z = 2;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(j.position, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(j.normal, 3));
+    if (j.uv) g.setAttribute('uv', new THREE.BufferAttribute(j.uv, 2));
     g.setIndex(new THREE.BufferAttribute(j.index, 1));
     g.computeBoundingBox();
+    if (j.texture) {   // the paint: USAF markings, panel lines, red danger stripes
+      const tex = new THREE.Texture(await createImageBitmap(new Blob([j.texture.bytes], { type: j.texture.type })));
+      tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.needsUpdate = true;
+      skin.map = tex; skin.color.set(0xffffff); skin.needsUpdate = true;
+    }
     plane.updateMatrixWorld(true);
     const proxy = new THREE.Box3().setFromObject(plane);
     const pl = proxy.max.z - proxy.min.z, gl = g.boundingBox.max.z - g.boundingBox.min.z;

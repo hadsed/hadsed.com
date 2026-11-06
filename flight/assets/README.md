@@ -12,6 +12,7 @@ Rebuild from the original GLB (kept out of the repo):
 ```
 node scripts/pack-jet.mjs lockheed_sr-71_blackbird.glb --nose -x --up +y \
   --drop "^Object_([2-9]|1[0-9]|2[0-8]|34)$" --drop-below -1.52 --length 32.7 \
+  --texture DefaultWhite_texture.png \
   --credit "SR-71 model © helijah (sketchfab.com/helijah), Sketchfab Standard license. Extraction or reuse of the model is not permitted." \
   --out flight/assets
 ```

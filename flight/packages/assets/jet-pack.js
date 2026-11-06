@@ -1,8 +1,8 @@
 // Decoder for the packed jet format written by scripts/pack-jet.mjs.
 //
 // Layout: "HJT1" | u32 header length | header JSON | scrambled body.
-// The body is deflate-raw(meshopt vertex stream + meshopt index stream), XORed
-// with a keystream. The scramble is not cryptography; it keeps the licensed
+// The body is deflate-raw(meshopt vertex stream + meshopt index stream), then
+// optionally a WebP base-color texture, all XORed with a keystream. The scramble is not cryptography; it keeps the licensed
 // model from being a standalone, ready-to-use file (no GLB, no textures, no node
 // tree, nothing a 3D tool opens), which is what the model's license asks for.
 // No three.js here so the packer can share it under Node.
@@ -26,30 +26,36 @@ async function inflate(bytes) {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-// -> { position: Float32Array, normal: Float32Array, index: Uint32Array, credit }
+// -> { position, normal, uv (or null), index, texture: { bytes, type } (or null), credit }
 export async function decodeJet(buffer) {
   const bytes = new Uint8Array(buffer);
   if (String.fromCharCode(...bytes.subarray(0, 4)) !== MAGIC) throw new Error('not a packed jet');
   const hlen = new DataView(buffer).getUint32(4, true);
   const h = JSON.parse(new TextDecoder().decode(bytes.subarray(8, 8 + hlen)));
-  const body = await inflate(scramble(bytes.subarray(8 + hlen), h.seed));
+  const raw = scramble(bytes.subarray(8 + hlen), h.seed);
+  const body = await inflate(h.textureBytes ? raw.subarray(0, h.bodyBytes) : raw);
+  const texture = h.textureBytes ? { bytes: raw.slice(h.bodyBytes, h.bodyBytes + h.textureBytes), type: h.textureType } : null;
+  const S = h.stride || 12;
 
   await MeshoptDecoder.ready;
-  const vb = new Uint8Array(h.vertexCount * 12);
-  MeshoptDecoder.decodeVertexBuffer(vb, h.vertexCount, 12, body.subarray(0, h.vertexBytes));
+  const vb = new Uint8Array(h.vertexCount * S);
+  MeshoptDecoder.decodeVertexBuffer(vb, h.vertexCount, S, body.subarray(0, h.vertexBytes));
   const index = new Uint32Array(h.indexCount);
   MeshoptDecoder.decodeIndexBuffer(new Uint8Array(index.buffer), h.indexCount, 4, body.subarray(h.vertexBytes, h.vertexBytes + h.indexBytes));
 
   const dv = new DataView(vb.buffer);
   const position = new Float32Array(h.vertexCount * 3), normal = new Float32Array(h.vertexCount * 3);
+  const uv = S >= 16 ? new Float32Array(h.vertexCount * 2) : null;
   for (let i = 0; i < h.vertexCount; i++) {
-    let nx = dv.getInt8(i * 12 + 8) / 127, ny = dv.getInt8(i * 12 + 9) / 127, nz = dv.getInt8(i * 12 + 10) / 127;
+    const o = i * S;
+    const nx = dv.getInt8(o + 8) / 127, ny = dv.getInt8(o + 9) / 127, nz = dv.getInt8(o + 10) / 127;
     const l = Math.hypot(nx, ny, nz) || 1;
     for (let k = 0; k < 3; k++) {
-      const t = (dv.getInt16(i * 12 + k * 2, true) + 32768) / 65535;
+      const t = (dv.getInt16(o + k * 2, true) + 32768) / 65535;
       position[i * 3 + k] = h.min[k] + t * (h.max[k] - h.min[k]);
     }
     normal[i * 3] = nx / l; normal[i * 3 + 1] = ny / l; normal[i * 3 + 2] = nz / l;
+    if (uv) for (let k = 0; k < 2; k++) uv[i * 2 + k] = h.uvMin[k] + (dv.getUint16(o + 12 + k * 2, true) / 65535) * (h.uvMax[k] - h.uvMin[k]);
   }
-  return { position, normal, index, credit: h.credit };
+  return { position, normal, uv, index, texture, credit: h.credit };
 }
