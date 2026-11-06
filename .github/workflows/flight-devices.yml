@@ -1,0 +1,86 @@
+name: Flight lab across devices and networks
+
+# Every change to flight/ runs the lab on phones, tablets and desktops in all
+# three browser engines, through simulated networks (fiber to bad 3G, hotel
+# wifi, a dead link), plus a bot swarm against the room server. Nothing here
+# deploys; it only reports. Results: the job summary and the "flight-report"
+# artifact (screenshots, JSON).
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['flight/**', 'test/flight*', '.github/workflows/flight-devices.yml']
+  pull_request:
+    paths: ['flight/**', 'test/flight*', '.github/workflows/flight-devices.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: flight-devices-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  devices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm ci
+        working-directory: flight/server
+      - name: Install Playwright and its three engines
+        run: |
+          npm i --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium webkit firefox
+      - name: Start the room server (local Durable Objects)
+        working-directory: flight/server
+        run: |
+          nohup npx wrangler dev --port 8787 --var PER_IP:1000 > ../test/wrangler.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8787/health && exit 0; sleep 1; done
+          cat ../test/wrangler.log; exit 1
+      - name: Build the site with the lab
+        run: FLIGHT_LAB=1 npx eleventy
+      - name: Device matrix
+        id: devices
+        continue-on-error: true
+        run: node flight/test/devices.mjs
+      - name: Bot swarm, clean network (60 pilots in one room)
+        id: swarm_clean
+        continue-on-error: true
+        run: node flight/test/swarm.mjs --clients 60 --ramp 20 --seconds 30 --world sierra --json flight/test/out/swarm-clean.json --assert
+      - name: Bot swarm, 3G with a dead link and a reset
+        id: swarm_3g
+        continue-on-error: true
+        run: node flight/test/swarm.mjs --clients 12 --seconds 50 --world alps --profile 3g --chaos blackhole@15:8,cut@32 --json flight/test/out/swarm-3g.json --assert --max-hitch 25
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Flight lab: devices"
+            cat flight/test/out/devices.md 2>/dev/null || echo "no device report"
+            echo
+            echo "## Bot swarm"
+            for f in flight/test/out/swarm-*.json; do
+              [ -f "$f" ] || continue
+              echo "### $(basename "$f" .json)"
+              node -e 'const r=require(process.argv[1]); delete r.joinMsAll; delete r.stragglers; console.log("| metric | value |\n| --- | --- |"); for (const [k,v] of Object.entries(r)) console.log(`| ${k} | ${typeof v==="number"&&!Number.isInteger(v)?v.toFixed(1):v} |`)' "$PWD/$f"
+            done
+            echo
+            echo "fps is software rendering on a CI runner, not a phone. WebKit here is not iOS Safari; see flight/test/README.md."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flight-report
+          path: |
+            flight/test/out/
+            flight/test/wrangler.log
+      - name: Fail if anything failed
+        if: steps.devices.outcome == 'failure' || steps.swarm_clean.outcome == 'failure' || steps.swarm_3g.outcome == 'failure'
+        run: exit 1

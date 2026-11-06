@@ -16,6 +16,8 @@
   #tr { top: max(14px, env(safe-area-inset-top)); right: 16px; text-align: right; }
   #bl { bottom: max(14px, env(safe-area-inset-bottom)); left: 16px; }
   #help { bottom: max(14px, env(safe-area-inset-bottom)); right: 16px; text-align: right; color: var(--dim); transition: opacity 1s; }
+  /* Phones: no keyboard, and the key list would run into the altimeter. */
+  @media (max-width: 700px) { #help .keys { display: none; } }
   .dim { color: var(--dim); }
   #labels span { position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
   #stick { position: fixed; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px solid var(--gold); pointer-events: none; display: none; }
@@ -32,8 +34,7 @@
 <div class="hud" id="tr"><div id="aloft"></div><div class="dim" id="world"></div></div>
 <div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
 <div class="hud" id="help">
-  W/S pitch · A/D roll · Q/E yaw · R/F throttle · Space wave<br>
-  or drag anywhere · gamepad works too
+  <span class="keys">W/S pitch · A/D roll · Q/E yaw · R/F throttle · Space wave<br>or </span>drag anywhere to fly<span class="keys"> · gamepad works too</span>
 </div>
 <script type="module" src="main.js"></script>
 </body>

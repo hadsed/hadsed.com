@@ -44,7 +44,7 @@ export default {
 export class FlightRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    this.room = createRoom({ capacity: Number(env.ROOM_CAPACITY || 200) });
+    this.room = createRoom({ capacity: Number(env.ROOM_CAPACITY || 200), perIp: Number(env.PER_IP || 4) });
     this.timer = null;
   }
 

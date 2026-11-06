@@ -38,6 +38,14 @@ const controls = createControls({
 });
 window.__flight = { controls };   // hook for voice/gesture experiments in the console
 
+// iPad trackpads and Mac touchpads: a two-finger scroll or pinch would scroll
+// or zoom the page under the game. Safari ignores user-scalable=no, so cancel
+// the gestures themselves.
+const swallow = (e) => e.preventDefault();
+addEventListener('wheel', swallow, { passive: false });
+for (const g of ['gesturestart', 'gesturechange', 'gestureend']) addEventListener(g, swallow, { passive: false });
+addEventListener('touchmove', swallow, { passive: false });
+
 // ---- sim ----
 let jet = createJet({ heading: Math.PI * 0.25 });
 const prev = cloneJet(jet), view = cloneJet(jet);
@@ -46,16 +54,22 @@ let waggleLeft = 0;
 // ---- net ----
 const remotes = createRemotes();
 const roster = new Map();
+let welcomed = false;
 const config = await fetch(new URL('config.json', base)).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 const serverUrl = params.get('server') ?? config.server ?? null;
 const net = connect({
   url: serverUrl,
   world: world.id,
-  onSnapshot: (snap, t) => remotes.push(t, snap.entries),
+  onSnapshot: (snap, t) => remotes.push(t, snap.entries, snap.time),
   onMessage: (m) => {
     if (m.t === 'welcome') {
-      jet = createJet({ x: m.spawn.x, y: m.spawn.y, z: m.spawn.z, heading: m.spawn.heading });
-      copyJet(prev, jet);
+      // First welcome places the jet. After a reconnect, keep flying where you
+      // were; the server takes the first position it hears from a new seat.
+      if (!welcomed) {
+        jet = createJet({ x: m.spawn.x, y: m.spawn.y, z: m.spawn.z, heading: m.spawn.heading });
+        copyJet(prev, jet);
+        welcomed = true;
+      }
       remotes.clear(); roster.clear();
       $('callsign').textContent = m.callsign;
     }
@@ -92,7 +106,19 @@ function labels(camera, list) {
   for (let i = n; i < spans.length; i++) spans[i].style.display = 'none';
 }
 
-const renderer = createRenderer({ canvas, manifest, labels });
+let renderer;
+try {
+  renderer = createRenderer({ canvas, manifest, labels });
+} catch (err) {
+  // No WebGL (old device, blocked GPU, lockdown mode): say so instead of a black screen.
+  net.close();
+  $('status').textContent = 'this browser cannot draw 3D';
+  $('help').textContent = 'try another browser, or turn on hardware acceleration';
+  $('help').style.opacity = 1;
+  throw err;
+}
+Object.assign(window.__flight, { net, remotes, renderer, input: controls.read(0) });   // read() reuses one frame object
+Object.defineProperty(window.__flight, 'jet', { get: () => jet });
 renderer.setWorld(world).then(() => $('world').textContent = world.label);
 
 // ---- loop: fixed 60 Hz sim, render interpolated, send at 10 Hz ----
