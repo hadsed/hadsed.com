@@ -101,8 +101,8 @@ function decorateSite() {
 
 // The site sits on a see-through navy wash over the sky, lighter in the middle where the jet flies
 // and darker toward the edges, and the jet is framed a little below center (jy: fraction of the screen,
-// wide screens only). Had's picks from the jig. rim (renderer.rimLight) is there if the jet needs an outline.
-const WASH = { center: 0.44, edge: 0.68, w: 46, h: 40, x: 50, y: 52, rim: 0, jx: 0, jy: 0.1 };
+// wide screens only). Had's picks from the jig.
+const WASH = { center: 0.44, edge: 0.68, w: 46, h: 40, x: 50, y: 52, jx: 0, jy: 0.1 };
 const washCss = () => `html, body { background: radial-gradient(ellipse ${WASH.w}% ${WASH.h}% at ${WASH.x}% ${WASH.y}%, rgba(28, 36, 51, ${WASH.center}), rgba(28, 36, 51, ${WASH.edge}) 100%) fixed !important; }`;
 function styleSite() {
   const doc = siteDoc(); if (!doc || !doc.head) return;
@@ -113,7 +113,6 @@ function styleSite() {
 // The jet's side of the settings, pushed into the backdrop renderer.
 function styleSky() {
   const f = F(); if (!f || !f.renderer) return;
-  f.renderer.rimLight = WASH.rim;
   f.renderer.rig.frame = innerWidth >= innerHeight ? { x: WASH.jx, y: WASH.jy } : { x: 0, y: 0 };
 }
 addEventListener('resize', styleSky);

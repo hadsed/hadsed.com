@@ -60,16 +60,6 @@ export function createRenderer({ canvas, manifest, labels }) {
   // Matte, light-eating black like the real airframe's paint: no metal, almost no
   // sheen, and the packed paint (markings, panel lines, tiles) shown at full strength.
   const skin = new THREE.MeshStandardMaterial({ color: paint ? 0xffffff : 0x16171b, map: paint, roughness: 0.93, metalness: 0 });
-  // Backdrop rim light: a pale sky-colored edge on the black airframe, so its silhouette still reads
-  // under the site's dark wash. Main.js sets rim.value; it fades out as Fly glides into the chase cam.
-  const rim = { value: 0 }, rimColor = { value: new THREE.Color(0xb4c6de) };
-  skin.onBeforeCompile = (sh) => {
-    sh.uniforms.uRim = rim; sh.uniforms.uRimColor = rimColor;
-    sh.fragmentShader = 'uniform float uRim;\nuniform vec3 uRimColor;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
-      `#include <emissivemap_fragment>
-      float rimF = 1.0 - clamp(abs(dot(normalize(vViewPosition), normal)), 0.0, 1.0);
-      totalEmissiveRadiance += uRimColor * pow(rimF, 2.5) * uRim;`);
-  };
   const me = new THREE.Mesh(geo, skin);
   scene.add(me);
   const myLine = outlineMaterial({ color: gold, px: 1 });
@@ -121,7 +111,6 @@ export function createRenderer({ canvas, manifest, labels }) {
 
   return {
     renderer, scene, camera, rig, world,
-    rimLight: 0,   // backdrop rim strength (0 = none), scaled down as the rig leaves the orbit
     async setWorld(w) {
       const t = await loadHeightmap(w, manifest.base);
       world.setHeight(t.tex, { size: w.size, metersPerPixel: w.metersPerPixel, maxM: w.maxM, snowM: w.snowM, arid: w.arid ?? 0.3, encoded: false });
@@ -141,7 +130,6 @@ export function createRenderer({ canvas, manifest, labels }) {
       rig.update(me.position, tmpQ, dt, camera.aspect);
       // Gold outlines are for flying; the calm site backdrop shows plain black jets.
       meLine.visible = ghostLines.visible = rig.blend > 0.5;
-      rim.value = (this.rimLight || 0) * (1 - Math.min(Math.max(rig.blend, 0), 1));
       const camPos = camera.position;
 
       // Ground follows the camera one grid cell at a time: the core vertices land exactly on their
