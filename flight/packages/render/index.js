@@ -56,7 +56,9 @@ export function createRenderer({ canvas, manifest, labels }) {
   // jet brings its paint (geo.userData.map: markings, insignia, panel lines),
   // darkened to the airframe's black.
   const paint = geo.userData.map || null;
-  const skin = new THREE.MeshStandardMaterial({ color: paint ? 0x4a4a52 : 0x16171b, map: paint, roughness: 0.55, metalness: 0.35 });
+  // Matte, light-eating black like the real airframe's paint: no metal, almost no
+  // sheen, and the packed paint (markings, panel lines, tiles) shown at full strength.
+  const skin = new THREE.MeshStandardMaterial({ color: paint ? 0xffffff : 0x16171b, map: paint, roughness: 0.93, metalness: 0 });
   const me = new THREE.Mesh(geo, skin);
   scene.add(me);
   const myLine = outlineMaterial({ color: gold, px: 1 });
