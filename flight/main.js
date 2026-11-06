@@ -14,6 +14,9 @@ const base = new URL('./', import.meta.url);
 const params = new URLSearchParams(location.search);
 
 const manifest = await loadManifest(base);
+// Licensed jet models carry their credit and reuse terms; the license asks us to show them.
+const credit = manifest.jet.geometry?.userData.credit;
+if (credit) document.getElementById('credit').textContent = credit;
 const world = manifest.worlds.find((w) => w.id === params.get('world')) || manifest.worlds[0];
 
 // ---- controls (the SDK knows nothing about jets; we name the axes here) ----
