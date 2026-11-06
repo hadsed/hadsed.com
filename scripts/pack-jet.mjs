@@ -15,6 +15,9 @@
 // --nose  which axis the nose points along in the source (+x -x +y -y +z -z);
 //         the output always has the nose down -Z, up +Y, like the sim.
 // --up    which axis is up in the source (default +y).
+// --drop-below y   also drop every connected part (welded by position) that
+//         reaches below this height, in source units after --nose/--up. Handy
+//         when gear and open doors are merged into the same meshes as the hull.
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer";
@@ -60,8 +63,7 @@ const mul = (a, b) => { // column-major 4x4
 
 const visit = (node, parent) => {
   const name = node.getName() || "";
-  const meshName = node.getMesh()?.getName() || "";
-  if (drop && (drop.test(name) || drop.test(meshName))) { dropped.push(name || meshName); return; }
+  if (drop && drop.test(name)) { dropped.push(name); return; }
   const world = mul(parent, node.getMatrix());
   const mesh = node.getMesh();
   if (mesh) for (const prim of mesh.listPrimitives()) {
@@ -99,6 +101,26 @@ const right = [up[1] * -nose[2] - up[2] * -nose[1], up[2] * -nose[0] - up[0] * -
 const dot = (a, i, b) => a[i] * b[0] + a[i + 1] * b[1] + a[i + 2] * b[2];
 const reorient = (arr) => { for (let i = 0; i < arr.length; i += 3) { const x = dot(arr, i, right), y = dot(arr, i, up), z = -dot(arr, i, nose); arr[i] = x; arr[i + 1] = y; arr[i + 2] = z; } };
 reorient(pos); reorient(nor);
+
+if (opt("drop-below") !== undefined) {
+  const floor = Number(opt("drop-below"));
+  const n = pos.length / 3, par = new Int32Array(n).map((_, i) => i);
+  const find = (i) => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  const seen = new Map();
+  for (let i = 0; i < n; i++) {
+    const k = `${pos[i * 3].toFixed(4)},${pos[i * 3 + 1].toFixed(4)},${pos[i * 3 + 2].toFixed(4)}`;
+    if (seen.has(k)) par[find(i)] = find(seen.get(k)); else seen.set(k, i);
+  }
+  for (let t = 0; t < idx.length; t += 3) { const a = find(idx[t]); par[find(idx[t + 1])] = a; par[find(idx[t + 2])] = a; }
+  const low = new Map();
+  for (let i = 0; i < n; i++) { const r = find(i); low.set(r, Math.min(low.get(r) ?? Infinity, pos[i * 3 + 1])); }
+  const kept = [];
+  let parts = 0;
+  for (const [, y] of low) if (y < floor) parts++;
+  for (let t = 0; t < idx.length; t += 3) if (low.get(find(idx[t])) >= floor) kept.push(idx[t], idx[t + 1], idx[t + 2]);
+  dropped.push(`${parts} parts below ${floor}`);
+  idx.length = 0; idx.push(...kept);
+}
 
 // ---- center on the bounding box, scale to the requested length ----
 const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
