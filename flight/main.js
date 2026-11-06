@@ -95,6 +95,14 @@ if (!serverUrl) $('status').textContent = 'solo flight';
 const labelsEl = $('labels');
 const spans = [];
 const proj = new THREE.Vector3();
+// Aviation units, like the altimeter: feet up close, nautical miles beyond.
+function range(m) {
+  const ft = m * 3.281;
+  if (ft < 6000) return `${Math.round(ft / 10) * 10} ft`;
+  const nm = m / 1852;
+  return `${nm < 10 ? nm.toFixed(1) : Math.round(nm)} nm`;
+}
+
 function labels(camera, list) {
   let n = 0;
   const w = innerWidth, h = innerHeight;
@@ -109,7 +117,7 @@ function labels(camera, list) {
     s.style.display = '';
     s.style.left = `${(proj.x * 0.5 + 0.5) * w}px`;
     s.style.top = `${(-proj.y * 0.5 + 0.5) * h}px`;
-    s.textContent = `${r.callsign || ''} ${d < 10000 ? Math.round(d) + ' m' : (d / 1000).toFixed(0) + ' km'}`;
+    s.textContent = `${r.callsign || ''} ${range(d)}`;
     s.className = follow && r.id === follow.id ? 'on' : '';
     n++;
   }
@@ -237,7 +245,7 @@ function followAxes(axes) {
   const d = escort(followIntent, jet, r.view, follow.side);
   const el = $('following');
   el.hidden = false;
-  el.textContent = `following ${r.callsign || ''}${d > 1500 ? ` · ${d < 10000 ? Math.round(d) + ' m' : (d / 1000).toFixed(0) + ' km'}` : ''}`;
+  el.textContent = `following ${r.callsign || ''}${d > 1500 ? ` · ${range(d)}` : ''}`;
   return followIntent;
 }
 Object.assign(window.__flight, { startFollow, stopFollow });
