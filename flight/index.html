@@ -27,7 +27,9 @@
   #following { margin-top: 14px; }
   #unfollow { pointer-events: auto; font: inherit; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; margin-left: 10px; padding: 3px 8px; opacity: 0.75; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #labels span.on { opacity: 1; }
-  #log { margin-top: 14px; font-size: 10px; line-height: 1.7; max-width: min(60vw, 360px); }
+  /* Hangs below the top-left items without widening them: on narrow phones a 60vw-wide #tl ran
+     under the count at top right. */
+  #log { position: absolute; left: 0; top: 100%; width: min(60vw, 360px); margin-top: 14px; font-size: 10px; line-height: 1.7; }
   .logline { opacity: 0; transform: translateY(-4px); transition: opacity .35s ease, transform .35s ease; color: var(--dim); }
   .logline::before { content: '› '; color: var(--gold); }
   .logline.on { opacity: 1; transform: none; }
