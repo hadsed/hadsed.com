@@ -4,8 +4,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
-import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
-const STORE = 'sr71-backdrop-v5';   // v5: navy monotone with ground color showing through
+import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS, DAY_LOOK, NIGHT_LOOK } from './world/index.js';
+const STORE = 'sr71-backdrop-v6';   // v6: night flight (stars, afterglow, city lights)
 
 // ---------- settings ----------
 const PRESETS = {
@@ -29,8 +29,9 @@ const STYLES = {
 };
 // Defaults = the look Had landed on 2026-11-05 (iPad), with altitude at the SR-71's ~85k ft ceiling.
 // The look itself (tone, scene, ground) lives in the shared world module, so the flight lab matches.
+const TIMES = { night: NIGHT_LOOK, day: DAY_LOOK };
 const DEFAULTS = {
-  preset: 'site', ...WORLD_DEFAULTS, style: 'navycolor',
+  preset: 'site', ...WORLD_DEFAULTS, ...NIGHT_LOOK, style: 'navycolor', time: 'night',
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -84,7 +85,7 @@ async function loadRegion(id) {
 // Original low-poly proxy (same blocking as the directing room). Local forward is -Z. Not flight-accurate.
 const nearScene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(34, 1, 0.5, 4000);
-nearScene.add(new THREE.HemisphereLight(0x9fb0cc, 0x4a505a, 2.0));
+const hemi = new THREE.HemisphereLight(0x9fb0cc, 0x4a505a, 2.0); nearScene.add(hemi);
 const sunLight = new THREE.DirectionalLight(0xffffff, 3.2); nearScene.add(sunLight);
 const bounce = new THREE.DirectionalLight(0x8090a8, 0.6); bounce.position.set(0, -100, 0); nearScene.add(bounce);
 
@@ -177,6 +178,9 @@ function apply() {
   world.setLook(S);
   post.setLook(S);
   sunLight.position.copy(sunDir).multiplyScalar(100);
+  // at night the jet is a dark shape against the stars: a little moonlight and sky, no sun
+  const night = +S.night || 0;
+  sunLight.intensity = 3.2 * (1 - night); hemi.intensity = 2.0 * (1 - 0.82 * night); bounce.intensity = 0.6 * (1 - 0.7 * night);
   const altitude = S.altitudeFt * 0.3048;
   const reg = REGIONS[S.region];
   if (reg) origin.set((S.offsetX ?? reg.peakKm[0]) * 1000, altitude, (S.offsetZ ?? reg.peakKm[1]) * 1000);
@@ -320,6 +324,16 @@ const SPEC = [
     ['vignette', 'range', { label: 'Vignette', min: 0, max: 1.2, step: 0.01 }],
     ['grain', 'range', { label: 'Grain', min: 0, max: 0.08, step: 0.001 }],
   ]],
+  ['Night', [
+    ['time', 'select', { label: 'Time of day', options: [['night', 'Night flight'], ['day', 'Day']] }],
+    ['night', 'range', { label: 'Night', min: 0, max: 1, step: 0.01 }],
+    ['stars', 'range', { label: 'Stars', min: 0, max: 3, step: 0.01 }],
+    ['milky', 'range', { label: 'Milky Way', min: 0, max: 2, step: 0.01 }],
+    ['afterglow', 'range', { label: 'Afterglow at the horizon', min: 0, max: 3, step: 0.01 }],
+    ['city', 'range', { label: 'City lights', min: 0, max: 3, step: 0.01 }],
+    ['moonAz', 'range', { label: 'Moon direction (°)', min: 0, max: 360, step: 1 }],
+    ['moonEl', 'range', { label: 'Moon height (°)', min: 0, max: 80, step: 1 }],
+  ]],
   ['Scene', [
     ['region', 'select', { label: 'Region', options: [['sierra', 'Sierra Nevada'], ['alps', 'Alps, Valais'], ['himalaya', 'Himalaya, Everest'], ['grandcanyon', 'Grand Canyon'], ['denali', 'Alaska Range, Denali']] }],
     ['altitudeFt', 'range', { label: 'Altitude (ft)', min: 20000, max: 85000, step: 500 }],
@@ -327,7 +341,7 @@ const SPEC = [
     ['offsetX', 'range', { label: 'Jet position E–W (km)', min: -140, max: 140, step: 0.5 }],
     ['offsetZ', 'range', { label: 'Jet position N–S (km)', min: -140, max: 140, step: 0.5 }],
     ['sunAz', 'range', { label: 'Sun direction (°)', min: 0, max: 360, step: 1 }],
-    ['sunEl', 'range', { label: 'Sun height (°)', min: -4, max: 70, step: 0.5 }],
+    ['sunEl', 'range', { label: 'Sun height (°)', min: -18, max: 70, step: 0.5 }],
     ['haze', 'range', { label: 'Visibility (km)', min: 40, max: 600, step: 5 }],
     ['clouds', 'range', { label: 'Cloud cover', min: 0, max: 1, step: 0.01 }],
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
@@ -398,6 +412,7 @@ function build() {
         S[key] = v;
         if (key === 'preset' && PRESETS[v]) Object.assign(S, PRESETS[v]);
         if (key === 'style' && STYLES[v]) Object.assign(S, STYLES[v]);
+        if (key === 'time' && TIMES[v]) Object.assign(S, TIMES[v]);
         if (key === 'region') { S.offsetX = null; S.offsetZ = null; }
         if (['shadow', 'mid', 'light', 'highlight'].includes(key)) S.preset = 'custom';
         sync(); apply();

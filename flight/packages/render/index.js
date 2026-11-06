@@ -28,7 +28,8 @@ export function createRenderer({ canvas, manifest, labels }) {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, 1, 2, 2.0e6);
-  scene.add(new THREE.HemisphereLight(0x8a9bbd, 0x1c2433, 1.2));
+  const hemi = new THREE.HemisphereLight(0x8a9bbd, 0x1c2433, 1.2);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff2d6, 2.4);
   sun.position.set(0.4, 1, 0.3);
   scene.add(sun);
@@ -47,6 +48,9 @@ export function createRenderer({ canvas, manifest, labels }) {
   scene.add(world.sky, world.terrain);
   if (!software) scene.add(world.clouds);
   sun.position.copy(world.sunDir);
+  // Night flight: the jets go dark against the stars, with a little moon and sky light left.
+  const night = +world.look.night || 0;
+  sun.intensity = 2.4 * (1 - 0.9 * night); hemi.intensity = 1.2 * (1 - 0.6 * night);
   const shift = new THREE.Vector2();
   const groundO = new THREE.Vector3();
 
@@ -132,13 +136,14 @@ export function createRenderer({ canvas, manifest, labels }) {
       meLine.visible = ghostLines.visible = rig.blend > 0.5;
       const camPos = camera.position;
 
-      // Ground follows the camera one grid cell at a time: the core vertices land exactly on their
-      // neighbors' spots, so the terrain under you never visibly changes. groundOffset (the site
-      // backdrop) slides the whole world under the jets, so the ground can drift slower than the
-      // jets really fly; the snap stays on the world's own grid.
-      const snap = world.cellSize, go = this.groundOffset;
+      // The ground grid slides with the camera continuously. Each vertex reads heights pre-filtered to
+      // its own spacing (world module), so nothing snaps. (Snapping the grid a cell at a time only kept
+      // the uniform core still; everything past it, which is nearly all you see from altitude, re-meshed
+      // on every snap: a visible jump about twice a second at Mach 3.) groundOffset (the site backdrop)
+      // slides the whole world under the jets, so the ground can drift slower than the jets really fly.
+      const go = this.groundOffset;
       const ox = go ? go[0] : 0, oz = go ? go[2] : 0;
-      shift.set(Math.round((camPos.x + ox) / snap) * snap - ox, Math.round((camPos.z + oz) / snap) * snap - oz);
+      shift.set(camPos.x, camPos.z);
       groundO.set(ox, 0, oz);
       world.frame(camera, go ? groundO : null, shift);
       world.uniforms.uMono.value = 1 - Math.min(Math.max(rig.blend, 0), 1);
