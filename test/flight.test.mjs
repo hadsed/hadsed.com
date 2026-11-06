@@ -224,16 +224,26 @@ test('controls: tilt is relative to the grip when enabled, right and toward you 
   assert.deepEqual({ ...c.read().axes }, { roll: 0, pitch: 0 });
 });
 
-test('assist: point right and the jet banks itself, turns, then rolls level on the new heading', () => {
+test('assist: stick right banks and turns; let go and it levels out where it is', () => {
   const j = createJet({ heading: 0 });
   const a = createAssist();
   const it = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
   let maxBank = 0;
   for (let i = 0; i < 60; i++) { step(j, a.update(it, j, 1, 0)); maxBank = Math.max(maxBank, -rightOf(j.q, [0, 0, 0])[1]); }  // 1 s of full right
   assert.ok(maxBank > 0.3, 'banked right without any roll input from the player');
-  for (let i = 0; i < 60 * 20; i++) step(j, a.update(it, j, 0, 0));                  // hands off
-  const turned = headingOf(j.q);
-  assert.ok(turned < -0.6 && turned > -1.6, `settled on a heading to the right (${turned.toFixed(2)} rad)`);
+  const atRelease = headingOf(j.q);
+  assert.ok(atRelease < -0.05, 'turned right');
+  for (let i = 0; i < 60 * 5; i++) step(j, a.update(it, j, 0, 0));                   // hands off
+  assert.ok(Math.abs(headingOf(j.q) - atRelease) < 0.2, 'no runaway turn after letting go');
   assert.ok(Math.abs(rightOf(j.q, [0, 0, 0])[1]) < 0.05, 'wings level again');
   assert.ok(Math.abs(fwd(j)[1]) < 0.05, 'nose level again');
+});
+
+test('assist: a correction the other way takes effect at once', () => {
+  const j = createJet({ heading: 0 });
+  const a = createAssist();
+  const it = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+  for (let i = 0; i < 48; i++) step(j, a.update(it, j, 0.6, 0));
+  for (let i = 0; i < 30; i++) step(j, a.update(it, j, -0.6, 0));
+  assert.ok(rightOf(j.q, [0, 0, 0])[1] > 0.1, 'banked left within half a second');
 });

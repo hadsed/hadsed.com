@@ -10,7 +10,8 @@
 <link rel="modulepreload" href="vendor/three.module.js">
 <style>
   :root { --sky: #0f1520; --gold: #e4c56f; --dim: #8592a8; }
-  html, body { margin: 0; height: 100%; background: var(--sky); color: var(--gold); overflow: hidden; overscroll-behavior: none; }
+  html, body { margin: 0; height: 100%; background: var(--sky); color: var(--gold); overflow: hidden; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   body { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.08em; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   .hud { position: fixed; pointer-events: none; text-transform: uppercase; }
@@ -53,7 +54,7 @@
 <button id="tilt" type="button" hidden>tilt</button>
 <!-- Only shown when the browser cannot draw 3D. -->
 <div class="hud" id="help" hidden>
-  <span class="keys">WASD or arrows aim · R/F throttle · Space boost · E wave<br>or </span>drag toward where you want to go<span class="keys"> · gamepad works too</span>
+  <span class="keys">WASD or arrows steer · R/F throttle · Space boost · E wave<br>or </span>drag to steer, let go to level out<span class="keys"> · gamepad works too</span>
 </div>
 <script type="module" src="main.js"></script>
 </body>

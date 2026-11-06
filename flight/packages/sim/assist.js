@@ -4,9 +4,10 @@
 // pitches the jet toward it. Bots use it, follow mode uses it, and the
 // point-to-steer controls below use it.
 //
-// createAssist() is Sabre-style steering (Halo: Reach): the player moves an
-// aim direction, and the jet chases it, banking into the turn on its own and
-// rolling level when it gets there. The player never manages roll.
+// createAssist() is a self-centering assist. Stick deflection means "turn
+// that way, this hard": the jet banks into the turn on its own, and the
+// moment you let go it rolls wings level and holds the heading it has. There
+// is no hidden aim point to chase, so a correction always takes effect at once.
 import { forwardOf, rightOf, rotate, clamp } from './index.js';
 
 const f = [0, 0, 0], r = [0, 0, 0], loc = [0, 0, 0];
@@ -34,33 +35,22 @@ export function headingOf(q) {
   return Math.atan2(-f[0], -f[2]);
 }
 
-const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-
 // const assist = createAssist();
 // assist.update(intent, jet, aimX, aimY, dt)   // aimX + right, aimY + up, in [-1, 1]
 // assist.direction(out)                         // where the reticle points
-export function createAssist({ rate = 1.3, maxAhead = 0.75, maxPitch = 0.45, settle = 0.12 } = {}) {
+export function createAssist({ maxTurn = 0.45, maxPitch = 0.3, gain = 1.1 } = {}) {
   const aim = { yaw: null, pitch: 0 };
+  const dir = [0, 0, 0];
   const api = {
     aim,
-    // Point the aim where the nose already is (after follow mode, a respawn).
-    reset(jet) {
-      aim.yaw = headingOf(jet.q);
-      forwardOf(jet.q, f);
-      aim.pitch = clamp(Math.asin(clamp(f[1], -1, 1)), -maxPitch, maxPitch);
-    },
+    reset(jet) { aim.yaw = headingOf(jet.q); aim.pitch = 0; },
     update(intent, jet, ax = 0, ay = 0, dt = 1 / 60) {
-      if (aim.yaw === null) api.reset(jet);
-      // The stick moves the aim; the aim stays put when you let go.
-      aim.yaw -= ax * rate * dt;
-      if (Math.abs(ay) > 0.05) aim.pitch += ay * rate * 0.6 * dt;
-      else aim.pitch -= Math.sign(aim.pitch) * Math.min(Math.abs(aim.pitch), settle * dt);   // drift back to level
-      aim.pitch = clamp(aim.pitch, -maxPitch, maxPitch);
-      // Keep the aim within reach of the nose so it can't wander behind you.
-      const h = headingOf(jet.q);
-      aim.yaw = h + clamp(wrap(aim.yaw - h), -maxAhead, maxAhead);
+      // Soft center: small deflections do very little, full stick turns hard.
+      const soft = (v) => Math.sign(v) * Math.abs(v) ** 1.6;
+      aim.yaw = headingOf(jet.q) - soft(ax) * maxTurn;
+      aim.pitch = soft(ay) * maxPitch;
       const d = api.direction(dir);
-      steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, 2.2);
+      steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, gain);
       intent.yaw = 0;
       return intent;
     },
@@ -72,6 +62,5 @@ export function createAssist({ rate = 1.3, maxAhead = 0.75, maxPitch = 0.45, set
       return out;
     },
   };
-  const dir = [0, 0, 0];
   return api;
 }

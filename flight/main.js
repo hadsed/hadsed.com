@@ -26,9 +26,9 @@ const canvas = $('view');
 // Sabre-style steering (Halo: Reach): every input moves an aim point, and the
 // jet turns toward it, banking on its own. aimX + is right, aimY + is up.
 // Phones and tablets can also aim by tilting; off until TILT is tapped.
-const tilter = tilt({ x: 'aimX', y: 'aimY', range: 25 });
+const tilter = tilt({ x: 'aimX', y: 'aimY', range: 35 });
 // Drag toward where you want to go.
-const stick = pointerStick({ element: canvas, x: 'aimX', y: 'aimY', invertY: true, radius: Math.min(innerWidth, innerHeight) * 0.18 });
+const stick = pointerStick({ element: canvas, x: 'aimX', y: 'aimY', invertX: true, radius: Math.min(innerWidth, innerHeight) * 0.24 });
 const buttons = scripted('buttons');   // on-screen BOOST
 const controls = createControls({
   axes: ['aimX', 'aimY', 'throttle'],
@@ -52,7 +52,10 @@ const controls = createControls({
 });
 const assist = createAssist();
 const aimIntent = { pitch: 0, roll: 0, yaw: 0, throttle: 0, boost: false };
-window.__flight = { controls, assist };   // hook for voice/gesture experiments in the console
+window.__flight = { controls, assist };
+// A long press on a phone would open the select / save-image menu; flying needs the whole screen.
+addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('selectstart', (e) => e.preventDefault());   // hook for voice/gesture experiments in the console
 
 // iPad trackpads and Mac touchpads: a two-finger scroll or pinch would scroll
 // or zoom the page under the game. Safari ignores user-scalable=no, so cancel
