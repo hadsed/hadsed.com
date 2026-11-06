@@ -29,7 +29,8 @@
     font: 10px/1 var(--mono); letter-spacing: .16em; color: var(--glow); background: none; border: 0; padding: 10px 2px; cursor: pointer;
     opacity: 0; pointer-events: none; transition: opacity .6s .6s, color .2s; -webkit-tap-highlight-color: transparent; }
   /* gold like the flight HUD, which has no gray text */
-  #exit:hover, #exit:focus-visible { opacity: 1 !important; }
+  /* only while flying: a tapped button keeps :hover on touch screens, which kept it on over the site */
+  body.flying #exit:hover, body.flying #exit:focus-visible { opacity: 1; }
   body.flying #exit { opacity: .7; pointer-events: auto; }
 </style>
 </head>
@@ -37,7 +38,7 @@
 <!-- tilt steering needs the motion sensors; the frame is created by script so its src waits for the site -->
 <iframe id="sky" title="Fly" tabindex="-1" allow="gamepad; fullscreen; accelerometer; gyroscope"></iframe>
 <iframe id="site" title="Had Seddiqi"></iframe>
-<button id="exit" aria-label="Back to the website">ESC · BACK</button>
+<button id="exit" >Back to site</button>
 <script>
 const $ = (s) => document.querySelector(s);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -179,6 +180,7 @@ function leave() {
   state = 'site';
   document.body.classList.remove('flying');
   f.land();
+  $('#exit').blur();
   skyFrame.tabIndex = -1;
   site.focus();
 }
