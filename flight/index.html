@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Flight lab</title>
+<!-- The import map must come before any module load or preload; Firefox ignores a late one. -->
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<link rel="modulepreload" href="vendor/three.module.js">
+<style>
+  :root { --sky: #0f1520; --gold: #e4c56f; --dim: #8592a8; }
+  html, body { margin: 0; height: 100%; background: var(--sky); color: var(--gold); overflow: hidden; overscroll-behavior: none; }
+  body { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.08em; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .hud { position: fixed; pointer-events: none; text-transform: uppercase; }
+  #tl { top: max(14px, env(safe-area-inset-top)); left: 16px; }
+  #tr { top: max(14px, env(safe-area-inset-top)); right: 16px; text-align: right; }
+  #bl { bottom: max(14px, env(safe-area-inset-bottom)); left: 16px; }
+  #help { bottom: max(14px, env(safe-area-inset-bottom)); right: 16px; text-align: right; color: var(--dim); transition: opacity 1s; }
+  /* Phones: no keyboard, and the key list would run into the altimeter. */
+  @media (max-width: 700px) { #help .keys { display: none; } }
+  .dim { color: var(--dim); }
+  #labels span { position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
+  #stick { position: fixed; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px solid var(--gold); pointer-events: none; display: none; }
+  #thr { display: inline-block; width: 80px; height: 3px; background: #2a3448; vertical-align: middle; margin-left: 6px; }
+  #thr i { display: block; height: 100%; background: var(--gold); }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="labels"></div>
+<div id="stick"></div>
+<div class="hud" id="tl"><div id="callsign">—</div><div class="dim" id="status">loading</div></div>
+<div class="hud" id="tr"><div id="aloft"></div><div class="dim" id="world"></div></div>
+<div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
+<div class="hud" id="help">
+  <span class="keys">W/S pitch · A/D roll · Q/E yaw · R/F throttle · Space wave<br>or </span>drag anywhere to fly<span class="keys"> · gamepad works too</span>
+</div>
+<script type="module" src="main.js"></script>
+</body>
+</html>
