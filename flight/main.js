@@ -44,7 +44,7 @@ const controls = createControls({
     keyboard({
       axes: {
         aimX: [['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']],
-        aimY: [['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']],
+        aimY: [['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']],   // like a stick: forward dives, back climbs
         throttle: ['KeyF', 'KeyR'],
       },
       actions: { boost: ['Space', 'ShiftLeft', 'ShiftRight'], waggle: 'KeyE' },
@@ -52,7 +52,7 @@ const controls = createControls({
     }),
     stick,
     // Right stick aims, left stick forward/back is throttle, A boosts, B waves.
-    gamepad({ axes: { aimX: 2, aimY: 3, throttle: 1 }, invert: { aimY: true, throttle: true }, buttons: { boost: 0, waggle: 1 } }),
+    gamepad({ axes: { aimX: 2, aimY: 3, throttle: 1 }, invert: { throttle: true }, buttons: { boost: 0, waggle: 1 } }),
     tilter,
     buttons,
   ],
@@ -206,7 +206,8 @@ function frame(nowMs) {
   if (attract) calmRemotes(dt);
 
   if (attract && !window.__flight.ready && readyAt) placeBackdrop(nowMs);
-  renderer.draw({ self: view, remotes: remoteList, time: nowMs / 1000, dt });
+  const lead = follow && !attract ? remotes.remotes.get(follow.id)?.view : null;
+  renderer.draw({ self: view, remotes: remoteList, time: nowMs / 1000, dt, focus: lead ? lead.pos : null });
 
   $('alt').textContent = `alt ${Math.round(jet.pos[1] * 3.281).toLocaleString()} ft`;
   $('mach').textContent = `mach ${(jet.speed / 295).toFixed(2)}`;
@@ -308,10 +309,12 @@ function rumble(on) {
 function flyIntent(input) {
   const a = input.axes;
   // Follow stays on through stick, throttle and boost; it ends only on purpose
-  // (the leave button, X, or tapping the same jet again). Boost still works.
+  // (the leave button, X, or tapping the same jet again). While you steer, you
+  // fly; let go and the autopilot takes you back to your slot. Boost still works.
   if (follow) {
     const it = followAxes();
-    if (it) { it.boost = it.boost || input.actions.boost; assist.reset(jet); return it; }
+    const steering = Math.abs(a.aimX) > 0.08 || Math.abs(a.aimY) > 0.08;
+    if (it && !steering) { it.boost = it.boost || input.actions.boost; assist.reset(jet); return it; }
   }
   assist.update(aimIntent, jet, a.aimX, a.aimY, STEP);
   aimIntent.throttle = a.throttle;

@@ -38,6 +38,7 @@ export function createCameraRig(camera, {
   const rig = {
     blend: 1, target: 1,                    // chase by default; the backdrop sets both to 0
     boosting: false,                        // set each frame; eases the boost pull-back in and out
+    focus: null,                            // a Vector3 to keep in frame too (the jet you follow), or null
     orbit: { yaw: 0, pitch: 0, spin: 0 },   // yaw/pitch: gesture offsets; spin: accumulated drift
     get moving() { return rig.blend !== rig.target; },
     // Snap the chase cam onto the jet (respawn, first frame).
@@ -50,7 +51,8 @@ export function createCameraRig(camera, {
   // at Mach 2.7, more on boost), which left the jet a speck 200 m ahead.
   const camOff = new THREE.Vector3(), lookOff = new THREE.Vector3(), camUp = new THREE.Vector3(0, 1, 0);
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
-  let ready = false, bk = 0;
+  let ready = false, bk = 0, fw = 0;
+  const focusPt = new THREE.Vector3();
   // The orbit follows the jet's heading slowly, so autopilot turns don't whip it around.
   let heading = null;
 
@@ -73,6 +75,14 @@ export function createCameraRig(camera, {
     camUp.lerp(up, ready ? 1 - Math.exp(-dt * 3) : 1).normalize();
     camPos.copy(jetPos).add(camOff);
     camLook.copy(jetPos).add(lookOff);
+    // Following: swing the eye toward the leader so it stays on screen, framing
+    // both jets, and pull back a little so both fit.
+    fw += ((rig.focus ? 1 : 0) - fw) * (1 - Math.exp(-dt * 1.5));
+    if (rig.focus) focusPt.copy(rig.focus);
+    if (fw > 0.001) {
+      camLook.lerp(focusPt, 0.5 * fw);
+      camPos.addScaledVector(camOff, 0.35 * fw);
+    }
 
     // ---- orbit pose, in the jet's (smoothed) heading frame ----
     const h = Math.atan2(-fwd.x, -fwd.z);

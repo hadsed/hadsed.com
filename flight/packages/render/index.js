@@ -92,6 +92,7 @@ export function createRenderer({ canvas, manifest, labels }) {
   const rig = createCameraRig(camera);
   const tmpQ = new THREE.Quaternion(), wag = new THREE.Quaternion(), m4 = new THREE.Matrix4();
   const v = new THREE.Vector3(), s1 = new THREE.Vector3(1, 1, 1);
+  const focusV = new THREE.Vector3();
 
   function viewQuat(jet, time, out) {
     out.set(jet.q[0], jet.q[1], jet.q[2], jet.q[3]);
@@ -115,7 +116,7 @@ export function createRenderer({ canvas, manifest, labels }) {
       world.setHeight(t.tex, { size: w.size, metersPerPixel: w.metersPerPixel, maxM: w.maxM, snowM: w.snowM, arid: w.arid ?? 0.3, encoded: false });
       world.setLook({ exag: t.exaggeration });
     },
-    draw({ self, remotes, time, dt }) {
+    draw({ self, remotes, time, dt, focus = null }) {   // focus: [x, y, z] to keep in frame, or null
       // Your jet
       viewQuat(self, time, tmpQ);
       me.position.set(self.pos[0], self.pos[1], self.pos[2]);
@@ -125,6 +126,7 @@ export function createRenderer({ canvas, manifest, labels }) {
       myLine.px.value = 1 * dpr(); ghostLine.px.value = 1.6 * dpr();
 
       rig.boosting = (self.flags & FLAG.BOOST) !== 0;
+      rig.focus = focus ? focusV.set(focus[0], focus[1], focus[2]) : null;
       rig.update(me.position, tmpQ, dt, camera.aspect);
       // Gold outlines are for flying; the calm site backdrop shows plain black jets.
       meLine.visible = ghostLines.visible = rig.blend > 0.5;

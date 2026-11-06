@@ -20,13 +20,15 @@ export function steerTo(intent, jet, tx, ty, tz, aggressive = 1, maxNose = 0.35)
   forwardOf(q, f); rightOf(q, r);
   const bank = Math.asin(clamp(-r[1], -1, 1));
   const nose = Math.asin(clamp(f[1], -1, 1));
-  const ahead = -loc[2], side = loc[0], up = loc[1];
+  const ahead = -loc[2], side = loc[0];
   const heading = Math.atan2(side, ahead);                 // + means target is to the right
   const wantBank = clamp(heading * 1.6 * aggressive, -1.0, 1.0);
   intent.roll = clamp((wantBank - bank) * 2.5, -1, 1);
-  // The target's elevation is measured from the nose (jet frame), so add the
-  // nose's own pitch to get the climb angle wanted, then cap it.
-  const wantNose = clamp(nose + Math.atan2(up, Math.hypot(side, ahead)), -maxNose, maxNose);
+  // Climb angle wanted: the target's elevation in the world, not in the jet's
+  // frame (banked, a point off to the side reads as "up" and the jet would climb
+  // in every hard turn).
+  const dx = tx - jet.pos[0], dy = ty - jet.pos[1], dz = tz - jet.pos[2];
+  const wantNose = clamp(Math.atan2(dy, Math.hypot(dx, dz)), -maxNose, maxNose);
   intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
   return intent;
 }
@@ -40,7 +42,7 @@ export function headingOf(q) {
 // const assist = createAssist();
 // assist.update(intent, jet, aimX, aimY, dt)   // aimX + right, aimY + up, in [-1, 1]
 // assist.direction(out)                         // where the reticle points
-export function createAssist({ maxTurn = 0.45, maxPitch = 0.6, gain = 1.1 } = {}) {
+export function createAssist({ maxTurn = 0.75, maxPitch = 0.85, gain = 1.1 } = {}) {
   const aim = { yaw: null, pitch: 0 };
   const dir = [0, 0, 0];
   const api = {
