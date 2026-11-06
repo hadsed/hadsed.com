@@ -1,0 +1,20 @@
+<!-- Source for src/assets/og.jpg, the 1200x630 link-preview image.
+     Put the full-size toned photo next to this file as photo.jpg, open it in a
+     1200x630 viewport (or headless Chromium), and screenshot as JPEG. -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:Petrona;font-weight:300;src:url(https://fonts.gstatic.com/s/petrona/v38/mtGl4_NXL7bZo9XXq35wRLONYyOjFk7TsQRB.ttf)}
+html,body{margin:0}
+body{width:1200px;height:630px;background:#1c2433;display:grid;grid-template-columns:630px 1fr;align-items:center}
+img{width:630px;height:630px;object-fit:cover;display:block}
+.t{display:flex;justify-content:center}
+.b{display:flex;flex-direction:column;gap:30px}
+h1{margin:0;font:300 118px/.98 Petrona,serif;color:#e6e9ed;letter-spacing:-.5px}
+p{margin:0;font:30px/1 Verdana,sans-serif;color:#8a919c;letter-spacing:.5px}
+</style></head><body><img src="photo.jpg"><div class="t"><div class="b"><h1>Had<br>Seddiqi</h1><p>hadsed.com</p></div></div>
+<script>
+document.fonts.ready.then(()=>{const c=document.createElement('canvas').getContext('2d');
+c.font='300 118px Petrona';const h=c.measureText('H').actualBoundingBoxLeft;
+c.font='30px Verdana';const u=c.measureText('h').actualBoundingBoxLeft;
+// actualBoundingBoxLeft is positive when ink extends left of origin; shift URL so both ink edges match
+document.querySelector('p').style.marginLeft=(u-h)+'px';document.title=[h,u].join(',');});
+</script></body></html>
