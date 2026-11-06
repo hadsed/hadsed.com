@@ -37,9 +37,9 @@ export function createRenderer({ canvas, manifest, labels }) {
   // Drawn straight to the screen (no post pass): the world shaders tone themselves, the sky to the
   // palette, the ground in natural color.
   const coarse = matchMedia('(pointer: coarse)').matches;
-  // 256 x 256 with the density pulled in under the camera: same ~350 m spacing nearby, a quarter of
-  // the vertices (software GL and weak phones are vertex-bound here).
-  const world = createWorld({ segments: 256, near: 0.06 });
+  // 256 x 256 with a uniform 350 m core: a quarter of the backdrop's vertices (software GL and weak
+  // phones are vertex-bound here).
+  const world = createWorld({ segments: 256, cell: 350, flat: 0.375 });
   // The backdrop's look (navy monotone, ground color showing through). The monotone follows the camera
   // rig: full in the backdrop orbit, fading to natural color as Fly glides into the chase cam.
   world.setLook({ ...WORLD_DEFAULTS });
@@ -127,8 +127,9 @@ export function createRenderer({ canvas, manifest, labels }) {
       rig.update(me.position, tmpQ, dt, camera.aspect);
       const camPos = camera.position;
 
-      // Ground follows the camera in whole grid cells so lines don't swim.
-      const snap = 2500;
+      // Ground follows the camera one grid cell at a time: the core vertices land exactly on their
+      // neighbors' spots, so the terrain under you never visibly changes.
+      const snap = world.cellSize;
       shift.set(Math.round(camPos.x / snap) * snap, Math.round(camPos.z / snap) * snap);
       world.frame(camera, null, shift);
       world.uniforms.uMono.value = 1 - Math.min(Math.max(rig.blend, 0), 1);
