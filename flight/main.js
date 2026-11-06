@@ -210,8 +210,8 @@ function frame(nowMs) {
   $('alt').textContent = `alt ${Math.round(jet.pos[1] * 3.281).toLocaleString()} ft`;
   $('mach').textContent = `mach ${(jet.speed / 295).toFixed(2)}`;
   thr.style.width = `${Math.round(jet.throttle * 100)}%`;
-  const aloft = net.state.status === 'online' ? roster.size + 1 : 1;
-  $('aloft').textContent = `${aloft} aloft`;
+  const others = net.state.status === 'online' ? roster.size : 0;
+  $('aloft').textContent = `${others} other${others === 1 ? '' : 's'} in flight`;
   const st = stick.state;
   stickDot.style.display = st ? 'block' : 'none';
   if (st) { stickDot.style.left = `${st.cur.x}px`; stickDot.style.top = `${st.cur.y}px`; }

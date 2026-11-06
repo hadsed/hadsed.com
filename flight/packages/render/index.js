@@ -125,6 +125,8 @@ export function createRenderer({ canvas, manifest, labels }) {
 
       rig.boosting = (self.flags & FLAG.BOOST) !== 0;
       rig.update(me.position, tmpQ, dt, camera.aspect);
+      // Gold outlines are for flying; the calm site backdrop shows plain black jets.
+      meLine.visible = ghostLines.visible = rig.blend > 0.5;
       const camPos = camera.position;
 
       // Ground follows the camera in whole grid cells so lines don't swim.
