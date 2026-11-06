@@ -33,7 +33,7 @@ export const SLOTS = {
   wide: { right: 270, ahead: 480, up: 90 },
   tall: { right: 400, ahead: 410, up: 14 },
 };
-const NEAR = 60000;   // only bother with jets this close
+const NEAR = 8000;    // only keep company with jets this close; chasing a far one means long hard turns
 // The backdrop sits behind text people are reading, so it keeps company only with
 // jets flying calmly: not boosting, turning under 2.5 deg/s. Anyone busier is left alone.
 const CALM_TURN = 2.5 * Math.PI / 180;
@@ -136,7 +136,7 @@ export function createAttractPilot({ home = HOME, rng = Math.random, slot: SLOT 
       let lead = me.lead !== null ? remotes.find((r) => r.id === me.lead && r.view && r.visible) : null;
       // Its attitude is drawn eased and its boost not at all, so a busy moment is fine;
       // only let it go once it has pulled well away from the slot.
-      if (lead && api.gap(jet) > 5000) { lead = null; me.lead = null; me.leadFor = 0; }
+      if (lead && api.gap(jet) > 6000) { lead = null; me.lead = null; me.leadFor = 0; }
       if (!lead || me.leadFor <= 0) {
         const n = nearest(jet, remotes);
         if (n && n !== lead) { lead = n; me.lead = n.id; me.leadFor = 90 + rng() * 120; }
