@@ -165,7 +165,7 @@ async function run(browser, site, cfg) {
     // Drag and hold: the stick axis the game reads must follow the finger.
     // (Measured on the input itself; altitude would be muddied by whatever the
     // jet was already doing.)
-    const pitch = () => page.evaluate(() => window.__flight.input.axes.pitch);
+    const pitch = () => page.evaluate(() => window.__flight.input.axes.aimY ?? window.__flight.input.axes.pitch);
     // Poll rather than sample once: the first frames after a press can lag on a
     // busy software-rendered runner.
     const waitPitch = async (ok, ms = 1500) => {
