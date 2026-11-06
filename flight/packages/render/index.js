@@ -5,6 +5,7 @@
 // r.draw({ self, remotes, time, dt });   // self: jet view; remotes: [{ id, view, callsign }]
 import * as THREE from 'three';
 import { jetGeometry, loadHeightmap } from '../assets/index.js';
+import { createWorld, WORLD_DEFAULTS } from '../world/index.js';
 import { createContrails } from './contrails.js';
 import { createCameraRig } from './camera.js';
 
@@ -25,55 +26,16 @@ export function createRenderer({ canvas, manifest, labels }) {
   sun.position.set(0.4, 1, 0.3);
   scene.add(sun);
 
-  // ---- terrain: one grid that follows the camera, heights from the world's map ----
-  const terrainU = {
-    uHeight: { value: null }, uWidth: { value: 250000 }, uMaxH: { value: 4300 }, uExag: { value: 1.5 },
-    uShift: { value: new THREE.Vector2() }, uCam: { value: new THREE.Vector3() },
-    uSky: { value: sky }, uInk: { value: new THREE.Color(pal.ink) }, uGold: { value: gold }, uNavy: { value: new THREE.Color(pal.navy) },
-  };
-  const terrain = new THREE.Mesh(
-    new THREE.PlaneGeometry(700000, 700000, 400, 400).rotateX(-Math.PI / 2),
-    new THREE.ShaderMaterial({
-      uniforms: terrainU,
-      vertexShader: /* glsl */`
-        #include <common>
-        #include <logdepthbuf_pars_vertex>
-        uniform sampler2D uHeight; uniform float uWidth, uExag; uniform vec2 uShift;
-        varying vec3 vWorld;
-        void main() {
-          vec3 p = position + vec3(uShift.x, 0.0, uShift.y);
-          float h = texture2D(uHeight, p.xz / uWidth + 0.5).r;
-          p.y = max(h, 0.0) * uExag;
-          vWorld = p;
-          gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
-          #include <logdepthbuf_vertex>
-        }`,
-      fragmentShader: /* glsl */`
-        #include <logdepthbuf_pars_fragment>
-        uniform vec3 uSky, uInk, uGold, uNavy, uCam; uniform float uMaxH, uExag;
-        varying vec3 vWorld;
-        float line(float v, float period) {
-          float x = v / period;
-          float w = fwidth(x);
-          return 1.0 - smoothstep(0.0, w * 1.4, abs(fract(x - 0.5) - 0.5));
-        }
-        void main() {
-          #include <logdepthbuf_fragment>
-          float h = vWorld.y / (uMaxH * uExag);
-          float grid = max(line(vWorld.x, 2500.0), line(vWorld.z, 2500.0));
-          float contour = line(vWorld.y, 450.0);
-          vec3 c = mix(uNavy * 0.55, uNavy * 1.15, h);
-          c = mix(c, uInk, grid * 0.8);
-          c = mix(c, uGold, contour * (0.25 + 0.6 * h));
-          float d = length(vWorld - uCam);
-          float fog = 1.0 - exp(-d / 160000.0);
-          gl_FragColor = vec4(mix(c, uSky, fog * fog), 1.0);
-        }`,
-    }),
-  );
-  terrain.frustumCulled = false;
-  terrain.visible = false;
-  scene.add(terrain);
+  // ---- sky, terrain, cloud deck: the same world module as the SR-71 backdrop ----
+  // Drawn straight to the screen (no post pass): the world shaders tone themselves, the sky to the
+  // palette, the ground in natural color.
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const world = createWorld({ segments: coarse ? 384 : 512 });
+  world.setLook({ ...WORLD_DEFAULTS, mono: 0, haze: 160, grid: 0.45, gridSize: 500, contour: 0.3, contourStep: 150, lineBright: 0.6 });
+  world.uniforms.uDirect.value = 1;
+  scene.add(world.sky, world.terrain, world.clouds);
+  sun.position.copy(world.sunDir);
+  const shift = new THREE.Vector2();
 
   // ---- jets ----
   const geo = jetGeometry(manifest.jet);
@@ -123,14 +85,11 @@ export function createRenderer({ canvas, manifest, labels }) {
   addEventListener('resize', resize);
 
   return {
-    renderer, scene, camera, rig,
-    async setWorld(world) {
-      const t = await loadHeightmap(world, manifest.base);
-      terrainU.uHeight.value = t.tex;
-      terrainU.uWidth.value = t.width;
-      terrainU.uMaxH.value = t.maxM;
-      terrainU.uExag.value = t.exaggeration;
-      terrain.visible = true;
+    renderer, scene, camera, rig, world,
+    async setWorld(w) {
+      const t = await loadHeightmap(w, manifest.base);
+      world.setHeight(t.tex, { size: w.size, metersPerPixel: w.metersPerPixel, maxM: w.maxM, snowM: w.snowM, arid: w.arid ?? 0.3, encoded: false });
+      world.setLook({ exag: t.exaggeration });
     },
     draw({ self, remotes, time, dt }) {
       // Your jet
@@ -143,8 +102,8 @@ export function createRenderer({ canvas, manifest, labels }) {
 
       // Ground follows the camera in whole grid cells so lines don't swim.
       const snap = 2500;
-      terrainU.uShift.value.set(Math.round(camPos.x / snap) * snap, Math.round(camPos.z / snap) * snap);
-      terrainU.uCam.value.copy(camPos);
+      shift.set(Math.round(camPos.x / snap) * snap, Math.round(camPos.z / snap) * snap);
+      world.frame(camera, null, shift);
 
       // Ghosts
       let n = 0;
