@@ -33,6 +33,12 @@ export default function (eleventyConfig) {
 
   eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
 
+  // Branch previews (SITE_URL set) carry the SR-71 model shootout at /lab/sr71-models/.
+  // Production builds never include it.
+  if (process.env.SITE_URL || process.env.LAB) {
+    eleventyConfig.addPassthroughCopy({ "notes/lab/sr71-models": "lab/sr71-models" });
+  }
+
   const targets = wikilinkTargets();
   eleventyConfig.addTransform("wikilinks", function (content) {
     if (!(this.page.outputPath || "").endsWith(".html")) return content;
