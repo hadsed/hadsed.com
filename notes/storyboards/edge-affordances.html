@@ -20,7 +20,9 @@
     --ease: cubic-bezier(.2, .7, .2, 1);
   }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.4 var(--font); }
-  #lab { position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0; display: block; }
+  /* 100% rather than 100vh: on iPad Safari 100vh is the height with the toolbars hidden, which
+     pushes the bottom of the page (and the pinned Fly) under the visible edge. */
+  #lab { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
   #veil { position: fixed; inset: 0; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity .32s ease; z-index: 5; }
   #veil.on { opacity: 1; }
   button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -254,7 +256,7 @@ function prepLab() {
   const doc = labDoc();
   if (!doc.getElementById('edge-mock')) {
     const st = doc.createElement('style'); st.id = 'edge-mock';
-    st.textContent = '#panel{display:none!important} #site{transition:opacity .9s ease}';
+    st.textContent = '#panel{display:none!important} #site{transition:opacity .9s ease} #site,#backdrop{width:100%!important;height:100%!important}';
     doc.head.appendChild(st);
   }
   const f = siteFrame();
@@ -313,7 +315,7 @@ function decorateSite() {
          is no taller than the menu, which leaves sticky nothing to stick within. */
       @media (min-width: 641px) {
         html[data-place="pinned"] .menu { position: fixed; top: 0; bottom: 0; z-index: 2; width: var(--menu-width);
-          left: max(1.5rem, calc((100% - 64rem) / 2 + 1.5rem)); padding: 3rem 0 2rem; display: flex; flex-direction: column; }
+          left: max(1.5rem, calc((100% - 64rem) / 2 + 1.5rem)); padding: 3rem 0 max(2rem, calc(env(safe-area-inset-bottom) + 1rem)); display: flex; flex-direction: column; }
         html[data-place="pinned"] main { grid-column: 2; }
         html[data-place="pinned"] .menu ul { flex: 1; display: flex; flex-direction: column; }
         html[data-place="pinned"] .edge-menu { margin: auto 0 0 !important; }
