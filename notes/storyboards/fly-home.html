@@ -5,12 +5,13 @@
 <meta name="robots" content="noindex">
 <title>Had Seddiqi</title>
 <!--
-  Staging home: the website over the SR-71 backdrop, with Fly pinned at the foot of the sidebar.
-  Clicking Fly pushes the camera in, fades the site, and hands over to the shared-sky flight lab.
-  This is the edge-affordance mockup (/lab/edge/) with Had's picks baked in and every jig removed:
-  menu concept, pinned sidebar, blink every 5s for 2s (sine swell, strength 0.95, 2px halo).
-  Layers: #lab iframe = backdrop lab (?clean, which hides its panel) with the site in its own iframe;
-  #flight iframe = /lab/flight/, created on click so nobody joins the room until they choose to fly.
+  Staging home: the website over a live 3D sky, with Fly pinned at the foot of the sidebar.
+  One renderer for everything: #sky is the flight lab in ?attract mode, which draws the backdrop
+  (your jet held still in the backdrop's framing, the live MMO jets flying around it) and is also
+  the game. Clicking Fly fades the site out and glides that same camera into the chase cam behind
+  your jet, as one shot; the HUD fades in and the watch-only socket becomes a seat. Esc/Back glides
+  back out and the site fades in. Nobody takes a seat (or counts as aloft) until they press Fly.
+  Fly item picks: menu concept, pinned sidebar, blink every 5s for 2s (sine swell, strength 0.95, 2px halo).
 -->
 <style>
   :root { --bg: #1c2433; --muted: #8a919c; --glow: #e4c56f; --sky: #0f1520;
@@ -19,32 +20,31 @@
   /* 100% rather than 100vh: on iPad Safari 100vh is the height with the toolbars hidden, which
      pushes the pinned Fly under the visible edge. */
   iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
-  #flight { opacity: 0; transition: opacity .9s ease; background: var(--sky); z-index: 2; }
-  #flight.on { opacity: 1; }
+  /* The sky fades in once it has drawn the ground; the site is readable on navy before that. */
+  #sky { opacity: 0; transition: opacity 1.2s ease; z-index: 1; }
+  #sky.on { opacity: 1; }
+  #site { z-index: 2; background: transparent; color-scheme: normal; transition: opacity .9s ease; }
+  body.flying #site { opacity: 0; pointer-events: none; }
   #exit { position: fixed; z-index: 3; right: calc(14px + env(safe-area-inset-right)); top: calc(36px + env(safe-area-inset-top));
     font: 10px/1 var(--mono); letter-spacing: .16em; color: var(--glow); background: none; border: 0; padding: 10px 2px; cursor: pointer;
     opacity: 0; pointer-events: none; transition: opacity .6s .6s, color .2s; -webkit-tap-highlight-color: transparent; }
   /* gold like the flight HUD, which has no gray text */
   #exit:hover, #exit:focus-visible { opacity: 1 !important; }
   body.flying #exit { opacity: .7; pointer-events: auto; }
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 10px var(--mono); letter-spacing: .2em; color: var(--muted);
-    z-index: 4; background: var(--bg); transition: opacity .6s; }
-  #loading.done { opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
-<iframe id="lab" title="Had Seddiqi" src="../sr71/?clean"></iframe>
+<!-- tilt steering needs the motion sensors; the frame is created by script so its src waits for the site -->
+<iframe id="sky" title="Fly" tabindex="-1" allow="gamepad; fullscreen; accelerometer; gyroscope"></iframe>
+<iframe id="site" title="Had Seddiqi"></iframe>
 <button id="exit" aria-label="Back to the website">ESC · BACK</button>
-<div id="loading">LOADING</div>
 <script>
 const $ = (s) => document.querySelector(s);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const labFrame = $('#lab');
-const L = () => labFrame.contentWindow && labFrame.contentWindow.__lab;
-const labDoc = () => labFrame.contentDocument;
-const siteFrame = () => labDoc() && labDoc().getElementById('site');
-const siteDoc = () => { try { return siteFrame().contentDocument; } catch { return null; } };
-let state = 'site';   // site | entering | flying | leaving
+const skyFrame = $('#sky'), site = $('#site');
+const F = () => { try { return skyFrame.contentWindow.__flight; } catch { return null; } };
+const siteDoc = () => { try { return site.contentDocument; } catch { return null; } };
+let state = 'site';   // site | flying
 
 // SR-71 climbing away, three-quarter view from above. Silhouette rendered from the
 // flight lab's jet (scripts/pack-jet.mjs output) and traced; nose up and to the right.
@@ -84,27 +84,73 @@ function decorateSite() {
   try { const p = doc.location.pathname; if (p && !p.startsWith('/lab/')) history.replaceState(null, '', `?p=${encodeURIComponent(p)}`); } catch {}
 }
 
-function prepLab() {
-  const doc = labDoc();
-  if (!doc.getElementById('fly-lab')) {
-    const st = doc.createElement('style'); st.id = 'fly-lab';
-    st.textContent = '#site{transition:opacity .9s ease} #site,#backdrop{width:100%!important;height:100%!important}';
-    doc.head.appendChild(st);
-  }
-  const lab = L();
-  const p = new URLSearchParams(location.search).get('p');
-  if (p && p.startsWith('/') && !p.startsWith('//')) { lab.S.sitePath = p; lab.apply(); }
-  const f = siteFrame();
-  if (f && !f.__fly) { f.__fly = true; f.addEventListener('load', decorateSite); }
-  decorateSite();
-  labFrame.contentWindow.addEventListener('keydown', onKey);
+// The site sits on a see-through navy wash over the sky (the backdrop lab's "site background 0.49").
+const SITE_BG = 'html, body { background: rgba(28, 36, 51, 0.49) !important; }';
+function styleSite() {
+  const doc = siteDoc(); if (!doc || !doc.head) return;
+  let tag = doc.getElementById('backdrop-wash');
+  if (!tag) { tag = doc.createElement('style'); tag.id = 'backdrop-wash'; doc.head.appendChild(tag); }
+  tag.textContent = SITE_BG;
 }
-const waitLab = setInterval(() => {
-  if (!L()) return;
-  clearInterval(waitLab);
-  prepLab();
-  setTimeout(() => $('#loading').classList.add('done'), 500);
+site.addEventListener('load', () => {
+  styleSite(); decorateSite();
+  try { wireGestures(site.contentWindow); } catch (err) { console.warn('gestures', err); }
+  try { site.contentWindow.addEventListener('keydown', onKey); } catch {}
+});
+{
+  const p = new URLSearchParams(location.search).get('p');
+  site.src = p && p.startsWith('/') && !p.startsWith('//') ? p : '/';
+}
+// The sky loads behind the site and fades up when it has settled next to a live jet (or found none).
+skyFrame.src = '../flight/?attract';
+const waitSky = setInterval(() => {
+  const f = F(); if (!f || !f.ready) return;
+  clearInterval(waitSky);
+  skyFrame.classList.add('on');
+  try { skyFrame.contentWindow.addEventListener('keydown', onKey); } catch {}
 }, 100);
+
+// ---------- gestures on the site pan the backdrop camera ----------
+// Page position pans (a pure function of scroll, so it always reverses); sideways swipes and
+// wheel turn it. Same feel as the backdrop lab; offsets go to the flight lab's camera rig.
+const DEG = Math.PI / 180;
+const G = { scrollYaw: 0, scrollPitch: 0, sideYaw: 0, yaw: 0, pitch: 0 };
+function readScroll(w) {
+  const screens = w.scrollY / Math.max(w.innerHeight, 1);
+  G.scrollYaw = Math.min(screens * 10, 90) * DEG;
+  G.scrollPitch = Math.min(screens * 1.5, 8) * DEG;
+}
+function wireGestures(w) {
+  const doc = w.document;
+  if (doc.__sky) return;
+  doc.__sky = true;
+  doc.documentElement.style.overscrollBehaviorX = 'none';   // stop sideways swipes from navigating back
+  w.addEventListener('scroll', () => readScroll(w), { passive: true });
+  w.addEventListener('wheel', (e) => {
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+    if (dx && Math.abs(dx) > Math.abs(e.deltaY) * 0.5) { G.sideYaw += dx * 0.001; e.preventDefault(); }
+  }, { passive: false });
+  let t0 = null, axis = null;
+  w.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY }; axis = null; } }, { passive: true });
+  w.addEventListener('touchmove', (e) => {
+    if (!t0 || e.touches.length !== 1) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY, dx = x - t0.x, dy = y - t0.y;
+    if (!axis && Math.hypot(dx, dy) > 8) axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y';
+    if (axis === 'x') { G.sideYaw -= dx * 0.003; t0 = { x, y }; e.preventDefault(); }
+  }, { passive: false });
+  w.addEventListener('touchend', () => { t0 = null; }, { passive: true });
+  readScroll(w);
+}
+let lastG = performance.now();
+(function stepGestures(now) {
+  requestAnimationFrame(stepGestures);
+  const dt = Math.min((now - lastG) / 1000, 0.1); lastG = now;
+  const k = 1 - Math.exp(-dt / 0.18);
+  G.yaw += (G.scrollYaw + G.sideYaw - G.yaw) * k;
+  G.pitch += (G.scrollPitch - G.pitch) * k;
+  const rig = F()?.renderer?.rig;
+  if (rig) { rig.orbit.yaw = G.yaw; rig.orbit.pitch = G.pitch; }
+})(performance.now());
 
 // ---------- Fly blink: a slow swell to the gold of the "next role" orb and back ----------
 const MUTED = [138, 145, 156], GOLD = [228, 197, 111];
@@ -118,58 +164,23 @@ if (!reduceMotion) setTimeout(function blink() {
   setTimeout(blink, EVERY * 1000);
 }, 3000);   // first blink ~3s after load
 
-// ---------- enter / leave ----------
-let anim = null, home = null, flight = null;
-function animate(ms, fn) {
-  cancelAnimationFrame(anim);
-  const t0 = performance.now();
-  const step = (now) => { const t = Math.min(1, (now - t0) / ms); fn(t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2); if (t < 1) anim = requestAnimationFrame(step); };
-  anim = requestAnimationFrame(step);
-}
+// ---------- enter / leave: one camera move in one scene ----------
 function enter() {
-  const lab = L(); if (state !== 'site' || !lab) return;
-  state = 'entering';
-  home = { pos: lab.camera.position.clone(), yaw: lab.G.sideYaw };
-  lab.S.siteOpacity = 0; lab.S.driftSpeed = 0.15; lab.apply();
-  if (!reduceMotion) {
-    const p0 = lab.camera.position.clone(), t = lab.controls.target.clone(), off = p0.clone().sub(t), y0 = lab.G.sideYaw;
-    animate(2600, (k) => { lab.camera.position.copy(t).add(off.clone().multiplyScalar(1 - 0.28 * k)); lab.G.sideYaw = y0 + 0.45 * k; });
-  }
-  // Start loading the flight lab now, under the push-in, and fade it up once it has drawn a frame.
-  flight = document.createElement('iframe');
-  flight.id = 'flight'; flight.title = 'Fly'; flight.allow = 'gamepad; fullscreen; accelerometer; gyroscope';   // tilt steering
-  flight.src = '../flight/';
-  document.body.appendChild(flight);
-  const t0 = performance.now();
-  const ready = setInterval(() => {
-    let ok = false;
-    try { const f = flight.contentWindow.__flight; ok = !!(f && f.renderer); } catch {}
-    if (!ok && performance.now() - t0 < 8000) return;
-    clearInterval(ready);
-    setTimeout(() => {
-      if (state !== 'entering') return;
-      flight.classList.add('on');
-      document.body.classList.add('flying');
-      state = 'flying';
-      try { flight.contentWindow.addEventListener('keydown', onKey); } catch {}
-      flight.focus();
-      lab.S.site = false; lab.apply();
-    }, Math.max(0, 1300 - (performance.now() - t0)));
-  }, 100);
+  const f = F(); if (state !== 'site' || !f || !f.fly) return;
+  state = 'flying';
+  document.body.classList.add('flying');
+  f.fly();
+  skyFrame.classList.add('on');
+  skyFrame.tabIndex = 0;
+  skyFrame.focus();
 }
 function leave() {
-  if (state !== 'flying') return;
-  const lab = L(); state = 'leaving';
+  const f = F(); if (state !== 'flying' || !f) return;
+  state = 'site';
   document.body.classList.remove('flying');
-  flight.classList.remove('on');
-  lab.S.driftSpeed = 0.02; lab.S.siteOpacity = 0; lab.S.site = true; lab.apply();
-  requestAnimationFrame(() => requestAnimationFrame(() => { lab.S.siteOpacity = 1; lab.apply(); }));
-  if (home && !reduceMotion) {
-    const p0 = lab.camera.position.clone(), y0 = lab.G.sideYaw, h = home;
-    animate(1400, (k) => { lab.camera.position.lerpVectors(p0, h.pos, k); lab.G.sideYaw = y0 + (h.yaw - y0) * k; });
-  }
-  const f = flight; flight = null;
-  setTimeout(() => { f.remove(); state = 'site'; }, 950);   // removing the frame closes its socket
+  f.land();
+  skyFrame.tabIndex = -1;
+  site.focus();
 }
 function onKey(e) { if (e.key === 'Escape') leave(); }
 addEventListener('keydown', onKey);

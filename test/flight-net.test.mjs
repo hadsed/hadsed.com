@@ -217,3 +217,19 @@ test('room: back to the site, a seat becomes a watcher again and leaves the rost
   assert.ok(other.some((m) => m.t === 'roster' && m.remove?.includes(seat.id)));
   assert.ok(sent.some((m) => m.t === 'watching'));
 });
+
+test('client: against a server that cannot watch, a watcher hangs up instead of taking a seat', async () => {
+  const { connect } = await import('../flight/packages/net/client.js');
+  const socks = [];
+  class FakeWS { constructor(url) { this.url = url; this.readyState = 1; this.sent = []; socks.push(this); } send(d) { this.sent.push(d); } close() { this.closed = true; } }
+  const net = connect({ url: 'wss://x', watch: true, WebSocketImpl: FakeWS });
+  socks[0].onmessage({ data: JSON.stringify({ t: 'welcome', id: 3, callsign: 'KITE 10', spawn: {} }) });
+  assert.ok(socks[0].closed);
+  assert.equal(net.state.status, 'solo');
+  await new Promise((r) => setTimeout(r, 1200));
+  assert.equal(socks.length, 1, 'no redial while watching');
+  net.join();
+  assert.equal(socks.length, 2);
+  assert.doesNotMatch(socks[1].url, /watch=1/);
+  net.close();
+});

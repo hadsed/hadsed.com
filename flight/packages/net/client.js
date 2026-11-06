@@ -22,7 +22,7 @@ export function connect({
   url, world = 'sierra', onSnapshot, onMessage, onStatus = () => {}, watch = false,
   staleMs = 4000, openTimeoutMs = 10000, socketOptions, WebSocketImpl = globalThis.WebSocket,
 } = {}) {
-  let ws = null, closed = false, retry = 1000, timer = null, lastMsg = 0, openedAt = 0;
+  let ws = null, closed = false, retry = 1000, timer = null, lastMsg = 0, openedAt = 0, noWatch = false;
   const state = { status: url ? 'connecting' : 'solo', id: null, callsign: null, reconnects: 0, stale: 0, watch };
   const live = () => state.status === 'online' || state.status === 'watching';
 
@@ -31,7 +31,7 @@ export function connect({
   const hidden = () => typeof document !== 'undefined' && document.hidden;
 
   function open() {
-    if (closed || !url) return;
+    if (closed || !url || (state.watch && noWatch)) return;
     clearTimeout(timer);
     // A background tab sends nothing, so the server would time it out anyway.
     // Wait until the page is visible again (see wake below).
@@ -55,6 +55,9 @@ export function connect({
         return;
       }
       let msg; try { msg = JSON.parse(e.data); } catch { return; }
+      // An older server that can't watch seats everyone. A watcher must not pad the
+      // aloft count, so it hangs up and waits for join() instead.
+      if (msg.t === 'welcome' && state.watch) { noWatch = true; api.pause(); set('solo'); return; }
       if (msg.t === 'welcome') { state.id = msg.id; state.callsign = msg.callsign; state.watch = false; set('online'); }
       if (msg.t === 'watching') { state.id = null; state.callsign = null; set('watching'); }
       if (msg.t === 'full') set('solo');
@@ -115,6 +118,7 @@ export function connect({
       state.watch = false;
       if (ws?.readyState === 1 && state.status === 'watching') ws.send(JSON.stringify({ t: 'join' }));
       else if (ws) abandon('join');
+      else if (url && !closed) { retry = 1000; open(); }
     },
     // Seat -> watcher (back to the site), keeping the socket.
     watch() {
@@ -124,7 +128,7 @@ export function connect({
       else if (ws) abandon('watch');
     },
     // A hidden backdrop has nobody looking at it: hang up, and dial again when visible.
-    pause() { if (ws) { const old = ws; ws = null; old.onopen = old.onmessage = old.onclose = old.onerror = null; try { old.close(1000, 'paused'); } catch {} } clearTimeout(timer); set(url ? 'connecting' : 'solo'); },
+    pause() { if (ws) { const old = ws; ws = null; old.onopen = old.onmessage = old.onclose = old.onerror = null; try { old.close(1000, 'paused'); } catch {} } clearTimeout(timer); set(url && !noWatch ? 'connecting' : 'solo'); },
     resume() { if (!closed && url && !ws) { retry = 1000; open(); } },
     close() {
       closed = true; clearTimeout(timer); clearInterval(watchdog);
