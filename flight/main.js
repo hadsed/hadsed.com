@@ -20,6 +20,9 @@ const params = new URLSearchParams(location.search);
 // ?attract: the site backdrop. The jet flies itself, the HUD is hidden, and the
 // socket only watches (no seat, so the aloft count stays honest) until fly().
 let attract = params.has('attract');
+// Boost speed cue, while Had picks one: ?speed=dust (default) | vapor | lens.
+const speedStyle = ['dust', 'vapor', 'lens'].includes(params.get('speed')) ? params.get('speed') : 'dust';
+let vignette = 0;
 if (attract) document.body.classList.add('attract');
 
 const manifest = await loadManifest(base);
@@ -158,7 +161,7 @@ function labels(camera, list) {
 
 let renderer;
 try {
-  renderer = createRenderer({ canvas, manifest, labels });
+  renderer = createRenderer({ canvas, manifest, labels, speedStyle, look: params.get('look') === 'real' ? 'real' : 'site' });
 } catch (err) {
   // No WebGL (old device, blocked GPU, lockdown mode): say so instead of a black screen.
   net.close();
@@ -222,6 +225,10 @@ function frame(nowMs) {
   const others = net.state.status === 'online' ? roster.size : 0;
   $('aloft').textContent = `${others} other${others === 1 ? '' : 's'} in flight`;
   if (!attract) statusLog();
+  if (speedStyle === 'lens') {
+    vignette += ((!attract && jet.flags & FLAG.BOOST ? 1 : 0) - vignette) * (1 - Math.exp(-dt * 2.5));
+    $('vignette').style.opacity = vignette.toFixed(3);
+  }
   const st = stick.state;
   stickDot.style.display = st ? 'block' : 'none';
   if (st) { stickDot.style.left = `${st.cur.x}px`; stickDot.style.top = `${st.cur.y}px`; }

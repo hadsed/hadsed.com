@@ -14,8 +14,13 @@ import { createWind } from './wind.js';
 import { FLAG } from '../net/protocol.js';
 
 const MAX_GHOSTS = 64;
+const REAL_LOOK = { grid: 0, contour: 0, haze: 170 };
 
-export function createRenderer({ canvas, manifest, labels }) {
+// look: 'site' (default: the gold-outlined jets over the site's survey-grid ground)
+// or 'real' (a comparison look: plain matte jets, natural ground with no grid or
+// contours, white contrails, a little more haze).
+export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', look = 'site' }) {
+  const real = look === 'real';
   const pal = manifest.palette;
   const sky = new THREE.Color(pal.sky), gold = new THREE.Color(pal.gold);
 
@@ -44,7 +49,7 @@ export function createRenderer({ canvas, manifest, labels }) {
   const world = createWorld({ segments: software ? 256 : 320, cell: 350, flat: 0.375, lite: software });
   // The backdrop's look (navy monotone, ground color showing through). The monotone follows the camera
   // rig: full in the backdrop orbit, fading to natural color as Fly glides into the chase cam.
-  world.setLook({ ...WORLD_DEFAULTS });
+  world.setLook({ ...WORLD_DEFAULTS, ...(real ? REAL_LOOK : {}) });
   world.uniforms.uDirect.value = 1;
   // Per-pixel relief (three height reads a pixel) is free on a GPU but halves the frame rate on a CPU
   // rasterizer; there the per-vertex relief is enough.
@@ -93,9 +98,9 @@ export function createRenderer({ canvas, manifest, labels }) {
   dots.frustumCulled = false;
   scene.add(dots);
 
-  const trails = createContrails({ scene, gold, sky, max: MAX_GHOSTS + 1 });
+  const trails = createContrails({ scene, gold: real ? new THREE.Color(0xe8ecf2) : gold, sky, max: MAX_GHOSTS + 1 });
   const boost = createBoost({ scene, geo, max: MAX_GHOSTS + 1 });
-  const wind = createWind({ scene });
+  const wind = createWind({ scene, geo, style: speedStyle });
 
   // ---- camera: backdrop orbit and chase cam, one continuous move between them (camera.js) ----
   const rig = createCameraRig(camera);
@@ -138,8 +143,9 @@ export function createRenderer({ canvas, manifest, labels }) {
       rig.focus = focus ? focusV.set(focus[0], focus[1], focus[2]) : null;
       rig.update(me.position, tmpQ, dt, camera.aspect);
       // Gold outlines are for flying; the calm site backdrop shows plain black jets.
-      meLine.visible = ghostLines.visible = rig.blend > 0.5;
+      meLine.visible = ghostLines.visible = !real && rig.blend > 0.5;
       // Air streaming past: only in the chase view, not the calm backdrop.
+      wind.setProjection?.(canvas.height, camera.fov);
       wind.update(dt, me.position, tmpQ, self.speed, rig.boosting ? 1 : 0, Math.min(1, Math.max(0, rig.blend * 2 - 1)));
       const camPos = camera.position;
 
