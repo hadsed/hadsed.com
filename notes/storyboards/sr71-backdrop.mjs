@@ -34,9 +34,12 @@ const DEFAULTS = {
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
 };
+const CLEAN = new URLSearchParams(location.search).has('clean');
+if (CLEAN) document.documentElement.classList.add('clean');
 const load = () => {
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch {}
+  // ?clean: the lab as a plain backdrop (no panel, no saved tweaks), for the staging home page.
+  if (!CLEAN) try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch {}
   let fromHash = {};
   try { if (location.hash.length > 1) fromHash = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch {}
   const out = { ...DEFAULTS, ...saved, ...fromHash };
@@ -44,7 +47,7 @@ const load = () => {
   return out;
 };
 const S = load();
-const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch {} };
+const save = () => { if (CLEAN) return; try { localStorage.setItem(STORE, JSON.stringify(S)); } catch {} };
 
 // ---------- renderer ----------
 const canvas = document.getElementById('backdrop');
@@ -308,6 +311,46 @@ for (const side of [-1, 1]) {
   const nozzle = add(new THREE.CylinderGeometry(0.82, 0.9, 0.9, 24, 1, true), nozzleMat); nozzle.rotation.x = Math.PI / 2; nozzle.position.set(side * 5, 0, 9.6);
 }
 plane.position.z = 2;
+
+// The real jet (helijah's SR-71, gear and chute removed) from the flight lab's packed asset, when the
+// flight lab is deployed next to this one (branch previews). It replaces the proxy at the proxy's own
+// size and spot, so camera framing is unchanged. Any failure keeps the proxy.
+(async () => {
+  try {
+    const base = new URL('../flight/', location.href);
+    const manifest = await fetch(new URL('assets/manifest.json', base)).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    if (manifest.jet?.kind !== 'packed') return;
+    const [{ decodeJet }, buf] = await Promise.all([
+      import(new URL('packages/assets/jet-pack.js', base).href),
+      fetch(new URL(manifest.jet.src, base)).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }),
+    ]);
+    const j = await decodeJet(buf);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(j.position, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(j.normal, 3));
+    if (j.uv) g.setAttribute('uv', new THREE.BufferAttribute(j.uv, 2));
+    g.setIndex(new THREE.BufferAttribute(j.index, 1));
+    g.computeBoundingBox();
+    if (j.texture) {   // the paint: USAF markings, panel lines, red danger stripes
+      const tex = new THREE.Texture(await createImageBitmap(new Blob([j.texture.bytes], { type: j.texture.type })));
+      tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.needsUpdate = true;
+      skin.map = tex; skin.color.set(0xffffff); skin.needsUpdate = true;
+    }
+    plane.updateMatrixWorld(true);
+    const proxy = new THREE.Box3().setFromObject(plane);
+    const pl = proxy.max.z - proxy.min.z, gl = g.boundingBox.max.z - g.boundingBox.min.z;
+    const k = pl / gl;
+    const c = new THREE.Vector3(); g.boundingBox.getCenter(c);
+    const pc = new THREE.Vector3(); proxy.getCenter(pc);
+    for (const o of [...plane.children]) o.visible = false;
+    const mesh = new THREE.Mesh(g, skin);
+    mesh.scale.setScalar(k);
+    mesh.position.set(pc.x - c.x * k, pc.y - c.y * k, pc.z - c.z * k).sub(plane.position);
+    plane.add(mesh);
+    window.__labJet = { triangles: j.index.length / 3, credit: j.credit };
+    dirty = true;
+  } catch (err) { console.warn('packed jet unavailable, keeping the proxy', err); }
+})();
 
 // ---------- monotone composite ----------
 const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
@@ -750,7 +793,7 @@ document.getElementById('shot').addEventListener('click', () => {
   });
 });
 addEventListener('keydown', (e) => {
-  if (e.target.closest('input, select')) return;
+  if (CLEAN || e.target.closest('input, select')) return;
   if (e.key === 'h') document.getElementById('toggle').click();
   if (e.key === ' ') { S.drift = !S.drift; sync(); apply(); e.preventDefault(); }
 });
@@ -761,6 +804,6 @@ if (S.view) {
 }
 
 apply();
-if (innerWidth < 640) document.getElementById('toggle').click();  // phones start with the panel tucked away
+if (innerWidth < 640 && !CLEAN) document.getElementById('toggle').click();  // phones start with the panel tucked away
 loop();
 window.__lab = { S, apply, sync, render, camera, controls, G };

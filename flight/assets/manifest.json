@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "palette": {
+    "sky": "#0f1520",
+    "navy": "#1c2433",
+    "ink": "#3a4a66",
+    "gold": "#e4c56f"
+  },
+  "jet": { "kind": "packed", "src": "assets/jet.230b45cc7d.bin", "length": 32.7 },
+  "worlds": [
+    {
+      "id": "sierra",
+      "label": "Sierra Nevada",
+      "heightmap": "assets/sierra.png",
+      "encoding": "terrarium",
+      "size": 1024,
+      "metersPerPixel": 243.38,
+      "minM": 30,
+      "maxM": 4310,
+      "exaggeration": 1.5
+    }
+  ]
+}

@@ -33,6 +33,7 @@
   .panel-foot { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid rgba(200, 205, 213, 0.12); }
   #status { flex-basis: 100%; min-height: 1.2em; color: var(--glow); font-size: 11px; }
   .hint { color: var(--muted); font-size: 11px; padding: 0 0 6px; }
+  html.clean #panel { display: none; }
   @media (max-width: 640px) {
     #panel { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 55vh; }
     #panel.closed { left: auto; }

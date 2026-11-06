@@ -27,11 +27,19 @@ function wikilinkTargets() {
 }
 
 export default function (eleventyConfig) {
-  for (const path of ["notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
+  for (const path of ["flight/**", "notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
     eleventyConfig.ignores.add(path);
   }
 
   eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
+
+  // Flight lab (multiplayer jets) ships on branch previews only, like the other labs.
+  // The room server in flight/server deploys separately as a Cloudflare Worker.
+  if (process.env.SITE_URL || process.env.FLIGHT_LAB) {
+    for (const part of ["index.html", "main.js", "config.json", "packages", "assets", "vendor"]) {
+      eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
+    }
+  }
 
   // Branch previews (SITE_URL set) also carry the SR-71 backdrop lab at /lab/sr71/,
   // so it can be explored on any device. Production builds never include it.
@@ -43,7 +51,17 @@ export default function (eleventyConfig) {
       [`${lab}/vendor/*.min.js`]: "lab/sr71/vendor",
       [`${lab}/terrain/regions.json`]: "lab/sr71/terrain/regions.json",
       [`${lab}/terrain/*.webp`]: "lab/sr71/terrain",
+      // edge-affordance mockups that sit on top of the lab
+      [`${lab}/edge-affordances.html`]: "lab/edge/index.html",
+      // staging home: site + backdrop + Fly, which hands over to the flight lab
+      [`${lab}/fly-home.html`]: "lab/home/index.html",
     });
+  }
+
+  // Branch previews (SITE_URL set) carry the SR-71 model shootout at /lab/sr71-models/.
+  // Production builds never include it.
+  if (process.env.SITE_URL || process.env.LAB) {
+    eleventyConfig.addPassthroughCopy({ "notes/lab/sr71-models": "lab/sr71-models" });
   }
 
   const targets = wikilinkTargets();
