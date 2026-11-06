@@ -467,5 +467,6 @@ if (S.view) {
 }
 
 apply();
+if (innerWidth < 640) document.getElementById('toggle').click();  // phones start with the panel tucked away
 loop();
 window.__lab = { S, apply, sync, render, camera, controls };
