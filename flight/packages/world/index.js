@@ -99,7 +99,7 @@ vec4 finishSky(vec3 c){
 // and don't shimmer as the camera drifts. A faint Milky Way band, and the afterglow: a thin orange
 // seam right on the horizon, strongest toward the sun, with a cool grey-blue glow just above it.
 export const STARS = /* glsl */`
-uniform float uStars, uAfterglow, uMilky; uniform vec3 uSun;
+uniform float uStars, uAfterglow, uMilky;
 vec3 shash3(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
 float starLayer(vec3 d, float n, float keep, float pix, out vec3 tint){
   vec3 g = d * n, id = floor(g), r = shash3(id);
@@ -128,17 +128,17 @@ vec3 nightSky(vec3 d, float el, vec3 base){
                + vnoise(vec2(dot(d, vec3(0.3, -0.7, 0.6)), dot(d, vec3(0.9, 0.2, -0.4))) * 23.0) * 0.4;
     e += vec3(0.020, 0.022, 0.030) * band * smoothstep(0.25, 0.85, lane) * uMilky;
     vec3 t; float s;
-    s = starLayer(d, 70.0, 0.5, pix, t);   e += t * s * 2.4;
-    s = starLayer(d, 160.0, 0.45 + 0.4 * band * uMilky, pix, t); e += t * s * 1.0;
-    s = starLayer(d, 330.0, 0.35 + 0.5 * band * uMilky, pix, t); e += t * s * 0.45;
+    s = starLayer(d, 70.0, 0.55, pix, t);   e += t * s * 3.2;
+    s = starLayer(d, 160.0, 0.6 + 0.35 * band * uMilky, pix, t); e += t * s * 1.6;
+    s = starLayer(d, 330.0, 0.5 + 0.45 * band * uMilky, pix, t); e += t * s * 0.8;
     e *= uStars * up * dark;
   }
   if (uAfterglow > 0.0) {
     vec2 h = normalize(d.xz + 1e-6), sh = normalize(uSun.xz + 1e-6);
     float toward = smoothstep(-0.6, 1.0, dot(h, sh));
     float x = max(el, 0.0);
-    float seam = exp(-x / 0.007) * smoothstep(-0.012, 0.0, el);
-    e += vec3(1.0, 0.36, 0.09) * seam * (0.25 + 1.6 * toward) * 0.35 * uAfterglow;
+    float seam = exp(-x / 0.008) * smoothstep(-0.02, 0.0, el);
+    e += vec3(1.0, 0.5, 0.16) * seam * (0.2 + 1.8 * toward) * 0.8 * uAfterglow;
     e += vec3(0.10, 0.12, 0.15) * exp(-x / 0.045) * smoothstep(-0.01, 0.0, el) * (0.5 + 0.8 * toward) * uAfterglow;
   }
   return e;
@@ -153,9 +153,9 @@ float lines1(float c){ float fw = fwidth(c); float g = abs(fract(c - 0.5) - 0.5)
 
 // One grid, dense under the camera and stretching out toward the horizon, so a single draw covers
 // 1,500 km. The middle (`flat` of each half) is a uniform grid of `cell` meters; past it the spacing
-// grows smoothly (cubic) out to R. A moving camera shifts the grid in whole cells (see cellSize and
-// frame(shift)), so every vertex in the core lands exactly where a neighbor was and the ground under
-// you never changes; only far-off vertices, already sparse and hazy, resample.
+// grows smoothly (cubic) out to R. A moving camera shifts the core in whole cells (frame(shift)), so
+// every core vertex lands exactly where a neighbor was and the ground under you never changes; with a
+// filtered heightmap the cell is one texel and the sparser vertices past the core slide smoothly.
 export function terrainGeometry(segments = 512, R = 750000, cell = 352, flat = 0.375) {
   const n = segments + (segments % 2 ? 0 : 1);   // odd: a vertex sits under the camera
   const h = (n - 1) / 2, K = Math.round(h * flat);
@@ -250,7 +250,10 @@ function buildHeightMips(tex) {
   return mips.length - 1;
 }
 
-export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
+// lite: a CPU rasterizer (SwiftShader, llvmpipe) runs every branch of a shader whatever the uniforms say,
+// so the night sky, city lights and per-pixel relief are compiled out there.
+export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = false } = {}) {
+  const defines = lite ? { WORLD_LITE: '' } : {};
   const sunDir = new THREE.Vector3(0, 1, 0);
   const U = {
     uCam: { value: new THREE.Vector3() }, uEarthR: { value: EARTH_R }, uOrigin: { value: new THREE.Vector3() },
@@ -269,7 +272,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
   // Drawn first, behind everything, with no depth test, depth write or log-depth.
   const sky = new THREE.Mesh(
     skyGeometry(1.5e6),
-    new THREE.ShaderMaterial({
+    new THREE.ShaderMaterial({ defines,
       side: THREE.DoubleSide, depthWrite: false, depthTest: false, uniforms: U,
       vertexShader: /* glsl */`
         uniform vec3 uSun, uHaze; uniform float uDip, uSkyK, uNight;
@@ -291,21 +294,27 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */`
-        uniform float uNight, uDip;
+        uniform float uNight, uDip; uniform vec3 uSun;
         varying vec3 vDir; varying vec4 vSky; varying vec3 vBase;
         ${NOISE}
         ${TONE}
+        #ifndef WORLD_LITE
         ${STARS}
+        #endif
         void main(){
           vec3 d = normalize(vDir);
           float disk = pow(max(dot(d, uSun), 0.0), 2500.0) * (1.0 - uNight);
           // Night: light of its own (stars, the afterglow seam), added on top of the toned sky. Through the
           // monotone it turns to the palette's light and gold; in natural color it keeps its orange.
           vec3 e = vec3(0.0);
+          #ifndef WORLD_LITE
           if (uNight > 0.0) e = nightSky(d, asin(clamp(d.y, -1.0, 1.0)) + uDip, vBase) * uNight;
+          #endif
           if (uDirect > 0.5) {
             vec3 sky = vSky.rgb;
+            #ifndef WORLD_LITE
             if (uNight > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(vBase + e, 0.0) - display(vBase, 0.0), 0.0), vec3(1.0 / 2.2));
+            #endif
             // the disk is far past white: in the post pass the tone turns it to highlight; direct, draw that
             gl_FragColor = vec4(mix(sky, pow(uHigh, vec3(1.0 / 2.2)), min(disk * 3.0, 1.0)), 1.0);
           } else {
@@ -324,16 +333,17 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
     uShade: { value: 0.35 }, uLineBright: { value: 0.6 }, uLineGold: { value: 0 },
     uTint: { value: 0 }, uTintContrast: { value: 1 }, uTintPivot: { value: 0.5 }, uSlope: { value: 0 },
     uColor: { value: 1 }, uTexture: { value: 1 }, uCity: { value: 1 },
-    uFiltered: { value: 0 }, uMaxLod: { value: 0 },
+    uFiltered: { value: 0 }, uMaxLod: { value: 0 }, uPixelRelief: { value: 1 },
+    uSlide: { value: new THREE.Vector2() }, uCell: { value: cell }, uLodBias: { value: 0.5 },
   };
   const terrain = new THREE.Mesh(
     terrainGeometry(segments, 750000, cell, flat),
-    new THREE.ShaderMaterial({
+    new THREE.ShaderMaterial({ defines,
       uniforms: { ...U, ...TU },
       vertexShader: /* glsl */`
         #include <common>
         #include <logdepthbuf_pars_vertex>
-        uniform vec3 uCam, uOrigin; uniform float uEarthR, uWidth, uTexel, uExag, uEncoded, uFiltered, uMaxLod; uniform vec2 uShift;
+        uniform vec3 uCam, uOrigin; uniform float uEarthR, uWidth, uTexel, uExag, uEncoded, uFiltered, uMaxLod, uCell, uLodBias; uniform vec2 uShift, uSlide;
         uniform sampler2D uHeight; uniform int uSize;
         attribute float aSpace;
         varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
@@ -354,26 +364,33 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
           return vec3(mix(mix(a, bx, f.x), mix(bz, c, f.x), f.y), mix(bx - a, c - bz, f.y), mix(bz - a, c - bx, f.x));
         }
         void main(){
-          vec2 xz = position.xz + uShift;                  // render space
-          vec2 wxz = xz + uOrigin.xz;                      // world space
-          vec2 uv = wxz / uWidth + 0.5;
           float h;
-          if (uFiltered > 0.5) {
-            // A moving camera: the grid slides with it continuously, and each vertex reads the heightmap
-            // pre-filtered to its own spacing (mip level), so sliding never snaps or flickers.
+          #ifdef HEIGHT_FILTERED
+            // Two kinds of vertex. The uniform core moves in whole heightmap texels (uShift), so each of
+            // its vertices sits on a texel center and reads the exact height there: the ground near you
+            // never changes shape. Past the core the grid also slides the leftover fraction (uSlide), so
+            // it moves continuously, and each vertex reads the heightmap pre-filtered to its own spacing
+            // (mip level): sparse vertices sliding over smoothed heights don't snap or swim.
             float m = uWidth * uTexel, sp = max(aSpace, m);
-            float lod = clamp(log2(sp / m) - 0.5, 0.0, uMaxLod);
+            float slide = smoothstep(uCell * 1.01, uCell * 2.5, aSpace);
+            vec2 xz = position.xz + uShift + slide * uSlide;   // render space
+            vec2 wxz = xz + uOrigin.xz;                         // world space
+            vec2 uv = wxz / uWidth + 0.5;
+            float lod = clamp(log2(sp / m) + uLodBias * slide, 0.0, uMaxLod);
             vec2 du = vec2(sp / uWidth, 0.0);
             h = textureLod(uHeight, uv, lod).r;
-            float hx = textureLod(uHeight, uv + du.xy, lod).r - textureLod(uHeight, uv - du.xy, lod).r;
-            float hz = textureLod(uHeight, uv + du.yx, lod).r - textureLod(uHeight, uv - du.yx, lod).r;
-            vN = normalize(vec3(-hx * uExag, 2.0 * sp, -hz * uExag));
-          } else {
+            float hx = textureLod(uHeight, uv + du.xy, lod).r - h;
+            float hz = textureLod(uHeight, uv + du.yx, lod).r - h;
+            vN = normalize(vec3(-hx * uExag, sp, -hz * uExag));
+          #else
+            vec2 xz = position.xz + uShift;
+            vec2 wxz = xz + uOrigin.xz;
+            vec2 uv = wxz / uWidth + 0.5;
             vec3 hg = hAt(uv);
             float m = uWidth * uTexel;
             h = hg.x;
             vN = normalize(vec3(-hg.y * uExag, m, -hg.z * uExag));
-          }
+          #endif
           vec3 w = vec3(xz.x, h * uExag - uOrigin.y, xz.y);
           vec2 rel = xz - uCam.xz;
           w.y -= dot(rel, rel) / (2.0 * uEarthR);
@@ -387,7 +404,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
         uniform float uTint, uTintContrast, uTintPivot, uSlope, uColor, uTexture, uSnowM, uArid, uNight, uCity;
         uniform vec3 uMoon, uCam, uOrigin; uniform float uAfterglow;
         varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
-        uniform sampler2D uHeight; uniform float uWidth, uTexel, uFiltered, uMaxLod, uExag;
+        uniform sampler2D uHeight; uniform float uWidth, uTexel, uFiltered, uMaxLod, uExag, uPixelRelief;
         float H;   // height here: per vertex, or per pixel from the filtered heightmap
         ${NOISE}
         ${TONE}
@@ -419,6 +436,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
           vec3 key = mix(vec3(1.0, 0.95, 0.86), vec3(0.62, 0.72, 1.0), uNight);   // sun, or a cool moon
           return c * (skyFill * (0.35 + 0.35 * n.y) + key * 2.2 * lit);
         }
+        #ifndef WORLD_LITE
         // Night: warm city lights on low, flat ground. Up close each light is a dot about a pixel across;
         // once the dots get smaller than a pixel they fade into the glow they average to, so distant towns
         // read as soft patches and nothing sparkles as the camera drifts.
@@ -443,26 +461,29 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
             float dist = length(vXZ - pt);
             float dots = step(r, dens) * exp(-dist * dist / (2.0 * sig * sig)) * (0.35 + 1.3 * r3) * min(1.0, size * size / (sig * sig) * 2.5);
             float avg = dens * 0.95 * 6.2832 * size * size / (cell * cell);   // what the dots average to
-            float far = smoothstep(0.4 * cell, 1.2 * cell, pm);
+            float far = smoothstep(0.7 * cell, 1.6 * cell, pm);
             l += mix(dots, avg * 2.5, far) * gain;
           }
-          return vec3(1.0, 0.60, 0.28) * l * low * 1.6;
+          return vec3(1.0, 0.60, 0.28) * l * low * 3.0;
         }
+        #endif
         void main(){
           #include <logdepthbuf_fragment>
           vec3 n = normalize(vN);
           H = vH;
-          if (uFiltered > 0.5) {
+          #if defined(HEIGHT_FILTERED) && !defined(WORLD_LITE)
+          if (uPixelRelief > 0.5) {
             // Relief per pixel, anchored to the world: height and slope read from the heightmap at this
             // pixel's footprint, so ridges and snowlines stay sharp and still however coarse the mesh is.
             float m = uWidth * uTexel, fp = max(length(fwidth(vXZ)), m);
             float lod = clamp(log2(fp / m), 0.0, uMaxLod);
             vec2 uv = vXZ / uWidth + 0.5, du = vec2(fp / uWidth, 0.0);
             H = textureLod(uHeight, uv, lod).r;
-            float hx = textureLod(uHeight, uv + du.xy, lod).r - textureLod(uHeight, uv - du.xy, lod).r;
-            float hz = textureLod(uHeight, uv + du.yx, lod).r - textureLod(uHeight, uv - du.yx, lod).r;
-            n = normalize(vec3(-hx * uExag, 2.0 * fp, -hz * uExag));
+            float hx = textureLod(uHeight, uv + du.xy, lod).r - H;   // forward differences: three reads a pixel
+            float hz = textureLod(uHeight, uv + du.yx, lod).r - H;
+            n = normalize(vec3(-hx * uExag, fp, -hz * uExag));
           }
+          #endif
           float grid = max(lines2(vXZ / uGridSize) * 0.55, lines2(vXZ / (uGridSize * 5.0)));
           float contour = max(lines1(H / uContourStep) * 0.55, lines1(H / (uContourStep * 5.0)));
           float ink = clamp(grid * uGrid + contour * uContour, 0.0, 1.0);
@@ -482,14 +503,18 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
           float fog = 1.0 - exp(-vDist / uHazeDist);
           vec3 haze = mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono);
           vec3 nightHaze = vec3(0.020, 0.026, 0.040);
+          #ifndef WORLD_LITE
           if (uNight > 0.0) {   // the far ground near the horizon catches the afterglow, warmest toward the sun
             vec2 look = normalize(vXZ - uCam.xz - uOrigin.xz + 1e-3);
             float toward = smoothstep(-0.6, 1.0, dot(look, normalize(uSun.xz + 1e-6)));
-            nightHaze += vec3(0.30, 0.12, 0.05) * pow(fog, 10.0) * toward * uAfterglow;
+            nightHaze += vec3(0.30, 0.11, 0.035) * pow(fog, 40.0) * toward * uAfterglow;
           }
+          #endif
           haze = mix(haze, nightHaze, uNight);
           c = mix(c, haze * mix(1.0, 0.8, uColor), fog * fog * 0.9 + fog * 0.1);
+          #ifndef WORLD_LITE
           if (uNight > 0.0 && uCity > 0.0) c += cityLights(n) * uCity * uNight * (1.0 - 0.7 * fog);
+          #endif
           gl_FragColor = finish(c, ink * uLineGold * (1.0 - fog));   // gold mask: lines the tone may turn gold
         }`,
     }),
@@ -500,7 +525,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
   // ---- cloud deck: scattered cumulus at cloudM, parallax against the ground ----
   const clouds = new THREE.Mesh(
     new THREE.PlaneGeometry(1.2e6, 1.2e6, 120, 120).rotateX(-Math.PI / 2),
-    new THREE.ShaderMaterial({
+    new THREE.ShaderMaterial({ defines,
       transparent: true, depthWrite: false, uniforms: U,
       // alpha-neutral for the post pass: clouds dim the gold mask under them and never add to it
       blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
@@ -547,8 +572,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
 
   return {
     uniforms: U, terrainUniforms: TU, sky, terrain, clouds, sunDir, look,
-    /** Grid spacing under the camera (m): shift the terrain in whole multiples of it. */
-    cellSize: cell,
+    /** Grid spacing under the camera (m). A filtered heightmap sets it to one texel. */
+    get cellSize() { return TU.uCell.value; },
     /** Any subset of WORLD_DEFAULTS' look keys: palette, tone, sun, haze, clouds, ground style. */
     setLook(o) {
       Object.assign(look, o);
@@ -576,23 +601,48 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
       TU.uSnowM.value = snowM || maxM * 0.8;
       TU.uArid.value = arid;
       TU.uEncoded.value = encoded ? 1 : 0;
-      TU.uFiltered.value = 0;
-      if (!encoded && tex.image?.data && tex.type === THREE.HalfFloatType && tex.format === THREE.RedFormat) {
-        TU.uMaxLod.value = buildHeightMips(tex);
-        TU.uFiltered.value = 1;
+      const filtered = !encoded && tex.image?.data && tex.type === THREE.HalfFloatType && tex.format === THREE.RedFormat;
+      if (filtered) TU.uMaxLod.value = buildHeightMips(tex);
+      // A filtered heightmap: the core grid is one texel apart, so moving it whole texels lands each
+      // vertex on a texel center.
+      const want = filtered ? metersPerPixel : cell;
+      if (Math.abs(want - TU.uCell.value) > 1e-6) {
+        terrain.geometry.dispose();
+        terrain.geometry = terrainGeometry(segments, 750000, want, flat);
+        TU.uCell.value = want;
+      }
+      TU.uFiltered.value = filtered ? 1 : 0;
+      // which height path the terrain compiles: a shader on a CPU rasterizer pays for every branch
+      const m = terrain.material, had = 'HEIGHT_FILTERED' in m.defines;
+      if (filtered !== had) {
+        m.defines = { ...m.defines };
+        if (filtered) m.defines.HEIGHT_FILTERED = ''; else delete m.defines.HEIGHT_FILTERED;
+        m.needsUpdate = true;
       }
       terrain.visible = true;
     },
     /**
      * Call each frame with the camera that draws the world. origin: world position of render (0,0,0).
-     * shift: optional render-space xz to move the terrain grid under a moving camera. Snap it to whole
-     * multiples of cellSize so the ground under the camera stays put.
+     * shift: optional render-space xz to center the terrain grid on (the camera's, as it moves). The
+     * grid's core moves in whole cells so the ground under the camera stays put; with a filtered
+     * heightmap the rest of the grid slides the remainder smoothly.
      */
     frame(camera, origin = null, shift = null) {
       if (origin) U.uOrigin.value.copy(origin); else U.uOrigin.value.set(0, 0, 0);
       U.uCam.value.copy(camera.position);
       sky.position.copy(camera.position);
-      if (shift) TU.uShift.value.copy(shift); else TU.uShift.value.set(0, 0);
+      const S = TU.uShift.value, slide = TU.uSlide.value, c = TU.uCell.value;
+      if (!shift) { S.set(0, 0); slide.set(0, 0); }
+      else if (TU.uFiltered.value) {
+        // texel centers sit at world (k + 1/2) * c; core vertices at multiples of c from S
+        const o = U.uOrigin.value;
+        const snap = (v, oo) => (Math.round((v + oo) / c - 0.5) + 0.5) * c - oo;
+        S.set(snap(shift.x, o.x), snap(shift.y, o.z));
+        slide.set(shift.x - S.x, shift.y - S.y);
+      } else {
+        S.set(Math.round(shift.x / c) * c, Math.round(shift.y / c) * c);
+        slide.set(0, 0);
+      }
       const alt = Math.max(camera.position.y + U.uOrigin.value.y, 1);
       U.uDip.value = Math.acos(EARTH_R / (EARTH_R + alt));
       U.uSkyK.value = 2.5 + 6.5 * Math.min(alt / 26000, 1);
