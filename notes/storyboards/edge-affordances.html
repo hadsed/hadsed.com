@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Edge affordances</title>
+<!--
+  Mockups of small "edge" controls that take a visitor from the website into the 3D world,
+  the first stop of a reels-style feed of worlds. The site and the SR-71 scene come from the
+  backdrop lab (/lab/sr71/), loaded in an iframe and driven through its window.__lab handle.
+  Nothing here edits the lab; it only reads the camera and flips settings at runtime.
+-->
+<style>
+  :root {
+    --bg: #1c2433; --text: #c8cdd5; --muted: #8a919c; --accent: #e6e9ed; --glow: #e4c56f;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --font: Verdana, Geneva, system-ui, -apple-system, sans-serif;
+    --edge: 14px;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.4 var(--font); }
+  #lab { position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0; display: block; }
+  #veil { position: fixed; inset: 0; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity .32s ease; z-index: 5; }
+  #veil.on { opacity: 1; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .gold { color: var(--glow); }
+  [data-concept] { display: none; }
+  body[data-c="jet"] [data-concept~="jet"], body[data-c="hud"] [data-concept~="hud"], body[data-c="tape"] [data-concept~="tape"],
+  body[data-c="frame"] [data-concept~="frame"], body[data-c="alt"] [data-concept~="alt"] { display: block; }
+  .edge { position: fixed; z-index: 3; }
+
+  /* 1. Jet silhouette in the corner */
+  .c-jet { right: calc(var(--edge) - 6px + env(safe-area-inset-right)); bottom: calc(var(--edge) - 6px + env(safe-area-inset-bottom)); width: 48px; height: 48px; }
+  .c-jet .jet { position: absolute; left: 50%; top: 50%; width: 17px; height: 32px; margin: -16px 0 0 -8.5px; color: var(--muted); opacity: .75;
+    transform: rotate(-38deg); transition: transform .45s var(--ease), color .25s, opacity .25s; }
+  .c-jet .trail { position: absolute; left: 50%; top: 50%; width: 1px; height: 0; transform-origin: 0 0; transform: rotate(142deg) translateY(12px);
+    background: linear-gradient(var(--glow), transparent); opacity: 0; transition: height .45s var(--ease), opacity .3s; }
+  .c-jet .tip { position: absolute; right: 44px; bottom: 17px; font: 9px/1 var(--mono); letter-spacing: .18em; color: var(--glow); opacity: 0; transform: translateX(4px); transition: opacity .25s, transform .35s var(--ease); white-space: nowrap; }
+  .c-jet:hover .jet, .c-jet:focus-visible .jet { color: var(--glow); opacity: 1; transform: rotate(-38deg) translateY(-3px); }
+  .c-jet:hover .trail, .c-jet:focus-visible .trail { height: 26px; opacity: .8; }
+  .c-jet:hover .tip, .c-jet:focus-visible .tip { opacity: 1; transform: none; }
+  body.entering[data-c="jet"] .c-jet .jet { transition: transform 1.6s cubic-bezier(.5, 0, .2, 1), opacity 1.6s ease-in, color .2s; color: var(--glow);
+    transform: translate(-42vw, -38vh) rotate(-38deg) scale(.35); opacity: 0; }
+  body.entering[data-c="jet"] .c-jet .trail { transition: none; opacity: 0; }
+
+  /* 2. HUD readout, bottom left; the same readout carries on inside the world */
+  .hud { left: calc(var(--edge) + env(safe-area-inset-left)); bottom: calc(var(--edge) + env(safe-area-inset-bottom)); text-align: left;
+    font: 10px/1.55 var(--mono); letter-spacing: .12em; color: var(--muted); opacity: .6; padding: 6px 8px 6px 0; transition: opacity .25s, color .25s; font-variant-numeric: tabular-nums; }
+  .hud .row { display: block; white-space: nowrap; }
+  .hud .orb { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--glow); margin: 0 7px 1px 1px; vertical-align: middle; }
+  .hud .go { display: block; color: var(--glow); max-height: 0; opacity: 0; overflow: hidden; transition: max-height .3s var(--ease), opacity .25s; }
+  button.hud:hover, button.hud:focus-visible { opacity: 1; color: var(--text); }
+  button.hud:hover .go, button.hud:focus-visible .go { max-height: 2em; opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .hud .orb { animation: wink 3.2s ease-in-out infinite; }
+    @keyframes wink { 0%, 100% { opacity: 1; box-shadow: 0 0 6px 1px rgba(228, 197, 111, .55); } 50% { opacity: .5; box-shadow: 0 0 1px 0 rgba(228, 197, 111, .2); } }
+  }
+
+  /* 3. Compass tape along the top edge */
+  .c-tape { left: 0; right: 0; top: env(safe-area-inset-top); height: 30px; opacity: .45; transition: opacity .25s; touch-action: none; }
+  .c-tape canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .c-tape .tip { position: absolute; left: 50%; top: 31px; transform: translate(-50%, -3px); font: 9px/1 var(--mono); letter-spacing: .18em; color: var(--glow); opacity: 0; transition: opacity .25s, transform .3s var(--ease); white-space: nowrap; }
+  .c-tape:hover, .c-tape:focus-visible, .c-tape.pulling { opacity: 1; }
+  .c-tape:hover .tip, .c-tape:focus-visible .tip, .c-tape.pulling .tip { opacity: 1; transform: translate(-50%, 0); }
+
+  /* 4. Canopy / viewfinder corners */
+  .c-frame { inset: 0; pointer-events: none; }
+  .c-frame button { position: absolute; width: 44px; height: 44px; pointer-events: auto; }
+  .c-frame i { position: absolute; width: 11px; height: 11px; border: 0 solid var(--text); opacity: .5; transition: all .45s var(--ease); }
+  .c-frame .tl { left: env(safe-area-inset-left); top: env(safe-area-inset-top); } .c-frame .tl i { left: 12px; top: 12px; border-width: 1px 0 0 1px; }
+  .c-frame .tr { right: env(safe-area-inset-right); top: env(safe-area-inset-top); } .c-frame .tr i { right: 12px; top: 12px; border-width: 1px 1px 0 0; }
+  .c-frame .bl { left: env(safe-area-inset-left); bottom: env(safe-area-inset-bottom); } .c-frame .bl i { left: 12px; bottom: 12px; border-width: 0 0 1px 1px; }
+  .c-frame .br { right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); } .c-frame .br i { right: 12px; bottom: 12px; border-width: 0 1px 1px 0; }
+  .c-frame.lock i { border-color: var(--glow); opacity: 1; }
+  .c-frame.lock .tl i { left: 18px; top: 18px; } .c-frame.lock .tr i { right: 18px; top: 18px; }
+  .c-frame.lock .bl i { left: 18px; bottom: 18px; } .c-frame.lock .br i { right: 18px; bottom: 18px; }
+  .c-frame .tip { position: absolute; right: 22px; top: 36px; font: 9px/1 var(--mono); letter-spacing: .18em; color: var(--glow); opacity: 0; transition: opacity .25s; }
+  .c-frame.lock .tip { opacity: 1; }
+  body.entering .c-frame i, body.in-world .c-frame i { width: 22px; height: 22px; border-color: var(--glow); opacity: .8; transition-duration: 1.2s; }
+  body.entering .c-frame .tl i, body.in-world .c-frame .tl i { left: 8px; top: 8px; } body.entering .c-frame .tr i, body.in-world .c-frame .tr i { right: 8px; top: 8px; }
+  body.entering .c-frame .bl i, body.in-world .c-frame .bl i { left: 8px; bottom: 8px; } body.entering .c-frame .br i, body.in-world .c-frame .br i { right: 8px; bottom: 8px; }
+  body.in-world .c-frame .tip { opacity: 0; }
+
+  /* 7. Altimeter where the scrollbar would be */
+  .c-alt { right: env(safe-area-inset-right); top: 18vh; bottom: 18vh; width: 34px; opacity: .45; transition: opacity .25s; }
+  .c-alt canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .c-alt .tip { position: absolute; right: 34px; top: 50%; transform: translate(4px, -50%); font: 9px/1 var(--mono); letter-spacing: .18em; color: var(--glow); opacity: 0; transition: opacity .25s, transform .3s var(--ease); white-space: nowrap; }
+  .c-alt:hover, .c-alt:focus-visible { opacity: 1; }
+  .c-alt:hover .tip, .c-alt:focus-visible .tip { opacity: 1; transform: translate(0, -50%); }
+
+  /* In-world chrome */
+  .world { display: none; }
+  body.in-world .world { display: block; }
+  .w-title { left: calc(var(--edge) + 6px + env(safe-area-inset-left)); top: calc(var(--edge) + 4px + env(safe-area-inset-top)); font: 10px/1.6 var(--mono); letter-spacing: .14em; color: var(--muted); }
+  .w-title b { display: block; font: 300 22px/1.2 Petrona, Georgia, serif; letter-spacing: 0; color: var(--accent); margin-top: 2px; }
+  .w-exit { right: calc(var(--edge) + env(safe-area-inset-right)); top: calc(var(--edge) + env(safe-area-inset-top)); font: 10px/1 var(--mono); letter-spacing: .16em; color: var(--muted); padding: 10px 6px; }
+  .w-exit:hover, .w-exit:focus-visible { color: var(--glow); }
+  .w-feed { right: calc(var(--edge) + env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: center; gap: 10px; }
+  body.in-world .w-feed { display: flex; }
+  .w-feed button { width: 36px; height: 36px; color: var(--muted); font: 15px/1 var(--mono); }
+  .w-feed button:hover { color: var(--glow); }
+  .w-dots { display: flex; flex-direction: column; gap: 7px; }
+  .w-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); opacity: .45; transition: all .3s; }
+  .w-dots span.on { background: var(--glow); opacity: 1; transform: scale(1.4); }
+  .w-hint { left: 50%; bottom: calc(var(--edge) + 4px + env(safe-area-inset-bottom)); transform: translateX(-50%); font: 10px/1 var(--mono); letter-spacing: .14em; color: var(--muted); white-space: nowrap; opacity: 0; transition: opacity 1s 1.2s; }
+  body.in-world .w-hint { opacity: .8; }
+  body.in-world .hud { opacity: .9; color: var(--text); pointer-events: none; }
+  body.in-world .hud .go { display: none; }
+  body.in-world .world-hud { display: block; }
+  .world-hud { display: none; }
+  body.in-world[data-c="hud"] .world-hud, body.in-world .c-alt, body.in-world .c-jet { display: none; }
+
+  /* Mockup switcher (not part of any concept) */
+  #switcher { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+    background: rgba(12, 16, 23, .82); border: 1px solid rgba(200, 205, 213, .16); border-radius: 12px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    width: min(420px, calc(100vw - 132px)); font-size: 12px; transition: opacity .3s; }
+  body[data-c="footer"] #switcher, body[data-c="alt"] #switcher { bottom: auto; top: calc(10px + env(safe-area-inset-top)); }
+  body.in-world #switcher, body.entering #switcher { opacity: 0; pointer-events: none; }
+  .sw-bar { display: flex; align-items: center; gap: 4px; padding: 4px; }
+  .sw-bar button { padding: 7px 10px; border-radius: 8px; color: var(--muted); }
+  .sw-bar button:hover { color: var(--accent); background: rgba(200, 205, 213, .07); }
+  .sw-name { flex: 1; text-align: center; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sw-name small { color: var(--glow); font: 10px var(--mono); letter-spacing: .1em; margin-right: 6px; }
+  .sw-notes { display: none; padding: 2px 12px 10px; color: var(--text); line-height: 1.5; border-top: 1px solid rgba(200, 205, 213, .1); }
+  #switcher.open .sw-notes { display: block; }
+  .sw-notes p { margin: 8px 0 0; }
+  .sw-notes .k { color: var(--glow); font: 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; display: block; margin-bottom: 1px; }
+  .sw-notes label { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--muted); cursor: pointer; }
+  .sw-notes input { accent-color: var(--glow); }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 10px var(--mono); letter-spacing: .2em; color: var(--muted); z-index: 7; background: var(--bg); transition: opacity .6s; }
+  #loading.done { opacity: 0; pointer-events: none; }
+  @media (max-width: 640px) {
+    #switcher, body[data-c] #switcher { width: calc(100vw - 132px); bottom: auto; top: calc(8px + env(safe-area-inset-top)); }
+    body[data-c="tape"] #switcher { top: auto; bottom: calc(10px + env(safe-area-inset-bottom)); }
+    .sw-bar button { padding: 7px 8px; }
+  }
+</style>
+</head>
+<body data-c="hud">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- SR-71 planform, nose up: long chined nose, two mid-wing nacelles with spikes, blended delta -->
+  <symbol id="sr71" viewBox="0 0 52 100">
+    <path fill="currentColor" d="M26 0 L27 8 L28.6 20 L30.4 32 L32 42 L33 47 L33 45 L34.7 44.6 L36 39.5 L37.3 44.6 L39 45 L39.3 58 L51 87 L50.8 90 L39.3 92 L38.8 99 L33.2 99 L32.8 94 L28 96 L27 99.5 L26 100 L25 99.5 L24 96 L19.2 94 L18.8 99 L13.2 99 L12.7 92 L1.2 90 L1 87 L12.7 58 L13 45 L14.7 44.6 L16 39.5 L17.3 44.6 L19 45 L19 47 L20 42 L21.6 32 L23.4 20 L25 8 Z"/>
+  </symbol>
+</svg>
+
+<iframe id="lab" title="Website over the SR-71 scene" src="../sr71/"></iframe>
+
+<!-- 1 -->
+<button class="edge c-jet" data-concept="jet" data-enter aria-label="Fly: enter the 3D world">
+  <span class="trail"></span><svg class="jet"><use href="#sr71"/></svg><span class="tip">FLY</span>
+</button>
+
+<!-- 2: also reused as the in-world readout for every concept -->
+<button class="edge hud" data-concept="hud" data-enter aria-label="Enter the 3D world">
+  <span class="row"><span class="orb"></span><span data-alt>85,000</span> FT</span>
+  <span class="row">HDG <span data-hdg>274</span>°&nbsp;&nbsp;M3.2</span>
+  <span class="go">ENTER ›</span>
+</button>
+<div class="edge hud world-hud" aria-hidden="true">
+  <span class="row"><span class="orb"></span><span data-alt>85,000</span> FT</span>
+  <span class="row">HDG <span data-hdg>274</span>°&nbsp;&nbsp;M3.2</span>
+</div>
+
+<!-- 3 -->
+<button class="edge c-tape" data-concept="tape" data-enter aria-label="Enter the 3D world">
+  <canvas id="tape"></canvas><span class="tip">PULL DOWN ↓</span>
+</button>
+
+<!-- 4 -->
+<div class="edge c-frame" data-concept="frame">
+  <button class="tl" data-enter aria-label="Enter the 3D world"><i></i></button>
+  <button class="tr" data-enter aria-label="Enter the 3D world"><i></i></button>
+  <button class="bl" data-enter aria-label="Enter the 3D world"><i></i></button>
+  <button class="br" data-enter aria-label="Enter the 3D world"><i></i></button>
+  <span class="tip">LOOK OUT</span>
+</div>
+
+<!-- 7 -->
+<button class="edge c-alt" data-concept="alt" data-enter aria-label="Enter the 3D world">
+  <canvas id="altimeter"></canvas><span class="tip">DESCEND ›</span>
+</button>
+
+<!-- in-world chrome -->
+<div class="edge world w-title"><span data-idx>01 / 05</span><b data-world>Sierra Nevada</b></div>
+<button class="edge world w-exit" id="exit">BACK TO SITE&nbsp;&nbsp;✕</button>
+<div class="edge w-feed">
+  <button id="prev" aria-label="Previous world">⌃</button>
+  <div class="w-dots" id="dots"></div>
+  <button id="next" aria-label="Next world">⌄</button>
+</div>
+<div class="edge world w-hint" id="hint">DRAG TO LOOK · SCROLL FOR NEXT WORLD</div>
+
+<div id="veil"></div>
+<div id="loading">LOADING SCENE</div>
+
+<div id="switcher" class="open">
+  <div class="sw-bar">
+    <button id="sw-prev" aria-label="Previous concept">‹</button>
+    <button class="sw-name" id="sw-name" aria-expanded="true"></button>
+    <button id="sw-next" aria-label="Next concept">›</button>
+  </div>
+  <div class="sw-notes" id="sw-notes"></div>
+</div>
+
+<script>
+const CONCEPTS = [
+  { id: 'hud', name: 'HUD readout', what: 'A two-line instrument readout in the bottom-left margin: altitude, live heading (it follows the camera), Mach, and the site\'s gold orb winking as a status light. Hover adds "ENTER ›".',
+    click: 'Site fades out, the camera pushes in and swings, and the readout stays put as the world\'s own HUD. Feels continuous because the control is already part of the world.' },
+  { id: 'jet', name: 'SR-71 in the corner', what: 'A 28px SR-71 planform in the bottom-right corner, angled across the page. Hover: it noses forward, a short gold contrail draws behind it, "FLY" appears.',
+    click: 'The jet flies off toward the middle of the screen and vanishes into the scene as the site fades out. The most "easter egg" of the set, closest to the corner peel.' },
+  { id: 'tape', name: 'Compass tape, top edge', what: 'A heading tape across the very top of the viewport, ticking with the camera\'s heading as the backdrop drifts. Gold caret at center. Hover: "PULL DOWN".',
+    click: 'Click, or drag it down like pulling a blind, and the site drops away. The tape stays as the world\'s heading indicator.' },
+  { id: 'frame', name: 'Canopy corners', what: 'Four viewfinder brackets in the corners, framing the page as a window you are looking through. Hover any corner: all four turn gold and lock inward.',
+    click: 'Brackets snap out to the edges as the site fades, so the frame you saw becomes the canopy you look through.' },
+  { id: 'menu', name: 'Menu item', what: 'A fifth menu entry, set apart from About / Portfolio / Experience / Blog by a gap and in the muted color, with a tiny jet glyph: "Fly".',
+    click: 'Same transition as the others. The most explicit: people will find it, but it reads as content navigation rather than an edge secret.' },
+  { id: 'footer', name: 'Footer altitude', what: 'The footer reads "© 2026 Had Seddiqi · 85,000 ft". The altitude is the link and lights gold on hover, with the jet sliding in.',
+    click: 'Same transition. Pure easter egg: almost nobody scrolls to it, the people who do get rewarded.' },
+  { id: 'alt', name: 'Altimeter edge', what: 'A thin altimeter tape on the right edge, where a scrollbar would sit. Scrolling the page winds the altitude down from 85,000 ft. Hover: "DESCEND ›".',
+    click: 'Same transition. Ties in with the scroll-pan work: the page itself becomes a flight instrument.' },
+];
+const WORLDS = [['sierra', 'Sierra Nevada'], ['alps', 'Alps, Valais'], ['himalaya', 'Himalaya, Everest'], ['grandcanyon', 'Grand Canyon'], ['denali', 'Alaska Range, Denali']];
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+// Start the lab from its defaults (Had's chosen look) every time, so toggles here never stick.
+try { localStorage.removeItem('sr71-backdrop-v3'); } catch {}
+
+const params = new URLSearchParams(location.search);
+let ci = Math.max(0, CONCEPTS.findIndex((c) => c.id === params.get('c')));
+let plain = params.get('bg') === 'plain';
+let notesOpen = params.get('notes') !== '0';
+let state = 'site';   // site | entering | world | leaving
+let wi = 0;
+const labFrame = $('#lab');
+const L = () => labFrame.contentWindow && labFrame.contentWindow.__lab;
+const labDoc = () => labFrame.contentDocument;
+const siteFrame = () => labDoc() && labDoc().getElementById('site');
+const siteDoc = () => { try { return siteFrame().contentDocument; } catch { return null; } };
+
+// ---------- lab wiring ----------
+function prepLab() {
+  const doc = labDoc();
+  if (!doc.getElementById('edge-mock')) {
+    const st = doc.createElement('style'); st.id = 'edge-mock';
+    st.textContent = '#panel{display:none!important} #site{transition:opacity .9s ease}';
+    doc.head.appendChild(st);
+  }
+  const f = siteFrame();
+  if (f && !f.__edge) { f.__edge = true; f.addEventListener('load', decorateSite); }
+  decorateSite();
+  // In the world: the wheel flips worlds instead of zooming, keys work while the iframe has focus.
+  const w = labFrame.contentWindow;
+  if (!w.__edge) {
+    w.__edge = true;
+    w.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    w.addEventListener('keydown', onKey);
+    let ty = null;
+    w.addEventListener('touchstart', (e) => { if (state === 'world' && e.touches.length === 1) ty = { y: e.touches[0].clientY, x: e.touches[0].clientX, t: performance.now() }; }, { passive: true });
+    w.addEventListener('touchend', (e) => {
+      if (!ty || state !== 'world') return;
+      const t = e.changedTouches[0], dy = t.clientY - ty.y, dx = t.clientX - ty.x;
+      if (Math.abs(dy) > 70 && Math.abs(dy) > Math.abs(dx) * 1.6 && performance.now() - ty.t < 450) go(wi + (dy < 0 ? 1 : -1));
+      ty = null;
+    }, { passive: true });
+  }
+}
+const waitLab = setInterval(() => {
+  const lab = L();
+  if (!lab) return;
+  clearInterval(waitLab);
+  prepLab();
+  applyBg();
+  setTimeout(() => $('#loading').classList.add('done'), 500);
+}, 100);
+labFrame.addEventListener('load', () => { const t = setInterval(() => { if (L()) { clearInterval(t); prepLab(); applyBg(); } }, 100); });
+
+function applyBg() {
+  const lab = L(); if (!lab) return;
+  lab.S.siteBg = plain ? 1 : 0.49;
+  lab.apply();
+}
+
+// Concepts 5 and 6 live inside the site page itself.
+const JET_SVG = '<svg viewBox="0 0 52 100" width="8" height="15" aria-hidden="true" style="vertical-align:-3px;margin-right:7px;transform:rotate(90deg)"><path fill="currentColor" d="' + document.querySelector('#sr71 path').getAttribute('d') + '"/></svg>';
+function decorateSite() {
+  const doc = siteDoc(); if (!doc || !doc.head) return;
+  if (!doc.getElementById('edge-mock-site')) {
+    const st = doc.createElement('style'); st.id = 'edge-mock-site';
+    st.textContent = `
+      .edge-only { display: none !important; }
+      html[data-c="menu"] .edge-menu, html[data-c="footer"] .edge-foot { display: revert !important; }
+      .edge-menu { margin-top: 1.4rem !important; }
+      .edge-menu a { color: var(--muted); }
+      .edge-menu a:hover { color: var(--glow); text-decoration: none; }
+      .edge-foot a { color: var(--muted); }
+      .edge-foot a svg { display: inline-block; width: 0; opacity: 0; margin-right: 0 !important; transition: all .35s cubic-bezier(.2,.7,.2,1); }
+      .edge-foot a:hover { color: var(--glow); text-decoration: none; }
+      .edge-foot a:hover svg { width: 8px; opacity: 1; margin-right: 6px !important; }
+      @media (max-width: 640px) { .edge-menu { margin-top: 0 !important; margin-left: auto !important; } }
+    `;
+    doc.head.appendChild(st);
+  }
+  const ul = doc.querySelector('.menu ul');
+  if (ul && !doc.querySelector('.edge-menu')) {
+    const li = doc.createElement('li'); li.className = 'edge-only edge-menu';
+    li.innerHTML = `<a href="#fly">${JET_SVG}Fly</a>`;
+    ul.appendChild(li);
+  }
+  const foot = doc.querySelector('footer');
+  if (foot && !doc.querySelector('.edge-foot')) {
+    const span = doc.createElement('span'); span.className = 'edge-only edge-foot';
+    span.innerHTML = ` · <a href="#fly">${JET_SVG}85,000 ft</a>`;
+    foot.appendChild(span);
+  }
+  for (const a of doc.querySelectorAll('a[href="#fly"]')) a.onclick = (e) => { e.preventDefault(); enter(); };
+  doc.documentElement.dataset.c = CONCEPTS[ci].id;
+}
+
+// ---------- instruments ----------
+function heading() {
+  const lab = L(); if (!lab) return 274;
+  const p = lab.camera.position, t = lab.controls.target;
+  const th = Math.atan2(p.x - t.x, p.z - t.z) + lab.G.yaw;
+  const dx = -Math.sin(th), dz = -Math.cos(th);
+  return ((Math.atan2(dx, -dz) * 180 / Math.PI) % 360 + 360) % 360;
+}
+function siteScroll() {
+  const d = siteDoc(); if (!d || !d.scrollingElement) return 0;
+  const el = d.scrollingElement, max = Math.max(1, el.scrollHeight - el.clientHeight);
+  return el.scrollTop / max;
+}
+const tape = $('#tape'), alti = $('#altimeter');
+function fit(c) {
+  const r = c.getBoundingClientRect(), k = Math.min(devicePixelRatio || 1, 2);
+  if (c.width !== Math.round(r.width * k) || c.height !== Math.round(r.height * k)) { c.width = Math.round(r.width * k); c.height = Math.round(r.height * k); }
+  const g = c.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0); g.clearRect(0, 0, r.width, r.height); return [g, r.width, r.height];
+}
+function drawTape(h) {
+  const [g, w] = fit(tape); if (!w) return;
+  const ppd = Math.max(5, Math.min(8, w / 140)), cx = w / 2;
+  g.font = '9px ui-monospace, Menlo, monospace'; g.textAlign = 'center'; g.textBaseline = 'top';
+  g.strokeStyle = '#8a919c'; g.fillStyle = '#8a919c'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, 0.5); g.lineTo(w, 0.5); g.globalAlpha = 0.35; g.stroke(); g.globalAlpha = 1;
+  const span = Math.ceil(cx / ppd) + 5;
+  for (let d = Math.floor(h - span); d <= h + span; d++) {
+    if (d % 5) continue;
+    const x = Math.round(cx + (d - h) * ppd) + 0.5, n = ((d % 360) + 360) % 360;
+    const fade = Math.max(0, 1 - Math.abs(x - cx) / (cx * 1.05));
+    g.globalAlpha = 0.25 + 0.75 * fade;
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, n % 10 ? 4 : 7); g.stroke();
+    if (n % 30 === 0) { const lab = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[n] ?? String(n / 10).padStart(2, '0'); g.fillText(lab, x, 10); }
+  }
+  g.globalAlpha = 1; g.fillStyle = '#e4c56f';
+  g.beginPath(); g.moveTo(cx - 4, 0); g.lineTo(cx + 4, 0); g.lineTo(cx, 5); g.closePath(); g.fill();
+  g.font = '9px ui-monospace, Menlo, monospace'; g.fillText(String(Math.round(h) % 360).padStart(3, '0'), cx, 21);
+}
+function drawAlt(frac) {
+  const [g, w, hgt] = fit(alti); if (!hgt) return;
+  const ft = 85000 - frac * 85000 * 0.6;   // the whole page spans 85k down to 34k
+  const ppf = hgt / 30000, cy = hgt / 2, x0 = w - 2;
+  g.font = '8px ui-monospace, Menlo, monospace'; g.textAlign = 'right'; g.textBaseline = 'middle';
+  g.strokeStyle = '#8a919c'; g.fillStyle = '#8a919c'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(x0 + 0.5, 0); g.lineTo(x0 + 0.5, hgt); g.globalAlpha = 0.3; g.stroke();
+  for (let f = Math.floor((ft - 16000) / 1000) * 1000; f <= ft + 16000; f += 1000) {
+    const y = Math.round(cy - (f - ft) * ppf) + 0.5; if (y < 0 || y > hgt) continue;
+    g.globalAlpha = 0.2 + 0.8 * Math.max(0, 1 - Math.abs(y - cy) / cy);
+    const major = f % 5000 === 0;
+    g.beginPath(); g.moveTo(x0 - (major ? 7 : 3), y); g.lineTo(x0, y); g.stroke();
+    if (major && Math.abs(y - cy) > 9) g.fillText(String(f / 1000), x0 - 10, y);
+  }
+  g.globalAlpha = 1; g.fillStyle = '#e4c56f';
+  g.beginPath(); g.moveTo(x0 - 1, cy); g.lineTo(x0 - 6, cy - 3.5); g.lineTo(x0 - 6, cy + 3.5); g.closePath(); g.fill();
+  g.fillText(String(Math.round(ft / 100) / 10), x0 - 9, cy);
+}
+function tick() {
+  requestAnimationFrame(tick);
+  const h = heading();
+  for (const el of $$('[data-hdg]')) el.textContent = String(Math.round(h) % 360).padStart(3, '0');
+  const lab = L(); if (lab) for (const el of $$('[data-alt]')) el.textContent = Number(lab.S.altitudeFt).toLocaleString('en-US');
+  const id = CONCEPTS[ci].id;
+  if (id === 'tape' || (state !== 'site' && id === 'tape')) drawTape(h);
+  if (id === 'alt' && state === 'site') drawAlt(siteScroll());
+}
+tick();
+
+// ---------- enter / leave ----------
+let anim = null;
+function animate(ms, fn, done) {
+  cancelAnimationFrame(anim);
+  const t0 = performance.now();
+  const step = (now) => { const t = Math.min(1, (now - t0) / ms); fn(t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2); if (t < 1) anim = requestAnimationFrame(step); else done && done(); };
+  anim = requestAnimationFrame(step);
+}
+let home = null;
+function cameraMove(toward, yaw, ms) {
+  const lab = L(); if (!lab || reduceMotion) return;
+  const p0 = lab.camera.position.clone(), t = lab.controls.target.clone(), off = p0.clone().sub(t), y0 = lab.G.sideYaw;
+  animate(ms, (k) => {
+    lab.camera.position.copy(t).add(off.clone().multiplyScalar(1 + (toward - 1) * k));
+    lab.G.sideYaw = y0 + yaw * k;
+  });
+}
+function enter() {
+  if (state !== 'site') return;
+  const lab = L(); if (!lab) return;
+  state = 'entering';
+  document.body.classList.add('entering');
+  home = { pos: lab.camera.position.clone(), yaw: lab.G.sideYaw };
+  lab.S.siteOpacity = 0; lab.apply();
+  cameraMove(0.72, 0.45, 2600);
+  lab.S.driftSpeed = 0.15; lab.apply();
+  setTimeout(() => {
+    lab.S.site = false; lab.apply();
+    document.body.classList.remove('entering'); document.body.classList.add('in-world');
+    state = 'world'; renderWorld();
+    labFrame.focus();
+  }, 1100);
+}
+function leave() {
+  if (state !== 'world') return;
+  const lab = L(); state = 'leaving';
+  document.body.classList.remove('in-world');
+  lab.S.driftSpeed = 0.02; lab.S.siteOpacity = 0; lab.S.site = true; lab.apply();
+  requestAnimationFrame(() => requestAnimationFrame(() => { lab.S.siteOpacity = 1; lab.apply(); }));
+  if (home && !reduceMotion) {
+    const p0 = lab.camera.position.clone(), y0 = lab.G.sideYaw, h = home;
+    animate(1400, (k) => { lab.camera.position.lerpVectors(p0, h.pos, k); lab.G.sideYaw = y0 + (h.yaw - y0) * k; });
+  }
+  setTimeout(() => { state = 'site'; }, 950);
+}
+function renderWorld() {
+  $('[data-idx]').textContent = `${String(wi + 1).padStart(2, '0')} / ${String(WORLDS.length).padStart(2, '0')}`;
+  $('[data-world]').textContent = WORLDS[wi][1];
+  $('#dots').innerHTML = WORLDS.map((_, i) => `<span class="${i === wi ? 'on' : ''}"></span>`).join('');
+}
+let switching = false;
+function go(i) {
+  if (state !== 'world' || switching) return;
+  i = (i + WORLDS.length) % WORLDS.length; if (i === wi) return;
+  switching = true; wi = i;
+  $('#veil').classList.add('on');
+  setTimeout(() => {
+    const lab = L();
+    lab.S.region = WORLDS[wi][0]; lab.S.offsetX = null; lab.S.offsetZ = null; lab.apply(); lab.sync();
+    lab.camera.position.set(52, 14, -48).multiplyScalar(0.72); lab.controls.target.set(0, 0, 1); lab.G.sideYaw = 0;
+    home = { pos: lab.camera.position.clone().multiplyScalar(1 / 0.72), yaw: 0 };
+    renderWorld();
+    setTimeout(() => { $('#veil').classList.remove('on'); switching = false; }, 650);
+  }, 340);
+}
+let wheelAcc = 0, wheelT = 0;
+function onWheel(e) {
+  if (state !== 'world') return;
+  e.preventDefault(); e.stopPropagation();
+  const now = performance.now(); if (now - wheelT > 300) wheelAcc = 0; wheelT = now;
+  wheelAcc += e.deltaY;
+  if (Math.abs(wheelAcc) > 60) { go(wi + Math.sign(wheelAcc)); wheelAcc = 0; wheelT = now + 600; }
+}
+function onKey(e) {
+  if (state === 'world') {
+    if (e.key === 'Escape') leave();
+    if (e.key === 'ArrowDown' || e.key === 'j') go(wi + 1);
+    if (e.key === 'ArrowUp' || e.key === 'k') go(wi - 1);
+  } else if (state === 'site' && !e.target.closest?.('input, textarea')) {
+    if (e.key === 'ArrowRight' && e.shiftKey) setConcept(ci + 1);
+    if (e.key === 'ArrowLeft' && e.shiftKey) setConcept(ci - 1);
+  }
+}
+addEventListener('keydown', onKey);
+addEventListener('wheel', onWheel, { passive: false });
+for (const b of $$('[data-enter]')) b.addEventListener('click', enter);
+$('#exit').addEventListener('click', leave);
+$('#next').addEventListener('click', () => go(wi + 1));
+$('#prev').addEventListener('click', () => go(wi - 1));
+
+// Frame corners lock together on hover.
+const frameEl = $('.c-frame');
+for (const b of $$('.c-frame button')) {
+  b.addEventListener('pointerenter', () => frameEl.classList.add('lock'));
+  b.addEventListener('pointerleave', () => frameEl.classList.remove('lock'));
+  b.addEventListener('focus', () => frameEl.classList.add('lock'));
+  b.addEventListener('blur', () => frameEl.classList.remove('lock'));
+}
+// Tape: click, or drag it down.
+{
+  const el = $('.c-tape'); let y0 = null, dragged = false;
+  el.addEventListener('pointerdown', (e) => { y0 = e.clientY; dragged = false; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', (e) => {
+    if (y0 == null) return;
+    const dy = Math.max(0, e.clientY - y0);
+    if (dy > 4) { dragged = true; el.classList.add('pulling'); const f = siteFrame(); if (f) f.style.opacity = String(Math.max(0, 1 - dy / 160)); }
+    if (dy > 90) { y0 = null; el.classList.remove('pulling'); enter(); }
+  });
+  const end = () => { if (y0 != null && dragged) { const f = siteFrame(); if (f) f.style.opacity = '1'; } y0 = null; el.classList.remove('pulling'); };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('click', (e) => { if (dragged) { e.stopImmediatePropagation(); dragged = false; } }, true);
+}
+
+// ---------- switcher ----------
+function setConcept(i) {
+  ci = (i + CONCEPTS.length) % CONCEPTS.length;
+  const c = CONCEPTS[ci];
+  document.body.dataset.c = c.id;
+  $('#sw-name').innerHTML = `<small>${ci + 1}/${CONCEPTS.length}</small>${c.name}`;
+  $('#sw-notes').innerHTML = `<p><span class="k">What you see</span>${c.what}</p><p><span class="k">On click</span>${c.click}</p>
+    <p style="color:var(--muted)">Inside the world: drag to look, scroll or swipe up for the next world, Esc or Back to return.</p>
+    <label><input type="checkbox" id="sw-plain" ${plain ? 'checked' : ''}> Plain site (no backdrop behind it, like today)</label>`;
+  $('#sw-plain').onchange = (e) => { plain = e.target.checked; applyBg(); writeUrl(); };
+  const d = siteDoc(); if (d) d.documentElement.dataset.c = c.id;
+  writeUrl();
+}
+function writeUrl() {
+  const q = new URLSearchParams({ c: CONCEPTS[ci].id }); if (plain) q.set('bg', 'plain'); if (!notesOpen) q.set('notes', '0');
+  history.replaceState(null, '', `?${q}`);
+}
+$('#sw-prev').onclick = () => setConcept(ci - 1);
+$('#sw-next').onclick = () => setConcept(ci + 1);
+$('#sw-name').onclick = () => { notesOpen = !notesOpen; $('#switcher').classList.toggle('open', notesOpen); $('#sw-name').setAttribute('aria-expanded', notesOpen); writeUrl(); };
+$('#switcher').classList.toggle('open', notesOpen);
+setConcept(ci);
+</script>
+</body>
+</html>

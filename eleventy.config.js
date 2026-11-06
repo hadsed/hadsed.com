@@ -45,6 +45,8 @@ export default function (eleventyConfig) {
       [`${lab}/vendor/OrbitControls.js`]: "lab/sr71/vendor/OrbitControls.js",
       [`${lab}/terrain/regions.json`]: "lab/sr71/terrain/regions.json",
       [`${lab}/terrain/*.png`]: "lab/sr71/terrain",
+      // edge-affordance mockups that sit on top of the lab
+      [`${lab}/edge-affordances.html`]: "lab/edge/index.html",
     });
   }
 
