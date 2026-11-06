@@ -21,7 +21,7 @@ concurrency:
 jobs:
   devices:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       WRANGLER_SEND_METRICS: 'false'
     steps:
@@ -35,12 +35,14 @@ jobs:
       - run: npm ci
         working-directory: flight/server
       - name: Install Playwright and its three engines
-        # A stuck browser download once ate the whole 30 minute budget; fail
-        # fast and try once more instead.
-        timeout-minutes: 12
+        # System libraries come from the Ubuntu mirror, which is sometimes
+        # very slow but gets there; the browsers come from Playwright's CDN,
+        # where a stuck download is retried instead of eating the job.
+        timeout-minutes: 20
         run: |
           npm i --no-save playwright@1.63.0
-          timeout 300 npx playwright install --with-deps chromium webkit firefox || timeout 300 npx playwright install --with-deps chromium webkit firefox
+          npx playwright install-deps chromium webkit firefox
+          for i in 1 2 3; do timeout 240 npx playwright install chromium webkit firefox && break; echo "browser download stalled, retrying"; done
       - name: Start the room server (local Durable Objects)
         working-directory: flight/server
         run: |
