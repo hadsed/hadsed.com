@@ -139,10 +139,17 @@ async function run(browser, site, cfg) {
   try {
     const t0 = Date.now();
     await page.goto(`${site.url}/lab/flight/?server=${encodeURIComponent(shaper.url)}`, { waitUntil: 'load' });
-    await page.waitForFunction(() => window.__flight?.jet, null, { timeout: 20000 });
+    // Poll on a timer, not on animation frames: a browser that never paints
+    // (no WebGL, throttled headless) would otherwise hide why it stalled.
+    try {
+      await page.waitForFunction(() => window.__flight?.jet, null, { timeout: 20000, polling: 250 });
+    } catch {
+      const why = await page.evaluate(() => `status "${document.getElementById('status')?.textContent}", help "${document.getElementById('help')?.textContent.trim()}"`).catch(() => 'page unreachable');
+      throw new Error(`game never started: ${why}; ${errors.slice(0, 3).join(' | ') || 'no console errors'}`);
+    }
     result.loadMs = Date.now() - t0;
     try {
-      await page.waitForFunction(() => document.getElementById('status').textContent === 'shared sky', null, { timeout: 20000 });
+      await page.waitForFunction(() => document.getElementById('status').textContent === 'shared sky', null, { timeout: 20000, polling: 250 });
       result.onlineMs = Date.now() - t0;
       check('joins the shared sky', true, `${result.onlineMs} ms on ${cfg.net}`);
     } catch { check('joins the shared sky', false, (await page.evaluate(flightState)).status); }
@@ -194,7 +201,8 @@ async function run(browser, site, cfg) {
       document.dispatchEvent(g);
       return { wheel: w.defaultPrevented, pinch: z.defaultPrevented, gesture: g.defaultPrevented };
     });
-    await page.mouse.move(cx, cy); await page.mouse.wheel(0, 600);
+    // Real wheel input too, where Playwright can send it (not mobile WebKit).
+    if (!(cfg.engine === 'webkit' && desc.isMobile)) { await page.mouse.move(cx, cy); await page.mouse.wheel(0, 600); }
     const after = await page.evaluate(probeHud);
     check('trackpad scroll and pinch are swallowed', gest.wheel && gest.pinch && gest.gesture && after.scrollY === 0 && after.scale === 1, JSON.stringify({ ...gest, scrollY: after.scrollY, scale: after.scale }));
 
