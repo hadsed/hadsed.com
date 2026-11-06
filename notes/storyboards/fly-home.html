@@ -56,8 +56,10 @@ const JET_SVG = '<svg class="fly-jet" viewBox="24 24 464 464" aria-hidden="true"
 const SITE_CSS = `
   .fly-jet { width: 15px; height: 15px; vertical-align: -2px; margin-right: 8px; transition: transform .35s cubic-bezier(.2,.7,.2,1); }
   .menu .fly-item { margin: 1.4rem 0 0; }
-  .fly-item a { color: var(--muted); white-space: nowrap; }
-  .fly-item a:hover, .fly-item a:focus-visible { color: var(--glow); text-decoration: none; }
+  /* Same font, size and color as the other menu items, framed so it reads as a button. */
+  .fly-item a { color: var(--text); white-space: nowrap; display: inline-block; padding: .3em .75em .3em .6em;
+    border: 1px solid rgba(200, 205, 213, .45); border-radius: 4px; transition: border-color .2s, color .2s; }
+  .fly-item a:hover, .fly-item a:focus-visible { color: var(--glow); border-color: var(--glow); text-decoration: none; }
   .fly-item a:hover .fly-jet, .fly-item a:focus-visible .fly-jet { transform: translate(2.5px, -2.5px); }
   /* Fixed rather than sticky: on short pages the grid row is no taller than the menu. */
   @media (min-width: 641px) {
@@ -67,7 +69,8 @@ const SITE_CSS = `
     .menu ul { flex: 1; display: flex; flex-direction: column; }
     .menu .fly-item { margin: auto 0 0; }
   }
-  @media (max-width: 640px) { .menu .fly-item { margin: 0 0 0 auto; } }
+  /* phones: centered on the menu row, without making the row taller */
+  @media (max-width: 640px) { .menu ul { align-items: center; } .menu .fly-item { margin: -.4em 0 -.4em auto; } }
 `;
 function decorateSite() {
   const doc = siteDoc(); if (!doc || !doc.head) return;
@@ -154,10 +157,11 @@ let lastG = performance.now();
 })(performance.now());
 
 // ---------- Fly blink: a slow swell to the gold of the "next role" orb and back ----------
-const MUTED = [138, 145, 156], GOLD = [228, 197, 111];
+const MUTED = [200, 205, 213], GOLD = [228, 197, 111];   // --text, --glow
 const EVERY = 5, LEN = 2, STR = 0.95, HALO = 2;
 const mix = (k) => `rgb(${MUTED.map((m, i) => Math.round(m + (GOLD[i] - m) * k)).join(',')})`;
 const FRAMES = [[0, 0], [0.5, 1], [1, 0]].map(([offset, v]) => ({ offset, easing: 'cubic-bezier(.37,0,.63,1)', color: mix(v * STR),
+  borderColor: v ? mix(v * STR) : 'rgba(200, 205, 213, .45)',
   filter: `drop-shadow(0 0 ${(v * HALO).toFixed(2)}px rgba(228,197,111,${(v * STR * 0.55).toFixed(3)}))` }));
 if (!reduceMotion) setTimeout(function blink() {
   const doc = siteDoc(), a = doc && doc.querySelector('.fly-item a');
