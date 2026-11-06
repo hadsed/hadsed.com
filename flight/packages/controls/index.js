@@ -78,3 +78,4 @@ export { keyboard } from './sources/keyboard.js';
 export { pointerStick } from './sources/pointer.js';
 export { gamepad } from './sources/gamepad.js';
 export { scripted } from './sources/scripted.js';
+export { tilt } from './sources/tilt.js';

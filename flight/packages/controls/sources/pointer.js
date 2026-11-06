@@ -1,7 +1,7 @@
 // A virtual stick: press anywhere on the element and drag. Distance from the
 // press point, divided by `radius` pixels, becomes the axis value.
-// pointerStick({ element, x: 'roll', y: 'pitch', radius: 80 })
-export function pointerStick({ element, x, y, radius = 80, invertY = false, deadzone = 0.06 } = {}) {
+// pointerStick({ element, x: 'roll', y: 'pitch', radius: 80, invertX: false, invertY: false })
+export function pointerStick({ element, x, y, radius = 80, invertX = false, invertY = false, deadzone = 0.06 } = {}) {
   let origin = null, cur = null, pointerId = null;
   const onDown = (e) => {
     if (pointerId !== null || e.button > 0) return;
@@ -35,7 +35,7 @@ export function pointerStick({ element, x, y, radius = 80, invertY = false, dead
     },
     poll(sink) {
       if (!origin) return;
-      if (x) sink.axis(x, shape((cur.x - origin.x) / radius));
+      if (x) sink.axis(x, shape(((cur.x - origin.x) / radius) * (invertX ? -1 : 1)));
       if (y) sink.axis(y, shape(((cur.y - origin.y) / radius) * (invertY ? -1 : 1)));
     },
     // Where the stick is, for drawing an on-screen indicator.

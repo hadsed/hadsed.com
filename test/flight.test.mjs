@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createJet, step, forwardOf, rightOf, cloneJet, LIMITS, STEP } from '../flight/packages/sim/index.js';
 import { encodeState, decodeState, encodeSnapshot, decodeSnapshot, ENTRY_BYTES } from '../flight/packages/net/protocol.js';
 import { createRemotes } from '../flight/packages/net/interp.js';
-import { createControls, scripted, keyboard } from '../flight/packages/controls/index.js';
-import { createPilot } from '../flight/packages/bots/pilot.js';
+import { createControls, scripted, keyboard, tilt } from '../flight/packages/controls/index.js';
+import { createPilot, escort } from '../flight/packages/bots/pilot.js';
 import { createRoom } from '../flight/server/room.js';
 
 const seeded = (s = 1) => () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -195,4 +195,30 @@ test('room: only the nearest jets are sent', () => {
   conns.forEach((c, i) => room.join({ send: c.send, ip: `i${i}` }));
   t += 100; room.tick(0.1);
   assert.equal(conns[0].snaps().at(-1).entries.length, 5);
+});
+
+test('follow: escort() flies a player from 20 km out onto the leader\'s wing', () => {
+  const lead = createJet({ x: 0, z: 0, heading: 0, speed: 850, throttle: 0.75 });
+  const me = createJet({ x: 15000, z: 14000, heading: 1.2, speed: 900 });
+  const intent = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+  let d = Infinity;
+  for (let i = 0; i < 60 * 150; i++) { d = escort(intent, me, lead, 1); step(me, intent); step(lead); }
+  assert.ok(d < 600, `holding the slot (off by ${Math.round(d)} m)`);
+});
+
+test('controls: tilt is relative to the grip when enabled, right and toward you are +', async () => {
+  const listeners = {};
+  const target = { DeviceOrientationEvent: function () {}, screen: { orientation: { angle: 0 } },
+    addEventListener: (t, f) => { listeners[t] = f; }, removeEventListener: () => {} };
+  const t = tilt({ x: 'roll', y: 'pitch', range: 25, target });
+  const c = createControls({ axes: ['roll', 'pitch'], sources: [t] });
+  assert.equal(await t.enable(), true);
+  listeners.deviceorientation({ beta: 40, gamma: 0 });        // comfortable grip = neutral
+  assert.deepEqual({ ...c.read().axes }, { roll: 0, pitch: 0 });
+  listeners.deviceorientation({ beta: 52, gamma: 30 });       // tilt right, top toward you
+  const a = c.read().axes;
+  assert.equal(a.roll, 1);
+  assert.ok(a.pitch > 0.3 && a.pitch < 0.6);
+  t.disable();
+  assert.deepEqual({ ...c.read().axes }, { roll: 0, pitch: 0 });
 });

@@ -1,12 +1,13 @@
 // The only file that knows about every part. It wires controls -> sim -> net
 // -> render and runs the loop. Everything interesting lives in packages/.
-import { createControls, keyboard, pointerStick, gamepad } from './packages/controls/index.js';
+import { createControls, keyboard, pointerStick, gamepad, tilt } from './packages/controls/index.js';
 import { createJet, step, cloneJet, copyJet, lerpJet, STEP } from './packages/sim/index.js';
 import { connect } from './packages/net/client.js';
 import { createRemotes } from './packages/net/interp.js';
 import { FLAG } from './packages/net/protocol.js';
 import { loadManifest } from './packages/assets/index.js';
 import { createRenderer } from './packages/render/index.js';
+import { escort } from './packages/bots/pilot.js';
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
@@ -21,7 +22,10 @@ const world = manifest.worlds.find((w) => w.id === params.get('world')) || manif
 
 // ---- controls (the SDK knows nothing about jets; we name the axes here) ----
 const canvas = $('view');
-const stick = pointerStick({ element: canvas, x: 'roll', y: 'pitch', radius: Math.min(innerWidth, innerHeight) * 0.18 });
+// Phones and tablets can steer by tilting; off until the TILT button is tapped.
+const tilter = tilt({ x: 'roll', y: 'pitch', range: 25 });
+// Drag like you are pulling the jet by its tail: down climbs, left banks right.
+const stick = pointerStick({ element: canvas, x: 'roll', y: 'pitch', invertX: true, radius: Math.min(innerWidth, innerHeight) * 0.18 });
 const controls = createControls({
   axes: ['pitch', 'roll', 'yaw', 'throttle'],
   actions: ['waggle'],
@@ -37,6 +41,7 @@ const controls = createControls({
     }),
     stick,
     gamepad({ axes: { roll: 0, pitch: 1, yaw: 2 }, buttons: { waggle: 0 } }),
+    tilter,
   ],
 });
 window.__flight = { controls };   // hook for voice/gesture experiments in the console
@@ -105,6 +110,7 @@ function labels(camera, list) {
     s.style.left = `${(proj.x * 0.5 + 0.5) * w}px`;
     s.style.top = `${(-proj.y * 0.5 + 0.5) * h}px`;
     s.textContent = `${r.callsign || ''} ${d < 10000 ? Math.round(d) + ' m' : (d / 1000).toFixed(0) + ' km'}`;
+    s.className = follow && r.id === follow.id ? 'on' : '';
     n++;
   }
   for (let i = n; i < spans.length; i++) spans[i].style.display = 'none';
@@ -141,7 +147,7 @@ function frame(nowMs) {
     const input = controls.read(STEP);
     if (input.pressed.waggle) waggleLeft = 1.2;
     copyJet(prev, jet);
-    step(jet, input.axes, STEP);
+    step(jet, followAxes(input.axes), STEP);
     waggleLeft = Math.max(0, waggleLeft - STEP);
     jet.flags = waggleLeft > 0 ? FLAG.WAGGLE : 0;
     if (!helpHidden && input.active.size) { helpHidden = true; setTimeout(() => ($('help').style.opacity = 0.25), 6000); }
@@ -168,3 +174,70 @@ function frame(nowMs) {
   if (st) { stickDot.style.left = `${st.cur.x}px`; stickDot.style.top = `${st.cur.y}px`; }
 }
 requestAnimationFrame(frame);
+
+
+// ---- tilt toggle (touch devices with motion sensors) ----
+const tiltBtn = $('tilt');
+if (tilter.supported && matchMedia('(pointer: coarse)').matches) {
+  tiltBtn.hidden = false;
+  tiltBtn.addEventListener('click', async () => {
+    if (tilter.enabled) { tilter.disable(); tiltBtn.textContent = 'tilt'; tiltBtn.classList.remove('on'); return; }
+    if (await tilter.enable()) { tiltBtn.textContent = 'tilt on'; tiltBtn.classList.add('on'); }
+    else tiltBtn.textContent = 'tilt blocked';
+  });
+}
+Object.assign(window.__flight, { tilt: tilter });
+
+// ---- follow: tap or click another jet and the autopilot flies you onto its wing ----
+// It is the same escort autopilot the bots use. Any stick, key or pad input
+// hands control back; so does tapping empty sky, or the other jet leaving.
+let follow = null;   // { id, side }
+const followIntent = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+let press = null;
+canvas.addEventListener('pointerdown', (e) => { press = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+canvas.addEventListener('pointerup', (e) => {
+  if (!press) return;
+  const tap = Math.hypot(e.clientX - press.x, e.clientY - press.y) < 8 && performance.now() - press.t < 350;
+  press = null;
+  if (!tap) return;
+  const id = pickJet(e.clientX, e.clientY);
+  if (id !== null) startFollow(id); else stopFollow();
+});
+
+function pickJet(x, y) {
+  const cam = renderer.camera;
+  let best = null, bestD = 56;   // px; generous so thumbs can hit a jet a few pixels wide
+  for (const r of remoteList) {
+    if (!r.view || !r.visible) continue;
+    proj.set(r.view.pos[0], r.view.pos[1], r.view.pos[2]).project(cam);
+    if (proj.z > 1) continue;
+    const sx = (proj.x * 0.5 + 0.5) * innerWidth, sy = (-proj.y * 0.5 + 0.5) * innerHeight;
+    const d = Math.min(Math.hypot(sx - x, sy - y), Math.hypot(sx - x, sy - 18 - y));   // the jet or its label
+    if (d < bestD) { bestD = d; best = r.id; }
+  }
+  return best;
+}
+
+function startFollow(id) {
+  follow = { id, side: Math.random() < 0.5 ? -1 : 1 };
+  window.__flight.follow = follow;
+}
+
+function stopFollow() {
+  follow = null;
+  window.__flight.follow = null;
+  $('following').hidden = true;
+}
+
+function followAxes(axes) {
+  if (!follow) return axes;
+  if (Math.abs(axes.pitch) > 0.15 || Math.abs(axes.roll) > 0.15 || Math.abs(axes.yaw) > 0.15 || Math.abs(axes.throttle) > 0.15) { stopFollow(); return axes; }
+  const r = remotes.remotes.get(follow.id);
+  if (!r?.view || !r.visible) { stopFollow(); return axes; }
+  const d = escort(followIntent, jet, r.view, follow.side);
+  const el = $('following');
+  el.hidden = false;
+  el.textContent = `following ${r.callsign || ''}${d > 1500 ? ` · ${d < 10000 ? Math.round(d) + ' m' : (d / 1000).toFixed(0) + ' km'}` : ''}`;
+  return followIntent;
+}
+Object.assign(window.__flight, { startFollow, stopFollow });

@@ -44,6 +44,10 @@ Rules that keep sources composable:
 - Heavy work (pose models, speech) belongs in a Worker; `poll` should only
   read the latest result.
 
+`tilt({ x, y, range })` reads the phone's motion sensors. Call `enable()`
+from a tap (iOS asks permission there); the grip at that moment is neutral,
+and `calibrate()` re-zeroes it.
+
 `scripted()` is the simplest source and the starting point for voice and
 gesture adapters: call `set`, `hold`, or `tap` from anywhere.
 

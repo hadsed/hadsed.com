@@ -76,11 +76,12 @@ export function createRenderer({ canvas, manifest, labels }) {
 
   // ---- jets ----
   const geo = jetGeometry(manifest.jet);
-  const skin = new THREE.MeshStandardMaterial({ color: 0x2b303a, emissive: gold, emissiveIntensity: 0.06, roughness: 0.5, metalness: 0.3 });
+  // Every jet is gold, yours and everyone else's.
+  const skin = new THREE.MeshStandardMaterial({ color: gold, emissive: gold, emissiveIntensity: 0.12, roughness: 0.4, metalness: 0.55 });
   const me = new THREE.Mesh(geo, skin);
   scene.add(me);
 
-  const ghostMat = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, emissive: gold, emissiveIntensity: 0.22, roughness: 0.6, transparent: true, opacity: 0.85 });
+  const ghostMat = skin;
   const ghosts = new THREE.InstancedMesh(geo, ghostMat, MAX_GHOSTS);
   ghosts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   ghosts.frustumCulled = false;

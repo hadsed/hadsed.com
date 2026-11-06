@@ -9,6 +9,45 @@ import { forwardOf, rightOf, rotate, clamp } from '../sim/index.js';
 
 const f = [0, 0, 0], r = [0, 0, 0], loc = [0, 0, 0];
 
+function steer(intent, jet, tx, ty, tz, aggressive = 1) {
+  // Target direction in the jet's own frame (inverse rotation).
+  const q = jet.q;
+  const inv = [-q[0], -q[1], -q[2], q[3]];
+  rotate(inv, tx - jet.pos[0], ty - jet.pos[1], tz - jet.pos[2], loc);
+  forwardOf(q, f); rightOf(q, r);
+  const bank = Math.asin(clamp(-r[1], -1, 1));
+  const nose = Math.asin(clamp(f[1], -1, 1));
+  const ahead = -loc[2], side = loc[0], up = loc[1];
+  const heading = Math.atan2(side, ahead);                 // + means target is to the right
+  const wantBank = clamp(heading * 1.6 * aggressive, -1.0, 1.0);
+  intent.roll = clamp((wantBank - bank) * 2.5, -1, 1);
+  const wantNose = clamp(Math.atan2(up, Math.hypot(side, ahead)), -0.35, 0.35);
+  intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
+}
+
+// Fly to a slot off the leader's wing and hold it: 180 m out, 60 m back, 20 m up.
+// Used by bots (escorting people) and by players (click a jet to follow it).
+export function escort(intent, jet, lead, side = 1) {
+  const lq = lead.q;
+  forwardOf(lq, f); rightOf(lq, r);
+  const lp = lead.pos;
+  const sx = lp[0] + r[0] * 180 * side - f[0] * 60;
+  const sy = lp[1] + 20;
+  const sz = lp[2] + r[2] * 180 * side - f[2] * 60;
+  // Aim at a point ahead of the slot so we converge instead of circling it.
+  const ahead = 1500;
+  steer(intent, jet, sx + f[0] * ahead, sy + f[1] * ahead, sz + f[2] * ahead, 1.2);
+  const dx = sx - jet.pos[0], dz = sz - jet.pos[2];
+  forwardOf(jet.q, f);
+  const along = dx * f[0] + dz * f[2];                  // + means slot is ahead of us
+  const wantSpeed = lead.speed + clamp(along * 0.08, -150, 250);
+  intent.throttle = clamp((wantSpeed - jet.speed) / 40, -1, 1);
+  intent.yaw = 0;
+  const d = Math.hypot(dx, sy - jet.pos[1], dz);
+  intent.boost = d > 3000 && along > 0;   // dash to catch up; never to fall back
+  return d;           // distance to the slot
+}
+
 export function createPilot({ rng = Math.random, radius = 90000 } = {}) {
   const intent = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
   const me = {
@@ -25,22 +64,6 @@ export function createPilot({ rng = Math.random, radius = 90000 } = {}) {
     const a = rng() * Math.PI * 2, d = radius * (0.2 + 0.8 * Math.sqrt(rng()));
     me.goal = [Math.cos(a) * d, 14000 + rng() * 14000, Math.sin(a) * d];
   };
-
-  function steer(jet, tx, ty, tz, aggressive = 1) {
-    // Target direction in the jet's own frame (inverse rotation).
-    const q = jet.q;
-    const inv = [-q[0], -q[1], -q[2], q[3]];
-    rotate(inv, tx - jet.pos[0], ty - jet.pos[1], tz - jet.pos[2], loc);
-    forwardOf(q, f); rightOf(q, r);
-    const bank = Math.asin(clamp(-r[1], -1, 1));
-    const nose = Math.asin(clamp(f[1], -1, 1));
-    const ahead = -loc[2], side = loc[0], up = loc[1];
-    const heading = Math.atan2(side, ahead);                 // + means target is to the right
-    const wantBank = clamp(heading * 1.6 * aggressive, -1.0, 1.0);
-    intent.roll = clamp((wantBank - bank) * 2.5, -1, 1);
-    const wantNose = clamp(Math.atan2(up, Math.hypot(side, ahead)), -0.35, 0.35);
-    intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
-  }
 
   return {
     me,
@@ -66,26 +89,12 @@ export function createPilot({ rng = Math.random, radius = 90000 } = {}) {
       if (me.mode === 'escort') {
         const lead = others.find((o) => o.id === me.lead);
         if (!lead) { me.modeLeft = 0; return intent; }
-        // Hold a slot off the leader's wing: 180 m out, 60 m back, 20 m up.
-        const lq = lead.jet.q;
-        forwardOf(lq, f); rightOf(lq, r);
-        const lp = lead.jet.pos;
-        const sx = lp[0] + r[0] * 180 * me.side - f[0] * 60;
-        const sy = lp[1] + 20;
-        const sz = lp[2] + r[2] * 180 * me.side - f[2] * 60;
-        // Aim at a point ahead of the slot so we converge instead of circling it.
-        const lead1 = 1500;
-        steer(jet, sx + f[0] * lead1, sy + f[1] * lead1, sz + f[2] * lead1, 1.2);
-        const dx = sx - jet.pos[0], dz = sz - jet.pos[2];
-        forwardOf(jet.q, f);
-        const along = dx * f[0] + dz * f[2];                  // + means slot is ahead of us
-        const wantSpeed = lead.jet.speed + clamp(along * 0.08, -150, 250);
-        intent.throttle = clamp((wantSpeed - jet.speed) / 40, -1, 1);
+        escort(intent, jet, lead.jet, me.side);
       } else {
         if (!me.goal) pickGoal();
         const g = me.goal;
         if (Math.hypot(g[0] - jet.pos[0], g[2] - jet.pos[2]) < 8000) pickGoal();
-        steer(jet, g[0], g[1], g[2], 0.7);
+        steer(intent, jet, g[0], g[1], g[2], 0.7);
         // Lazy hands: a little drift so the line isn't machine-straight.
         intent.roll = clamp(intent.roll + Math.sin(me.wobble * 0.37) * 0.08, -1, 1);
         intent.throttle = clamp((0.8 + 0.1 * Math.sin(me.wobble * 0.05)) - jet.throttle, -1, 1);

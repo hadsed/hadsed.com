@@ -22,7 +22,10 @@
   @media (max-width: 700px) { #help .keys { display: none; } }
   .dim { color: var(--dim); }
   #credit { text-transform: none; font-size: 9px; letter-spacing: 0; max-width: min(42vw, 260px); margin-top: 6px; opacity: 0.7; }
-  #labels span { position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
+  #labels span.on { opacity: 1; }
+  #tilt { position: fixed; right: 16px; bottom: max(14px, env(safe-area-inset-bottom)); font: inherit; letter-spacing: inherit; text-transform: uppercase; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; padding: 6px 10px; opacity: 0.6; }
+  #tilt.on { opacity: 1; background: rgba(228, 197, 111, 0.15); }
+  #labels span { pointer-events: none; position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
   #stick { position: fixed; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px solid var(--gold); pointer-events: none; display: none; }
   #thr { display: inline-block; width: 80px; height: 3px; background: #2a3448; vertical-align: middle; margin-left: 6px; }
   #thr i { display: block; height: 100%; background: var(--gold); }
@@ -33,11 +36,12 @@
 <div id="labels"></div>
 <div id="stick"></div>
 <!-- Top left is only who you are. #status stays for tests and the no-WebGL notice. -->
-<div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div class="dim" id="status" hidden>loading</div></div>
+<div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div id="following" hidden></div><div class="dim" id="status" hidden>loading</div></div>
 <div class="hud" id="tr"><div id="aloft"></div></div>
 <div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
 <!-- Model credit lives in the page source, not on screen; main.js fills it from the jet asset. -->
 <div id="credit" hidden></div>
+<button id="tilt" type="button" hidden>tilt</button>
 <!-- Only shown when the browser cannot draw 3D. -->
 <div class="hud" id="help" hidden>
   <span class="keys">W/S pitch · A/D roll · Q/E yaw · R/F throttle · Space wave<br>or </span>drag anywhere to fly<span class="keys"> · gamepad works too</span>

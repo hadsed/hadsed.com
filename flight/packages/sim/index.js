@@ -76,10 +76,11 @@ export function step(jet, intent = NO_INPUT, dt = STEP) {
   normalize(q);
 
   jet.throttle = clamp(jet.throttle + (intent.throttle || 0) * RATE.throttle * dt, 0, 1);
-  const target = LIMITS.minSpeed + jet.throttle * (LIMITS.maxSpeed - LIMITS.minSpeed);
+  // intent.boost: a short dash past top speed, used to catch up with a jet you follow.
+  const target = intent.boost ? LIMITS.maxSpeed * 1.25 : LIMITS.minSpeed + jet.throttle * (LIMITS.maxSpeed - LIMITS.minSpeed);
   forwardOf(q, fwd);
-  jet.speed += (target - jet.speed) * 0.4 * dt - 25 * fwd[1] * dt;
-  jet.speed = clamp(jet.speed, LIMITS.minSpeed * 0.8, LIMITS.maxSpeed * 1.05);
+  jet.speed += (target - jet.speed) * (intent.boost ? 0.8 : 0.4) * dt - 25 * fwd[1] * dt;
+  jet.speed = clamp(jet.speed, LIMITS.minSpeed * 0.8, LIMITS.maxSpeed * (intent.boost ? 1.25 : 1.05));
 
   jet.pos[0] += fwd[0] * jet.speed * dt;
   jet.pos[1] = clamp(jet.pos[1] + fwd[1] * jet.speed * dt, LIMITS.minAlt, LIMITS.maxAlt);
