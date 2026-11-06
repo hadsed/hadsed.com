@@ -297,7 +297,9 @@ for (const cfg0 of MATRIX) {
   let engine = cfg.engine;
   if (!engines.includes(engine)) { if (cfg.engine === 'firefox') continue; engine = 'chromium'; }
   if (!(engine in launched)) {
-    try { launched[engine] = await pw[engine].launch(); }
+    // Headless Firefox on Linux turns WebGL off unless told to use software GL.
+    const opts = engine === 'firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true, 'webgl.disabled': false, 'layers.acceleration.force-enabled': true } } : {};
+    try { launched[engine] = await pw[engine].launch(opts); }
     catch (e) { launched[engine] = null; console.log(`${engine}: not installed (${String(e.message).split('\n')[0]})`); }
   }
   if (!launched[engine]) continue;
