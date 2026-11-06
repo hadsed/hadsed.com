@@ -2,12 +2,36 @@
 // geometry or a world's terrain; how they are made (procedural today, glTF
 // tomorrow) stays in here. Add a world by adding it to assets/manifest.json.
 import * as THREE from 'three';
+import { decodeJet } from './jet-pack.js';
 
 export async function loadManifest(base) {
   const res = await fetch(new URL('assets/manifest.json', base));
   const m = await res.json();
   m.base = base;
+  if (m.jet.kind === 'packed') {
+    try {
+      m.jet.geometry = await packedJetGeometry(new URL(m.jet.src, base));
+    } catch (err) {
+      console.warn('packed jet failed, using procedural', err);
+      m.jet = { kind: 'procedural', model: 'sr71', length: m.jet.length };
+    }
+  }
   return m;
+}
+
+// A licensed model packed by scripts/pack-jet.mjs: already merged, nose down -Z,
+// scaled to length. Comes back as one BufferGeometry like the procedural jet.
+async function packedJetGeometry(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} ${res.status}`);
+  const j = await decodeJet(await res.arrayBuffer());
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(j.position, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(j.normal, 3));
+  g.setIndex(new THREE.BufferAttribute(j.index, 1));
+  g.computeBoundingSphere();
+  g.userData.credit = j.credit;
+  return g;
 }
 
 // ---- jet ----
@@ -15,6 +39,7 @@ export async function loadManifest(base) {
 // One merged BufferGeometry, so every ghost jet can share it in one
 // InstancedMesh draw. Nose points down -Z, matching the sim.
 export function jetGeometry(spec = { model: 'sr71' }) {
+  if (spec.geometry) return spec.geometry;
   if (spec.kind && spec.kind !== 'procedural') throw new Error(`jet kind ${spec.kind} not supported yet`);
   const parts = [];
   const add = (g, fn = () => {}) => { const o = new THREE.Object3D(); fn(o); o.updateMatrix(); parts.push(g.applyMatrix4(o.matrix)); };
