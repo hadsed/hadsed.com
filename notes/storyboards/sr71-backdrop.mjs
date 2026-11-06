@@ -31,6 +31,7 @@ const DEFAULTS = {
   style: 'grid', grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   drift: true, driftSpeed: 0.02,
+  scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
 };
 const load = () => {
@@ -408,15 +409,43 @@ function resize() {
 }
 addEventListener('resize', resize);
 
+// ---------- gesture offsets ----------
+// The orbit controls own the base view. Gestures on the site add a yaw/pitch offset on top, applied
+// to a separate render camera, so scroll-mapped pan is a pure function of page position and always reverses.
+const G = { yaw: 0, pitch: 0, scrollYaw: 0, scrollPitch: 0, sideYaw: 0, dragPitch: 0, spring: 0, lastOverscroll: 0 };
+const viewCam = camera.clone();
+const sph = new THREE.Spherical(), offV = new THREE.Vector3();
+const DEG = Math.PI / 180;
+let lastStep = performance.now();
+function stepGestures() {
+  const now = performance.now(), dt = Math.min((now - lastStep) / 1000, 0.1); lastStep = now;
+  // overscroll springs back once the wheel goes quiet (time-based, so it feels the same at any frame rate)
+  if (now - G.lastOverscroll > 140) G.spring *= Math.exp(-dt / 0.22);
+  if (Math.abs(G.spring) < 1e-4) G.spring = 0;
+  const yaw = G.scrollYaw + G.sideYaw + G.spring, pitch = G.scrollPitch + G.dragPitch;
+  const k = 1 - Math.exp(-dt / 0.18);   // smoothing toward the target offset
+  const ny = G.yaw + (yaw - G.yaw) * k, np = G.pitch + (pitch - G.pitch) * k;
+  const moving = Math.abs(ny - G.yaw) > 1e-5 || Math.abs(np - G.pitch) > 1e-5;
+  G.yaw = ny; G.pitch = np;
+  return moving;
+}
 function render() {
-  farCam.position.copy(camera.position); farCam.quaternion.copy(camera.quaternion);
-  shared.uCam.value.copy(camera.position);
-  sky.position.copy(camera.position);
+  offV.copy(camera.position).sub(controls.target);
+  sph.setFromVector3(offV);
+  sph.theta += G.yaw;
+  sph.phi = THREE.MathUtils.clamp(sph.phi - G.pitch, 0.05, Math.PI - 0.05);
+  viewCam.position.setFromSpherical(sph).add(controls.target);
+  viewCam.fov = camera.fov; viewCam.aspect = camera.aspect; viewCam.near = camera.near; viewCam.far = camera.far;
+  viewCam.updateProjectionMatrix();
+  viewCam.up.set(0, 1, 0); viewCam.lookAt(controls.target);
+  farCam.position.copy(viewCam.position); farCam.quaternion.copy(viewCam.quaternion);
+  shared.uCam.value.copy(viewCam.position);
+  sky.position.copy(viewCam.position);
   renderer.setRenderTarget(rt);
   renderer.clear();
   renderer.render(farScene, farCam);
   renderer.clearDepth();
-  renderer.render(nearScene, camera);
+  renderer.render(nearScene, viewCam);
   renderer.setRenderTarget(null);
   renderer.render(postScene, postCam);
 }
@@ -426,6 +455,7 @@ function loop() {
   requestAnimationFrame(loop);
   if (S.drift && !userBusy && !reduceMotion) dirty = true;
   if (controls.update()) dirty = true;
+  if (stepGestures()) dirty = true;
   if (!dirty) return;
   dirty = false;
   render();
@@ -444,14 +474,74 @@ function styleSite() {
 function applySite() {
   frame.hidden = !S.site;
   frame.style.opacity = S.siteOpacity;
-  frame.style.pointerEvents = S.siteClick ? 'auto' : 'none';
+  const gestures = S.scrollPan || S.sidePan || S.bgDrag || S.overscroll;
+  frame.style.pointerEvents = S.siteClick || gestures ? 'auto' : 'none';
+  if (!S.scrollPan) { G.scrollYaw = 0; G.scrollPitch = 0; } else readScroll();
   if (!S.site) return;
   const want = new URL(S.sitePath || '/', location.href).href;
   if (frame.dataset.src !== want) { frame.dataset.src = want; frame.src = want; }
   styleSite();
 }
+function readScroll() {
+  const w = frame.contentWindow; if (!w) return;
+  const screens = w.scrollY / Math.max(w.innerHeight, 1);
+  G.scrollYaw = Math.min(screens * S.scrollDeg, S.scrollMax) * DEG;
+  G.scrollPitch = Math.min(screens * S.scrollTilt, 8) * DEG;
+}
+const NOT_BACKGROUND = 'a, button, input, textarea, select, label, p, h1, h2, h3, h4, h5, li, img, svg, figure, pre, code, blockquote, time, .card, [class*="project"]';
+function wireGestures() {
+  const w = frame.contentWindow, doc = frame.contentDocument;
+  if (!doc || doc.__lab) return;
+  doc.__lab = true;
+  doc.documentElement.style.overscrollBehaviorX = 'none';   // stop sideways swipes from navigating back
+  w.addEventListener('scroll', () => { if (S.scrollPan) { readScroll(); } }, { passive: true });
+  w.addEventListener('wheel', (e) => {
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+    if (S.sidePan && Math.abs(dx) > Math.abs(e.deltaY) * 0.5 && dx) {
+      G.sideYaw += dx * S.sideSens * 0.001;
+      e.preventDefault();
+      return;
+    }
+    if (S.overscroll && e.deltaY) {
+      const el = doc.scrollingElement;
+      const atEnd = el.scrollTop + w.innerHeight >= el.scrollHeight - 2, atTop = el.scrollTop <= 0;
+      if ((atEnd && e.deltaY > 0) || (atTop && e.deltaY < 0)) {
+        G.spring = THREE.MathUtils.clamp(G.spring + e.deltaY * 0.0012, -25 * DEG, 25 * DEG);
+        G.lastOverscroll = performance.now();
+      }
+    }
+  }, { passive: false });
+  // touch: a mostly horizontal swipe pans; vertical swipes scroll the page as usual
+  let t0 = null, axis = null;
+  w.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY }; axis = null; } }, { passive: true });
+  w.addEventListener('touchmove', (e) => {
+    if (!S.sidePan || !t0 || e.touches.length !== 1) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY, dx = x - t0.x, dy = y - t0.y;
+    if (!axis && Math.hypot(dx, dy) > 8) axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y';
+    if (axis === 'x') { G.sideYaw -= dx * S.sideSens * 0.003; t0 = { x, y }; e.preventDefault(); }
+  }, { passive: false });
+  w.addEventListener('touchend', () => { t0 = null; }, { passive: true });
+  // mouse/pen: drag on empty background orbits in any direction
+  let drag = null;
+  w.addEventListener('pointerdown', (e) => {
+    if (!S.bgDrag || e.pointerType === 'touch' || e.button !== 0 || e.target.closest(NOT_BACKGROUND)) return;
+    drag = { x: e.clientX, y: e.clientY }; doc.documentElement.style.cursor = 'grabbing'; e.preventDefault();
+  });
+  w.addEventListener('pointermove', (e) => {
+    if (!drag) {
+      if (S.bgDrag && e.pointerType !== 'touch') doc.documentElement.style.cursor = e.target.closest(NOT_BACKGROUND) ? '' : 'grab';
+      return;
+    }
+    G.sideYaw -= (e.clientX - drag.x) * 0.004;
+    G.dragPitch = THREE.MathUtils.clamp(G.dragPitch + (e.clientY - drag.y) * 0.003, -0.6, 0.6);
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  w.addEventListener('pointerup', () => { drag = null; doc.documentElement.style.cursor = ''; });
+  readScroll();
+}
 frame.addEventListener('load', () => {
   styleSite();
+  try { wireGestures(); } catch (err) { console.warn('gestures', err); }
   // keep the overlay styled when clicking through to other site pages
   try { frame.contentWindow.addEventListener('pageshow', styleSite); } catch {}
 });
@@ -503,6 +593,16 @@ const SPEC = [
   ['Camera', [
     ['drift', 'check', { label: 'Slow drift' }],
     ['driftSpeed', 'range', { label: 'Drift speed', min: 0.02, max: 1.5, step: 0.01 }],
+  ]],
+  ['Gestures on the site', [
+    ['scrollPan', 'check', { label: '1. Page position pans' }],
+    ['scrollDeg', 'range', { label: 'Orbit per screen (°)', min: 0, max: 45, step: 0.5 }],
+    ['scrollTilt', 'range', { label: 'Tilt per screen (°)', min: 0, max: 5, step: 0.1 }],
+    ['scrollMax', 'range', { label: 'Max orbit from scroll (°)', min: 0, max: 360, step: 5 }],
+    ['sidePan', 'check', { label: '2. Sideways swipe pans' }],
+    ['sideSens', 'range', { label: 'Sideways sensitivity', min: 0.1, max: 4, step: 0.05 }],
+    ['bgDrag', 'check', { label: '3. Drag background (mouse)' }],
+    ['overscroll', 'check', { label: '4. Overscroll springs' }],
   ]],
   ['Website', [
     ['site', 'check', { label: 'Show site on top' }],
@@ -570,6 +670,7 @@ document.getElementById('toggle').addEventListener('click', () => {
   t.setAttribute('aria-expanded', String(open)); t.textContent = open ? 'Hide' : 'Show';
 });
 document.getElementById('reset-view').addEventListener('click', () => {
+  G.sideYaw = 0; G.dragPitch = 0; G.spring = 0;
   camera.position.set(52, 14, -48); controls.target.set(0, 0, 1); dirty = true;
 });
 document.getElementById('reset-all').addEventListener('click', () => { Object.assign(S, DEFAULTS); sync(); apply(); say('Back to defaults'); });
@@ -600,4 +701,4 @@ if (S.view) {
 apply();
 if (innerWidth < 640) document.getElementById('toggle').click();  // phones start with the panel tucked away
 loop();
-window.__lab = { S, apply, sync, render, camera, controls };
+window.__lab = { S, apply, sync, render, camera, controls, G };
