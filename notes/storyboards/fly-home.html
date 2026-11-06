@@ -59,8 +59,14 @@ const SITE_CSS = `
   /* Same font, size and color as the other menu items, framed so it reads as a button. */
   .fly-item a { color: var(--text); white-space: nowrap; display: inline-block; padding: .3em .75em .3em .6em;
     border: 1px solid rgba(200, 205, 213, .45); border-radius: 4px; transition: border-color .2s, color .2s; }
-  .fly-item a:hover, .fly-item a:focus-visible { color: var(--glow); border-color: var(--glow); text-decoration: none; }
-  .fly-item a:hover .fly-jet, .fly-item a:focus-visible .fly-jet { transform: translate(2.5px, -2.5px); }
+  .fly-item a:hover { text-decoration: none; }
+  /* hover only where a pointer can hover: a tap leaves :hover stuck on phones, so Fly stayed gold after Back */
+  .fly-item a:focus-visible { color: var(--glow); border-color: var(--glow); }
+  .fly-item a:focus-visible .fly-jet { transform: translate(2.5px, -2.5px); }
+  @media (hover: hover) {
+    .fly-item a:hover { color: var(--glow); border-color: var(--glow); }
+    .fly-item a:hover .fly-jet { transform: translate(2.5px, -2.5px); }
+  }
   /* Fixed rather than sticky: on short pages the grid row is no taller than the menu. */
   @media (min-width: 641px) {
     .menu { position: fixed; top: 0; bottom: 0; z-index: 2; width: var(--menu-width);
