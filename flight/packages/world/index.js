@@ -137,8 +137,8 @@ vec3 nightSky(vec3 d, float el, vec3 base){
     vec2 h = normalize(d.xz + 1e-6), sh = normalize(uSun.xz + 1e-6);
     float toward = smoothstep(-0.6, 1.0, dot(h, sh));
     float x = max(el, 0.0);
-    float seam = exp(-x / 0.008) * smoothstep(-0.02, 0.0, el);
-    e += vec3(1.0, 0.5, 0.16) * seam * (0.2 + 1.8 * toward) * 0.8 * uAfterglow;
+    float seam = exp(-x / 0.0045) * smoothstep(-0.012, 0.0, el);
+    e += vec3(1.0, 0.6, 0.24) * seam * (0.2 + 1.8 * toward) * 1.1 * uAfterglow;
     e += vec3(0.10, 0.12, 0.15) * exp(-x / 0.045) * smoothstep(-0.01, 0.0, el) * (0.5 + 0.8 * toward) * uAfterglow;
   }
   return e;
@@ -441,14 +441,14 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         // once the dots get smaller than a pixel they fade into the glow they average to, so distant towns
         // read as soft patches and nothing sparkles as the camera drifts.
         vec3 cityLights(vec3 n){
-          float low = smoothstep(1600.0, 500.0, H) * smoothstep(2.5, 6.0, H) * smoothstep(0.94, 0.985, n.y);
+          float low = smoothstep(2200.0, 700.0, H) * smoothstep(2.5, 6.0, H) * smoothstep(0.9, 0.97, n.y);
           if (low <= 0.0) return vec3(0.0);
           float pm = max(length(fwidth(vXZ)), 1.0);                     // meters per pixel here
           float town = fbm(vXZ / 22000.0 + 9.1, 3);
-          float urban = smoothstep(0.5, 0.68, town);
+          float urban = smoothstep(0.44, 0.64, town);
           float density = 0.03 + 0.7 * urban;
           const float CELL = 160.0;
-          float l = urban * 0.012;
+          float l = urban * 0.003;
           // two scales: street lights up close, and brighter clusters (town centers, junctions) that
           // still read as points from far away
           for (int k = 0; k < 2; k++) {
@@ -462,9 +462,9 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
             float dots = step(r, dens) * exp(-dist * dist / (2.0 * sig * sig)) * (0.35 + 1.3 * r3) * min(1.0, size * size / (sig * sig) * 2.5);
             float avg = dens * 0.95 * 6.2832 * size * size / (cell * cell);   // what the dots average to
             float far = smoothstep(0.7 * cell, 1.6 * cell, pm);
-            l += mix(dots, avg * 2.5, far) * gain;
+            l += mix(dots, avg * 1.2 * (0.4 + 1.2 * fbm(vXZ / 2500.0, 2)), far) * gain;
           }
-          return vec3(1.0, 0.60, 0.28) * l * low * 3.0;
+          return vec3(1.0, 0.60, 0.28) * l * low * 4.5;
         }
         #endif
         void main(){
@@ -507,7 +507,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           if (uNight > 0.0) {   // the far ground near the horizon catches the afterglow, warmest toward the sun
             vec2 look = normalize(vXZ - uCam.xz - uOrigin.xz + 1e-3);
             float toward = smoothstep(-0.6, 1.0, dot(look, normalize(uSun.xz + 1e-6)));
-            nightHaze += vec3(0.30, 0.11, 0.035) * pow(fog, 40.0) * toward * uAfterglow;
+            nightHaze += vec3(0.22, 0.10, 0.04) * pow(fog, 120.0) * toward * uAfterglow;
           }
           #endif
           haze = mix(haze, nightHaze, uNight);
