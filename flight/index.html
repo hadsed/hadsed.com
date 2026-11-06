@@ -21,6 +21,7 @@
   /* Phones: no keyboard, and the key list would run into the altimeter. */
   @media (max-width: 700px) { #help .keys { display: none; } }
   .dim { color: var(--dim); }
+  #credit { text-transform: none; font-size: 9px; letter-spacing: 0; max-width: min(42vw, 260px); margin-top: 6px; opacity: 0.7; }
   #labels span { position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
   #stick { position: fixed; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px solid var(--gold); pointer-events: none; display: none; }
   #thr { display: inline-block; width: 80px; height: 3px; background: #2a3448; vertical-align: middle; margin-left: 6px; }
@@ -31,11 +32,10 @@
 <canvas id="view"></canvas>
 <div id="labels"></div>
 <div id="stick"></div>
-<div class="hud" id="tl"><div id="callsign">—</div><div class="dim" id="status">loading</div></div>
+<div class="hud" id="tl"><div id="callsign">—</div><div class="dim" id="status">loading</div><div class="dim" id="credit"></div></div>
 <div class="hud" id="tr"><div id="aloft"></div><div class="dim" id="world"></div></div>
 <div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
 <div class="hud" id="help">
-  <div id="credit" style="text-transform:none;font-size:9px;opacity:.7;margin-bottom:4px"></div>
   <span class="keys">W/S pitch · A/D roll · Q/E yaw · R/F throttle · Space wave<br>or </span>drag anywhere to fly<span class="keys"> · gamepad works too</span>
 </div>
 <script type="module" src="main.js"></script>
