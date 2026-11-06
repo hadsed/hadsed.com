@@ -50,6 +50,8 @@ export class FlightRoom extends DurableObject {
 
   async fetch(req) {
     const [client, server] = Object.values(new WebSocketPair());
+    // Newer compatibility dates deliver binary frames as Blob; room.js wants ArrayBuffer.
+    server.binaryType = 'arraybuffer';
     server.accept();
     const seat = this.room.join({
       send: (d) => { try { server.send(d); } catch {} },
