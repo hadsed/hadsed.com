@@ -15,17 +15,20 @@ const PRESETS = {
   dusk: { shadow: '#06050d', mid: '#262447', light: '#c6c3dc', highlight: '#e9a77a' },
 };
 const STYLES = {
-  grid: { grid: 1, contour: 0, shade: 0.35 },
-  gridcontour: { grid: 0.7, contour: 0.8, shade: 0.3 },
-  contour: { grid: 0, contour: 1, shade: 0.3 },
-  shaded: { grid: 0, contour: 0, shade: 1 },
-  shadedgrid: { grid: 0.6, contour: 0, shade: 1 },
+  grid: { grid: 1, contour: 0, shade: 0.35, tint: 0, slope: 0, lineBright: 0.6 },
+  gridcontour: { grid: 0.7, contour: 0.8, shade: 0.3, tint: 0, slope: 0, lineBright: 0.6 },
+  contour: { grid: 0, contour: 1, shade: 0.3, tint: 0, slope: 0, lineBright: 0.6 },
+  shaded: { grid: 0, contour: 0, shade: 1, tint: 0, slope: 0, lineBright: 0.6 },
+  shadedgrid: { grid: 0.6, contour: 0, shade: 1, tint: 0, slope: 0, lineBright: 0.6 },
+  topo: { grid: 0.45, contour: 1, shade: 0.6, tint: 1, tintContrast: 1.3, tintPivot: 0.45, slope: 0.35, lineBright: 0.015, contourStep: 200 },
+  topoglow: { grid: 0.6, contour: 0.9, shade: 0.5, tint: 0.6, tintContrast: 1.2, tintPivot: 0.6, slope: 0.2, lineBright: 0.7 },
 };
 const DEFAULTS = {
   preset: 'site', ...PRESETS.site,
   midPoint: 0.42, hlStart: 0.74, hlAmount: 0.85, mono: 1, exposure: 1.0, contrast: 1.0, grain: 0.018, vignette: 0.45,
   region: 'sierra', altitudeFt: 60000, exag: 1.5, offsetX: null, offsetZ: null, sunAz: 215, sunEl: 18, haze: 260, clouds: 0, fov: 34,
   style: 'grid', grid: 1, gridSize: 2000, contour: 0, contourStep: 200, shade: 0.35, lineBright: 0.6, lineGold: 0,
+  tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   drift: true, driftSpeed: 0.2,
   site: false, sitePath: '/', siteOpacity: 1, siteBg: 0.35, siteClick: false,
 };
@@ -143,6 +146,7 @@ const terrainU = {
   uExag: { value: 1.5 }, uGroundY: { value: -18000 }, uMaxH: { value: 4000 },
   uGrid: { value: 1 }, uGridSize: { value: 2000 }, uContour: { value: 0 }, uContourStep: { value: 200 },
   uShade: { value: 0.35 }, uLineBright: { value: 0.6 }, uLineGold: { value: 0 },
+  uTint: { value: 0 }, uTintContrast: { value: 1 }, uTintPivot: { value: 0.5 }, uSlope: { value: 0 },
 };
 const ground = new THREE.Mesh(
   terrainGeometry(),
@@ -169,6 +173,7 @@ const ground = new THREE.Mesh(
       }`,
     fragmentShader: /* glsl */`
       uniform vec3 uSun, uHaze; uniform float uHazeDist, uMaxH, uGrid, uGridSize, uContour, uContourStep, uShade, uLineBright, uLineGold;
+      uniform float uTint, uTintContrast, uTintPivot, uSlope;
       varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
       // anti-aliased lines that fade out before they get denser than a couple of pixels
       float lines2(vec2 c){ vec2 fw = fwidth(c); vec2 g = abs(fract(c - 0.5) - 0.5) / max(fw, 1e-6);
@@ -184,7 +189,13 @@ const ground = new THREE.Mesh(
         float rise = clamp(vH / uMaxH, 0.0, 1.0);
         vec3 shaded = vec3(0.10, 0.11, 0.12) * (0.25 + 1.6 * lit) * (0.7 + 0.6 * rise);
         vec3 c = mix(vec3(0.028, 0.032, 0.04) * (0.8 + 0.5 * rise), shaded, uShade);
-        c += vec3(uLineBright) * ink * (0.75 + 0.5 * rise);
+        // hypsometric tint, after kaolti/monolith-terrain (MIT): fill brightness follows height, contrast set around a pivot
+        float rampT = clamp(0.5 + (rise - uTintPivot) * uTintContrast, 0.0, 1.0);
+        vec3 hyp = vec3(mix(0.03, 0.42, rampT)) * mix(1.0, 0.45 + 0.9 * lit, uShade);
+        c = mix(c, hyp, uTint);
+        c *= 1.0 - uSlope * smoothstep(0.25, 0.8, 1.0 - n.y);   // steep faces darken, like hachures
+        // lines are ink of a set brightness: low values give dark ink on a pale sheet, high values glow on dark ground
+        c = mix(c, vec3(uLineBright) * (0.75 + 0.5 * rise), ink);
         float fog = 1.0 - exp(-vDist / uHazeDist);
         c = mix(c, uHaze, fog * fog * 0.9 + fog * 0.1);
         gl_FragColor = vec4(c, ink * uLineGold * (1.0 - fog));   // alpha marks lines the final pass may turn gold
@@ -362,7 +373,7 @@ function apply() {
   const altitude = S.altitudeFt * 0.3048;
   terrainU.uGroundY.value = -altitude;
   terrainU.uExag.value = +S.exag;
-  for (const k of ['grid', 'gridSize', 'contour', 'contourStep', 'shade', 'lineBright', 'lineGold']) {
+  for (const k of ['grid', 'gridSize', 'contour', 'contourStep', 'shade', 'lineBright', 'lineGold', 'tint', 'tintContrast', 'tintPivot', 'slope']) {
     terrainU['u' + k[0].toUpperCase() + k.slice(1)].value = +S[k];
   }
   const reg = REGIONS[S.region];
@@ -473,13 +484,17 @@ const SPEC = [
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
   ]],
   ['Ground', [
-    ['style', 'select', { label: 'Style', options: [['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid']] }],
+    ['style', 'select', { label: 'Style', options: [['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid'], ['topo', 'Topo sheet (dark ink)'], ['topoglow', 'Topo, glowing lines']] }],
     ['grid', 'range', { label: 'Grid lines', min: 0, max: 1, step: 0.01 }],
     ['gridSize', 'range', { label: 'Grid spacing (m)', min: 250, max: 10000, step: 250 }],
     ['contour', 'range', { label: 'Contour lines', min: 0, max: 1, step: 0.01 }],
     ['contourStep', 'range', { label: 'Contour interval (m)', min: 25, max: 1000, step: 25 }],
     ['shade', 'range', { label: 'Shaded relief', min: 0, max: 1, step: 0.01 }],
-    ['lineBright', 'range', { label: 'Line brightness', min: 0, max: 2, step: 0.01 }],
+    ['lineBright', 'range', { label: 'Line brightness (0 = dark ink)', min: 0, max: 2, step: 0.005 }],
+    ['tint', 'range', { label: 'Height tint', min: 0, max: 1, step: 0.01 }],
+    ['tintContrast', 'range', { label: 'Height tint contrast', min: 0.3, max: 3, step: 0.05 }],
+    ['tintPivot', 'range', { label: 'Height tint pivot', min: 0, max: 1, step: 0.01 }],
+    ['slope', 'range', { label: 'Darken steep slopes', min: 0, max: 1, step: 0.01 }],
     ['lineGold', 'range', { label: 'Lines in highlight color', min: 0, max: 1, step: 0.01 }],
   ]],
   ['Camera', [
