@@ -2,7 +2,7 @@
 // Drag to look around it. The scene renders in color, then a final pass collapses it to a
 // navy monotone with a gold highlight (both adjustable), so it can sit quietly behind the site.
 import * as THREE from 'three';
-import { OrbitControls } from './vendor/OrbitControls.js';
+import { OrbitControls } from './vendor/OrbitControls.min.js';
 
 const EARTH_R = 6371000;
 const STORE = 'sr71-backdrop-v3';
@@ -31,7 +31,7 @@ const DEFAULTS = {
   style: 'grid', grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   drift: true, driftSpeed: 0.02,
-  scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, gestureLog: false,
+  scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
 };
 const load = () => {
@@ -48,7 +48,7 @@ const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } cat
 
 // ---------- renderer ----------
 const canvas = document.getElementById('backdrop');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 const coarse = matchMedia('(pointer: coarse)').matches;
 renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.5 : 2));
 renderer.autoClear = false;
@@ -127,7 +127,7 @@ farScene.add(sky);
 // Heights come from stitched AWS terrain tiles (terrain/*.png, terrarium encoding), mirrored past the
 // region edge so the ground runs to the horizon. The mesh is one grid whose vertices are dense under
 // the jet (~280 m apart) and stretch out toward the horizon, so a single draw covers 1,500 km.
-function terrainGeometry(n = 640, R = 750000, a = 0.12) {
+function terrainGeometry(n = coarse ? 384 : 512, R = 750000, a = 0.12) {
   const pos = new Float32Array(n * n * 3), idx = new Uint32Array((n - 1) * (n - 1) * 6);
   const warp = (u) => R * u * (a + (1 - a) * u * u);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -146,7 +146,7 @@ function terrainGeometry(n = 640, R = 750000, a = 0.12) {
   return g;
 }
 const terrainU = {
-  uHeight: { value: null }, uWidth: { value: 250000 }, uTexel: { value: 1 / 1024 }, uOffset: { value: new THREE.Vector2() },
+  uHeight: { value: null }, uSize: { value: 1024 }, uWidth: { value: 250000 }, uTexel: { value: 1 / 1024 }, uOffset: { value: new THREE.Vector2() },
   uExag: { value: 1.5 }, uGroundY: { value: -18000 }, uMaxH: { value: 4000 },
   uGrid: { value: 1 }, uGridSize: { value: 2000 }, uContour: { value: 0 }, uContourStep: { value: 200 },
   uShade: { value: 0.35 }, uLineBright: { value: 0.6 }, uLineGold: { value: 0 },
@@ -157,9 +157,21 @@ const ground = new THREE.Mesh(
   new THREE.ShaderMaterial({
     uniforms: { ...shared, ...terrainU },
     vertexShader: /* glsl */`
-      uniform vec3 uCam; uniform float uEarthR, uWidth, uTexel, uExag, uGroundY; uniform vec2 uOffset; uniform sampler2D uHeight;
+      uniform vec3 uCam; uniform float uEarthR, uWidth, uTexel, uExag, uGroundY; uniform vec2 uOffset; uniform sampler2D uHeight; uniform int uSize;
       varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
-      float hAt(vec2 uv){ return texture2D(uHeight, uv).r; }
+      // Heights stay in their terrarium RGB encoding on the GPU (no CPU decode): fetch exact texels,
+      // mirror past the edges, decode, then interpolate.
+      float texH(ivec2 p){
+        int n = uSize; p = ivec2(mod(vec2(p), float(2 * n)));
+        if (p.x >= n) p.x = 2 * n - 1 - p.x;
+        if (p.y >= n) p.y = 2 * n - 1 - p.y;
+        vec3 c = floor(texelFetch(uHeight, p, 0).rgb * 255.0 + 0.5);
+        return c.r * 256.0 + c.g + c.b / 256.0 - 32768.0;
+      }
+      float hAt(vec2 uv){
+        vec2 x = uv * float(uSize) - 0.5; vec2 i = floor(x), f = x - i; ivec2 b = ivec2(i);
+        return mix(mix(texH(b), texH(b + ivec2(1, 0)), f.x), mix(texH(b + ivec2(0, 1)), texH(b + ivec2(1, 1)), f.x), f.y);
+      }
       void main(){
         vec2 xz = position.xz;                          // camera stays within ~1 km of the origin
         vec2 data = xz + uOffset;
@@ -218,18 +230,11 @@ async function loadRegion(id) {
   const r = REGIONS[id] || list[0];
   if (!heightCache[r.id]) {
     heightCache[r.id] = (async () => {
-      const blob = await (await fetch(`terrain/${r.id}.png`)).blob();
-      const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
-      const cv = document.createElement('canvas'); cv.width = bmp.width; cv.height = bmp.height;
-      const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0);
-      const px = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
-      const half = new Uint16Array(bmp.width * bmp.height);
-      for (let i = 0; i < half.length; i++) {
-        half[i] = THREE.DataUtils.toHalfFloat(px[i * 4] * 256 + px[i * 4 + 1] + px[i * 4 + 2] / 256 - 32768);
-      }
-      const tex = new THREE.DataTexture(half, bmp.width, bmp.height, THREE.RedFormat, THREE.HalfFloatType);
-      tex.wrapS = tex.wrapT = THREE.MirroredRepeatWrapping;
-      tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
+      const blob = await (await fetch(`terrain/${r.id}.webp`)).blob();
+      const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none', imageOrientation: 'none' });
+      const tex = new THREE.Texture(bmp);
+      tex.colorSpace = THREE.NoColorSpace; tex.flipY = false;
+      tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
       return tex;
     })();
   }
@@ -237,8 +242,10 @@ async function loadRegion(id) {
   terrainU.uHeight.value = tex;
   terrainU.uWidth.value = r.metersPerPixel * r.size;
   terrainU.uTexel.value = 1 / r.size;
+  terrainU.uSize.value = r.size;
   terrainU.uMaxH.value = r.maxM;
   ground.visible = true;
+  reveal();
   document.getElementById('credit').textContent = `${r.label} · ${r.lat.toFixed(2)}°, ${r.lon.toFixed(2)}° · ${r.widthKm} km of real elevation, mirrored past the edges. Terrain: AWS Terrain Tiles (SRTM, USGS 3DEP, GMTED and others).`;
   dirty = true;
   return r;
@@ -412,16 +419,22 @@ addEventListener('resize', resize);
 // ---------- gesture offsets ----------
 // The orbit controls own the base view. Gestures on the site add a yaw/pitch offset on top, applied
 // to a separate render camera, so scroll-mapped pan is a pure function of page position and always reverses.
-const G = { yaw: 0, pitch: 0, scrollYaw: 0, scrollPitch: 0, sideYaw: 0, dragPitch: 0, spring: 0, lastOverscroll: 0 };
+const G = { yaw: 0, pitch: 0, scrollYaw: 0, scrollPitch: 0, sideYaw: 0, dragPitch: 0, spring: 0, bounce: 0, wheelOver: 0, lastOverscroll: 0 };
 const viewCam = camera.clone();
 const sph = new THREE.Spherical(), offV = new THREE.Vector3();
 const DEG = Math.PI / 180;
 let lastStep = performance.now();
+const OVER_MAX = 20 * Math.PI / 180;
 function stepGestures() {
   const now = performance.now(), dt = Math.min((now - lastStep) / 1000, 0.1); lastStep = now;
   // overscroll springs back once the wheel goes quiet (time-based, so it feels the same at any frame rate)
-  if (now - G.lastOverscroll > 140) G.spring *= Math.exp(-dt / 0.22);
-  if (Math.abs(G.spring) < 1e-4) G.spring = 0;
+  // Overscroll pan follows a rubber-band curve (tanh), so it starts proportional and can never jump past
+  // OVER_MAX. Two sources: the browser's own elastic bounce (Safari, Mac Chrome; smooth and eased by the
+  // browser, works for finger and trackpad alike) and, where there is no bounce, wheel input at the ends.
+  if (now - G.lastOverscroll > 140) G.wheelOver *= Math.exp(-dt / 0.3);
+  if (Math.abs(G.wheelOver) < 0.5) G.wheelOver = 0;
+  const px = Math.abs(G.bounce) > Math.abs(G.wheelOver) ? G.bounce : G.wheelOver;
+  G.spring = S.overscroll ? OVER_MAX * Math.tanh(px / 450) : 0;
   const yaw = G.scrollYaw + G.sideYaw + G.spring, pitch = G.scrollPitch + G.dragPitch;
   const k = 1 - Math.exp(-dt / 0.18);   // smoothing toward the target offset
   const ny = G.yaw + (yaw - G.yaw) * k, np = G.pitch + (pitch - G.pitch) * k;
@@ -450,6 +463,24 @@ function render() {
   renderer.render(postScene, postCam);
 }
 
+// Compile every shader before the first visible frame, then fade the scene in under the site.
+let revealed = false;
+async function reveal() {
+  if (revealed) return; revealed = true;
+  try { await Promise.all([renderer.compileAsync(farScene, farCam), renderer.compileAsync(nearScene, viewCam), renderer.compileAsync(postScene, postCam)]); } catch {}
+  render();
+  requestAnimationFrame(() => canvas.classList.add('ready'));
+}
+// If frames run slow (phones, big screens), step the render resolution down. Never steps back up.
+const frameTimes = []; let lastFrame = 0;
+function adapt(now) {
+  if (lastFrame && now - lastFrame < 250) frameTimes.push(now - lastFrame);
+  lastFrame = now;
+  if (frameTimes.length < 40) return;
+  const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length; frameTimes.length = 0;
+  const pr = renderer.getPixelRatio();
+  if (avg > 34 && pr > 0.75) { renderer.setPixelRatio(Math.max(0.75, pr - 0.25)); resize(); }
+}
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function loop() {
   requestAnimationFrame(loop);
@@ -458,7 +489,9 @@ function loop() {
   if (stepGestures()) dirty = true;
   if (!dirty) return;
   dirty = false;
+  if (!revealed) return;
   render();
+  adapt(performance.now());
 }
 
 // ---------- website mockup overlay ----------
@@ -477,7 +510,7 @@ function applySite() {
   const gestures = S.scrollPan || S.sidePan || S.bgDrag;
   logBox.hidden = !S.gestureLog;
   frame.style.pointerEvents = S.siteClick || gestures ? 'auto' : 'none';
-  if (!S.scrollPan) { G.scrollYaw = 0; G.scrollPitch = 0; } else readScroll();
+  readScroll();
   if (!S.site) return;
   const want = new URL(S.sitePath || '/', location.href).href;
   if (frame.dataset.src !== want) { frame.dataset.src = want; frame.src = want; }
@@ -501,35 +534,42 @@ function readScroll() {
   const el = w.document.scrollingElement;
   const maxY = Math.max(0, el.scrollHeight - w.innerHeight);
   const screens = THREE.MathUtils.clamp(w.scrollY, 0, maxY) / Math.max(w.innerHeight, 1);
-  G.scrollYaw = Math.min(screens * S.scrollDeg, S.scrollMax) * DEG;
-  G.scrollPitch = Math.min(screens * S.scrollTilt, 8) * DEG;
+  G.bounce = w.scrollY < 0 ? w.scrollY : w.scrollY > maxY ? w.scrollY - maxY : 0;   // elastic overshoot in px
+  G.scrollYaw = S.scrollPan ? Math.min(screens * S.scrollDeg, S.scrollMax) * DEG : 0;
+  G.scrollPitch = S.scrollPan ? Math.min(screens * S.scrollTilt, 8) * DEG : 0;
 }
 const NOT_BACKGROUND = 'a, button, input, textarea, select, label, p, h1, h2, h3, h4, h5, li, img, svg, figure, pre, code, blockquote, time, .card, [class*="project"]';
 function wireGestures() {
   const w = frame.contentWindow, doc = frame.contentDocument;
   if (!doc || doc.__lab) return;
   doc.__lab = true;
-  // No rubber-banding inside the mockup: Safari's elastic bounce (big with an iPad trackpad) dragged the
-  // whole page off the top and snapped it back. Also stops sideways swipes from navigating back.
-  for (const el of [doc.documentElement, doc.body]) el.style.overscrollBehavior = 'none';
-  w.addEventListener('scroll', () => { log(`scroll y ${Math.round(w.scrollY)}`); if (S.scrollPan) { readScroll(); } }, { passive: true });
+  // Keep vertical rubber-banding (it drives the overscroll pan); stop sideways swipes from navigating back.
+  for (const el of [doc.documentElement, doc.body]) el.style.overscrollBehaviorX = 'none';
+  w.addEventListener('scroll', () => { log(`scroll y ${Math.round(w.scrollY)}`); readScroll(); }, { passive: true });
   for (const type of ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'gesturestart']) {
     w.addEventListener(type, (e) => log(`${type} ${e.pointerType || ''}`), { passive: true });
   }
   // A trackpad gesture is a burst of wheel events (finger, then momentum) with no gap longer than ~250 ms.
   // Each burst locks to one axis when it starts, so a vertical scroll's sideways noise can't pan, and
-  // (The overscroll swing, idea 4, was removed at Had's call.)
-  let burst = { last: 0, axis: null };
+  // Wheel bursts that start pinned at an end feed the overscroll pan, capped per event so one big
+  // trackpad delta can't jump it (the old bug: ~25 degrees in two events, then a snap back).
+  let burst = { last: 0, axis: null, startedAtEnd: false };
   w.addEventListener('wheel', (e) => {
     const now = performance.now();
     const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0), dy = e.shiftKey ? 0 : e.deltaY;
-    if (now - burst.last > 250) burst = { last: now, axis: null };
+    const el = doc.scrollingElement, maxY = Math.max(0, el.scrollHeight - w.innerHeight);
+    const atEnd = w.scrollY >= maxY - 2, atTop = w.scrollY <= 0;
+    if (now - burst.last > 250) burst = { last: now, axis: null, startedAtEnd: (atEnd && dy > 0) || (atTop && dy < 0) };
     log(`wheel dx ${e.deltaX.toFixed(1)} dy ${e.deltaY.toFixed(1)} mode ${e.deltaMode} y ${Math.round(w.scrollY)}`);
     burst.last = now;
     if (!burst.axis && Math.hypot(dx, dy) > 2) burst.axis = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
     if (burst.axis === 'x') {
       if (S.sidePan) { G.sideYaw += dx * S.sideSens * 0.001; e.preventDefault(); }
       return;
+    }
+    if (burst.startedAtEnd && ((atEnd && dy > 0) || (atTop && dy < 0))) {
+      G.wheelOver = THREE.MathUtils.clamp(G.wheelOver + THREE.MathUtils.clamp(dy, -40, 40) * 0.5, -1500, 1500);
+      G.lastOverscroll = now;
     }
   }, { passive: false });
   // touch: a mostly horizontal swipe pans; vertical swipes scroll the page as usual
@@ -623,6 +663,7 @@ const SPEC = [
     ['sidePan', 'check', { label: '2. Sideways swipe pans' }],
     ['sideSens', 'range', { label: 'Sideways sensitivity', min: 0.1, max: 4, step: 0.05 }],
     ['bgDrag', 'check', { label: '3. Drag background (mouse)' }],
+    ['overscroll', 'check', { label: '4. Overscroll pans (rubber-band)' }],
     ['gestureLog', 'check', { label: 'Show event log (debug)' }],
   ]],
   ['Website', [
@@ -691,7 +732,7 @@ document.getElementById('toggle').addEventListener('click', () => {
   t.setAttribute('aria-expanded', String(open)); t.textContent = open ? 'Hide' : 'Show';
 });
 document.getElementById('reset-view').addEventListener('click', () => {
-  G.sideYaw = 0; G.dragPitch = 0; G.spring = 0;
+  G.sideYaw = 0; G.dragPitch = 0; G.wheelOver = 0;
   camera.position.set(52, 14, -48); controls.target.set(0, 0, 1); dirty = true;
 });
 document.getElementById('reset-all').addEventListener('click', () => { Object.assign(S, DEFAULTS); sync(); apply(); say('Back to defaults'); });

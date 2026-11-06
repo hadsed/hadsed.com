@@ -5,7 +5,7 @@ Source: AWS Open Data "Terrain Tiles" (Mapzen terrarium encoding), public and fr
 attribution. Underlying data: SRTM, GMTED2010, USGS NED/3DEP, ETOPO1 and others. See
 https://github.com/tilezen/joerd/blob/master/docs/attribution.md
 
-Each region is a 4 x 4 block of 256 px tiles stitched into one 1024 px terrarium PNG
+Each region is a 4 x 4 block of 256 px tiles stitched into one 1024 px lossless terrarium WebP
 (height_m = R * 256 + G + B / 256 - 32768), plus an entry in regions.json with its scale.
 Run from anywhere:  python3 notes/storyboards/terrain/fetch-terrain.py
 """
@@ -57,7 +57,7 @@ def main():
         _, pi, pj = max((small[i, j][0] * 256 + small[i, j][1] + small[i, j][2] / 256 - 32768, i, j)
                         for j in range(16, 112) for i in range(16, 112))
         mpp = EARTH_C * math.cos(math.radians(lat)) / (2 ** z * 256)
-        img.save(OUT / f'{rid}.png', optimize=True)
+        img.save(OUT / f'{rid}.webp', lossless=True, quality=100, method=6)  # lossless: heights must survive exactly
         manifest.append({'id': rid, 'label': label, 'lat': lat, 'lon': lon, 'zoom': z,
                          'size': img.width, 'metersPerPixel': round(mpp, 2),
                          'widthKm': round(mpp * img.width / 1000, 1),

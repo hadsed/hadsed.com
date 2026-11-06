@@ -40,11 +40,9 @@ export default function (eleventyConfig) {
     eleventyConfig.addPassthroughCopy({
       [`${lab}/sr71-backdrop.html`]: "lab/sr71/index.html",
       [`${lab}/sr71-backdrop.mjs`]: "lab/sr71/sr71-backdrop.mjs",
-      [`${lab}/vendor/three.module.js`]: "lab/sr71/vendor/three.module.js",
-      [`${lab}/vendor/three.core.js`]: "lab/sr71/vendor/three.core.js",
-      [`${lab}/vendor/OrbitControls.js`]: "lab/sr71/vendor/OrbitControls.js",
+      [`${lab}/vendor/*.min.js`]: "lab/sr71/vendor",
       [`${lab}/terrain/regions.json`]: "lab/sr71/terrain/regions.json",
-      [`${lab}/terrain/*.png`]: "lab/sr71/terrain",
+      [`${lab}/terrain/*.webp`]: "lab/sr71/terrain",
     });
   }
 
