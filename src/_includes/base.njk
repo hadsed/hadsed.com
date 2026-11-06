@@ -8,6 +8,16 @@
   <title>{{ pageTitle }}</title>
   <meta name="description" content="{{ pageDescription }}">
   <link rel="canonical" href="https://hadsed.com{{ page.url }}">
+  {#- A top-level visit hands over to /lab/home/, which shows this page over the live sky with Fly.
+      Inside that frame (or for crawlers, link previews and browsers without WebGL) the page stays as is. #}
+  <script>(function () {
+    try {
+      if (window.top !== window || /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|lighthouse/i.test(navigator.userAgent)) return;
+      var c = document.createElement('canvas');
+      if (!(c.getContext('webgl2') || c.getContext('webgl'))) return;
+      location.replace('/lab/home/?p=' + encodeURIComponent(location.pathname + location.search) + location.hash);
+    } catch (e) {}
+  })();</script>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Had Seddiqi">
   <meta property="og:title" content="{{ pageTitle }}">

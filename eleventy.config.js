@@ -33,13 +33,13 @@ export default function (eleventyConfig) {
 
   eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
 
-  // Flight lab (multiplayer jets) ships on branch previews only, like the other labs.
+  // Flight (multiplayer jets) and the home that wraps the site over its live sky ship everywhere,
+  // production included: every site page hands a top-level visit to /lab/home/ (see base.njk).
   // The room server in flight/server deploys separately as a Cloudflare Worker.
-  if (process.env.SITE_URL || process.env.FLIGHT_LAB) {
-    for (const part of ["index.html", "main.js", "attract.js", "config.json", "packages", "assets", "vendor"]) {
-      eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
-    }
+  for (const part of ["index.html", "main.js", "attract.js", "config.json", "packages", "assets", "vendor"]) {
+    eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
   }
+  eleventyConfig.addPassthroughCopy({ "notes/storyboards/fly-home.html": "lab/home/index.html" });
 
   // Branch previews (SITE_URL set) also carry the SR-71 backdrop lab at /lab/sr71/,
   // so it can be explored on any device. Production builds never include it.
@@ -56,8 +56,6 @@ export default function (eleventyConfig) {
       "flight/packages/world/*.js": "lab/sr71/world",
       // edge-affordance mockups that sit on top of the lab
       [`${lab}/edge-affordances.html`]: "lab/edge/index.html",
-      // staging home: site + backdrop + Fly, which hands over to the flight lab
-      [`${lab}/fly-home.html`]: "lab/home/index.html",
     });
   }
 

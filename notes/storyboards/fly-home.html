@@ -96,7 +96,13 @@ function decorateSite() {
   }
   for (const a of doc.querySelectorAll('a[href="#fly"]')) a.onclick = (e) => { e.preventDefault(); enter(); };
   // Keep the address bar in step with the page shown inside, so a reload lands on the same page.
-  try { const p = doc.location.pathname; if (p && !p.startsWith('/lab/')) history.replaceState(null, '', `?p=${encodeURIComponent(p)}`); } catch {}
+  // The address bar shows the page's own URL, so it can be copied and shared; loading that URL
+  // top-level comes straight back here (base.njk), so a reload lands on the same page.
+  try {
+    const l = doc.location, p = l.pathname;
+    if (p && !p.startsWith('/lab/')) history.replaceState(null, '', p + l.search + l.hash);
+    if (doc.title) document.title = doc.title;
+  } catch {}
 }
 
 // The site sits on a see-through navy wash over the sky, lighter in the middle where the jet flies
@@ -123,7 +129,7 @@ site.addEventListener('load', () => {
 });
 {
   const p = new URLSearchParams(location.search).get('p');
-  site.src = p && p.startsWith('/') && !p.startsWith('//') ? p : '/';
+  site.src = (p && p.startsWith('/') && !p.startsWith('//') ? p : '/') + location.hash;
 }
 // The sky loads behind the site and fades up when it has settled next to a live jet (or found none).
 skyFrame.src = '../flight/?attract';
