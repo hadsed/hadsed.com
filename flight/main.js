@@ -195,6 +195,7 @@ function frame(nowMs) {
     acc -= STEP;
   }
   lerpJet(view, prev, jet, acc / STEP);
+  slideGround();
 
   sendAcc += dt;
   if (sendAcc >= (attract ? 1 : 0.1)) { sendAcc = 0; net.send(jet); }   // watchers only report where they look from
@@ -389,4 +390,20 @@ function calmRemotes(dt) {
     r.rawFlags = r.view.flags; r.view.flags = 0;
   }
   if (calmQ.size > remoteList.length + 16) for (const id of calmQ.keys()) if (!remotes.remotes.has(id)) calmQ.delete(id);
+}
+
+// Behind the site the ground drifts by at a small fraction of the real speed (Mach 2.7 at
+// 85,000 ft reads as a fast scroll). The world slides along with the jets to make up the
+// rest, and lets go as the camera glides into the chase cam, so flying is full speed.
+// The offset is only visual: nothing in the sim or on the wire touches the terrain.
+const GROUND_SPEED = 0.06;
+const groundOffset = [0, 0, 0], lastView = [null, 0, 0];
+renderer.groundOffset = groundOffset;
+function slideGround() {
+  if (lastView[0] !== null) {
+    const dx = view.pos[0] - lastView[0], dz = view.pos[2] - lastView[2];
+    const k = (1 - GROUND_SPEED) * (1 - renderer.rig.blend);
+    if (k > 0 && Math.hypot(dx, dz) < 5000) { groundOffset[0] -= dx * k; groundOffset[2] -= dz * k; }   // not across a respawn
+  }
+  lastView[0] = view.pos[0]; lastView[2] = view.pos[2];
 }

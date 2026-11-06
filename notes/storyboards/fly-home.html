@@ -94,8 +94,8 @@ function decorateSite() {
   try { const p = doc.location.pathname; if (p && !p.startsWith('/lab/')) history.replaceState(null, '', `?p=${encodeURIComponent(p)}`); } catch {}
 }
 
-// The site sits on a see-through navy wash over the sky (the backdrop lab's "site background 0.49").
-const SITE_BG = 'html, body { background: rgba(28, 36, 51, 0.49) !important; }';
+// The site sits on a see-through navy wash over the sky (darker than the lab's 0.49, at Had's ask).
+const SITE_BG = 'html, body { background: rgba(28, 36, 51, 0.74) !important; }';   // dark enough that the sky is a hint behind the text, not a show
 function styleSite() {
   const doc = siteDoc(); if (!doc || !doc.head) return;
   let tag = doc.getElementById('backdrop-wash');
