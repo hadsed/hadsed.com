@@ -305,6 +305,40 @@ for (const side of [-1, 1]) {
 }
 plane.position.z = 2;
 
+// The real jet (helijah's SR-71, gear and chute removed) from the flight lab's packed asset, when the
+// flight lab is deployed next to this one (branch previews). It replaces the proxy at the proxy's own
+// size and spot, so camera framing is unchanged. Any failure keeps the proxy.
+(async () => {
+  try {
+    const base = new URL('../flight/', location.href);
+    const manifest = await fetch(new URL('assets/manifest.json', base)).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    if (manifest.jet?.kind !== 'packed') return;
+    const [{ decodeJet }, buf] = await Promise.all([
+      import(new URL('packages/assets/jet-pack.js', base).href),
+      fetch(new URL(manifest.jet.src, base)).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }),
+    ]);
+    const j = await decodeJet(buf);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(j.position, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(j.normal, 3));
+    g.setIndex(new THREE.BufferAttribute(j.index, 1));
+    g.computeBoundingBox();
+    plane.updateMatrixWorld(true);
+    const proxy = new THREE.Box3().setFromObject(plane);
+    const pl = proxy.max.z - proxy.min.z, gl = g.boundingBox.max.z - g.boundingBox.min.z;
+    const k = pl / gl;
+    const c = new THREE.Vector3(); g.boundingBox.getCenter(c);
+    const pc = new THREE.Vector3(); proxy.getCenter(pc);
+    for (const o of [...plane.children]) o.visible = false;
+    const mesh = new THREE.Mesh(g, skin);
+    mesh.scale.setScalar(k);
+    mesh.position.set(pc.x - c.x * k, pc.y - c.y * k, pc.z - c.z * k).sub(plane.position);
+    plane.add(mesh);
+    window.__labJet = { triangles: j.index.length / 3, credit: j.credit };
+    dirty = true;
+  } catch (err) { console.warn('packed jet unavailable, keeping the proxy', err); }
+})();
+
 // ---------- monotone composite ----------
 const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
 const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
