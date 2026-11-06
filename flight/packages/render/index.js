@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { jetGeometry, loadHeightmap } from '../assets/index.js';
 import { createContrails } from './contrails.js';
+import { createCameraRig } from './camera.js';
 
 const MAX_GHOSTS = 64;
 
@@ -101,11 +102,10 @@ export function createRenderer({ canvas, manifest, labels }) {
 
   const trails = createContrails({ scene, gold, sky, max: MAX_GHOSTS + 1 });
 
-  // ---- camera ----
-  const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camUp = new THREE.Vector3(0, 1, 0);
-  let camReady = false;
+  // ---- camera: backdrop orbit and chase cam, one continuous move between them (camera.js) ----
+  const rig = createCameraRig(camera);
   const tmpQ = new THREE.Quaternion(), wag = new THREE.Quaternion(), m4 = new THREE.Matrix4();
-  const v = new THREE.Vector3(), s1 = new THREE.Vector3(1, 1, 1), fwd = new THREE.Vector3(), up = new THREE.Vector3();
+  const v = new THREE.Vector3(), s1 = new THREE.Vector3(1, 1, 1);
 
   function viewQuat(jet, time, out) {
     out.set(jet.q[0], jet.q[1], jet.q[2], jet.q[3]);
@@ -117,14 +117,13 @@ export function createRenderer({ canvas, manifest, labels }) {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.fov = w < h ? 70 : 55;
-    camera.updateProjectionMatrix();
+    camera.updateProjectionMatrix();   // the rig sets the lens each frame
   }
   resize();
   addEventListener('resize', resize);
 
   return {
-    renderer, scene, camera,
+    renderer, scene, camera, rig,
     async setWorld(world) {
       const t = await loadHeightmap(world, manifest.base);
       terrainU.uHeight.value = t.tex;
@@ -139,18 +138,8 @@ export function createRenderer({ canvas, manifest, labels }) {
       me.position.set(self.pos[0], self.pos[1], self.pos[2]);
       me.quaternion.copy(tmpQ);
 
-      // Chase camera: behind and above, smoothed, horizon tilts with the bank.
-      fwd.set(0, 0, -1).applyQuaternion(tmpQ);
-      up.set(0, 1, 0).applyQuaternion(tmpQ);
-      v.copy(me.position).addScaledVector(fwd, -52).addScaledVector(up, 10);
-      const k = camReady ? 1 - Math.exp(-dt * 6) : 1;
-      camPos.lerp(v, k);
-      camLook.lerp(v.copy(me.position).addScaledVector(fwd, 120), camReady ? 1 - Math.exp(-dt * 10) : 1);
-      camUp.lerp(up, camReady ? 1 - Math.exp(-dt * 3) : 1).normalize();
-      camReady = true;
-      camera.position.copy(camPos);
-      camera.up.copy(camUp);
-      camera.lookAt(camLook);
+      rig.update(me.position, tmpQ, dt, camera.aspect);
+      const camPos = camera.position;
 
       // Ground follows the camera in whole grid cells so lines don't swim.
       const snap = 2500;
