@@ -68,6 +68,12 @@ export async function swarm({
   }
   log(`${clients} clients launched in ${((Date.now() - t0) / 1000).toFixed(1)} s${profile ? ` through "${profile}"` : ''}`);
 
+  // If this process is starved, its own timers slip and every number below
+  // gets worse for reasons that have nothing to do with the server.
+  const lagSamples = [];
+  let lagLast = performance.now();
+  const lagTimer = setInterval(() => { const n = performance.now(); lagSamples.push(n - lagLast - 50); lagLast = n; }, 50);
+
   // Fly: 10 Hz sim chunks and state reports, like a player's tab.
   const fly = setInterval(() => {
     const t = Date.now() / 1000;
@@ -112,7 +118,7 @@ export async function swarm({
   }
 
   await sleep(seconds * 1000);
-  clearInterval(fly); clearInterval(frames); events.forEach(clearTimeout);
+  clearInterval(fly); clearInterval(frames); clearInterval(lagTimer); events.forEach(clearTimeout);
 
   const elapsed = (Date.now() - t0) / 1000;
   const allGaps = bots.flatMap((b) => b.gaps);
@@ -139,6 +145,7 @@ export async function swarm({
     freezePctPeople: avg(watched('person').map((s) => s.freezePct)),
     freezePctBots: avg(watched('bot').map((s) => s.freezePct)),
     interpDelayMs: avg(bots.filter((b) => b.remotes).map((b) => b.remotes.delay)),
+    swarmLoopLagMsP99: pct(lagSamples, 0.99),   // >30 ms: this machine is the bottleneck, not the server
     joinMsAll: bots.map((b) => b.joinMs),
     stragglers: bots.filter((b) => b.net.state.status !== 'online').map((b) => ({ i: b.i, joinMs: b.joinMs, statuses: b.statuses })),
   };

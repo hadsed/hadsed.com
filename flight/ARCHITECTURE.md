@@ -49,16 +49,20 @@ through the arrows above.
 
 4. **Snapshot interpolation for remote jets** (Fiedler, *Snapshot
    Interpolation*; Valve, *Source Multiplayer Networking*). The server
-   broadcasts snapshots at 10 Hz. Clients draw others about 120 ms in the
-   past, blending between real snapshots. Your own jet is simulated locally
-   and never waits on the network, so it never lags.
+   broadcasts snapshots at 10 Hz, and every jet in a snapshot carries its age
+   (how long ago that state was true). Clients place states on the server's
+   clock, not on arrival time, and draw each jet a little in the past: about
+   200 ms on good links, growing per jet to cover the jitter actually seen
+   (up to 2 s on hotel wifi). Your own jet is simulated locally and never
+   waits on the network, so it never lags. Silence for 4 s means a dead
+   socket; the client redials and keeps flying where it was.
 
 5. **Client authority with server sanity checks.** There is nothing to win
    yet, so clients report their own position. The server clamps speed,
    altitude and jumps, and rate-limits messages. When the core loop gains
    stakes, the same protocol can switch to sending intents instead.
 
-6. **Binary on the hot path, JSON for rare messages.** A jet state is 25 bytes.
+6. **Binary on the hot path, JSON for rare messages.** A state report is 26 bytes; a snapshot entry is 27.
    Welcome and roster messages are JSON because they are rare and easy to
    evolve.
 
@@ -91,8 +95,8 @@ lazy routes, and sometimes fall into formation off a real player's wing.
 
 - 60 fps on a mid phone: one terrain draw, one jet draw, one instanced draw,
   one line draw, one points draw, plus HUD as plain DOM.
-- Network: about 25 bytes per visible jet per snapshot, 10 snapshots a second.
-  48 visible jets is 12 KB/s.
+- Network: 27 bytes per visible jet per snapshot, 10 snapshots a second.
+  48 visible jets is 13 KB/s (measured: 86 kbit/s per client with 100 in one room).
 - Sim step is allocation-free in the hot path.
 - Later: gesture inference runs in a Web Worker inside the controls SDK, so it
   never blocks the frame.
@@ -110,7 +114,8 @@ FLIGHT_LAB=1 npx eleventy --serve                       # site with /lab/flight/
 open http://localhost:8080/lab/flight/?server=ws://127.0.0.1:8787
 ```
 
-Tests: `npm test` (sim, protocol, controls, bots, room).
+Tests: `npm test` (sim, protocol, controls, bots, room, network robustness).
+Devices, networks and load: see `test/README.md`.
 
 Deploy: branch pushes deploy the Worker `hadsed-flight` and write its URL into
 `lab/flight/config.json`. There is one Worker, so the last branch pushed wins.

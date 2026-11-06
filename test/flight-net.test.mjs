@@ -11,7 +11,7 @@ import { createRemotes } from '../flight/packages/net/interp.js';
 import { createJet } from '../flight/packages/sim/index.js';
 
 // Before server-time interpolation these were 4% (4g), 22% (3g), 47% (hotel).
-for (const [profile, maxHitch] of [['wifi', 0.5], ['4g', 0.5], ['3g', 2], ['edge', 8], ['hotel', 15]]) {
+for (const [profile, maxHitch] of [['wifi', 0.5], ['4g', 0.5], ['3g', 2], ['edge', 5], ['hotel', 8]]) {
   test(`interp: remote jets stay smooth on ${profile} (hitches under ${maxHitch}% of frames)`, () => {
     const r = benchInterp(profile);
     assert.ok(r.frames > 3000);

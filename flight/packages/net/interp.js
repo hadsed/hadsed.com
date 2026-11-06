@@ -15,7 +15,7 @@ import { lerpJet, cloneJet, copyJet, forwardOf } from '../sim/index.js';
 // A jet flown from hotel wifi gets drawn further back than a bot, and does not
 // drag anyone else back with it. Delays change gradually (the render clock
 // runs at most `rate` fast or slow), so nothing ever jumps.
-export function createRemotes({ delay = 120, maxDelay = 1200, keep = 1500, coast = 400, window = 10000, rate = 0.1 } = {}) {
+export function createRemotes({ delay = 120, maxDelay = 2000, keep = 1500, coast = 400, window = 10000, rate = 0.1 } = {}) {
   const remotes = new Map();   // id -> { callsign, buf: [{ t, jet }], view, ages, cur }
   const fwd = [0, 0, 0];
   const lags = [];             // recent { at, lag } with lag = arrival - server time
