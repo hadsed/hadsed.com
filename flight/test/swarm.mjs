@@ -11,7 +11,7 @@
 // Flags: --url --origin --world --clients --ramp (joins/s) --seconds --profile
 //        --chaos (blackhole@<s>:<len>, cut@<s>) --json <file> --assert
 //
-// The server allows 4 sockets per IP per room copy, so from one machine
+// The server allows 16 sockets per IP per room copy, so from one machine
 // against a deployed Worker you get 4 per copy and spill across copies; run
 // wrangler dev with --var PER_IP:1000 to test one crowded room locally.
 
