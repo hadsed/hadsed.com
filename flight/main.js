@@ -75,6 +75,7 @@ const net = connect({
       }
       remotes.clear(); roster.clear();
       $('callsign').textContent = m.callsign;
+      $('you').hidden = false;
     }
     if (m.t === 'roster') {
       for (const [id, cs] of m.add || []) { roster.set(id, cs); remotes.meta(id, cs); }
@@ -116,6 +117,7 @@ try {
   // No WebGL (old device, blocked GPU, lockdown mode): say so instead of a black screen.
   net.close();
   $('status').textContent = 'this browser cannot draw 3D';
+  $('status').hidden = false;
   $('help').textContent = 'try another browser, or turn on hardware acceleration';
   $('help').style.opacity = 1;
   throw err;

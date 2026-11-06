@@ -32,9 +32,10 @@
 <canvas id="view"></canvas>
 <div id="labels"></div>
 <div id="stick"></div>
-<div class="hud" id="tl"><div id="callsign">—</div><div class="dim" id="status">loading</div><div class="dim" id="credit"></div></div>
+<!-- Top left is only who you are. #status stays for tests and the no-WebGL notice. -->
+<div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div class="dim" id="status" hidden>loading</div></div>
 <div class="hud" id="tr"><div id="aloft"></div><div class="dim" id="world"></div></div>
-<div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
+<div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div><div class="dim" id="credit"></div></div>
 <div class="hud" id="help">
   <span class="keys">W/S pitch · A/D roll · Q/E yaw · R/F throttle · Space wave<br>or </span>drag anywhere to fly<span class="keys"> · gamepad works too</span>
 </div>
