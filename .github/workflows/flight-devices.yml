@@ -49,7 +49,8 @@ jobs:
       - name: Device matrix
         id: devices
         continue-on-error: true
-        run: node flight/test/devices.mjs
+        # A virtual display lets Firefox run headed with software WebGL.
+        run: xvfb-run -a node flight/test/devices.mjs
       - name: Bot swarm, clean network (60 pilots in one room)
         id: swarm_clean
         continue-on-error: true
