@@ -50,9 +50,7 @@ export class FlightRoom extends DurableObject {
 
   async fetch(req) {
     const [client, server] = Object.values(new WebSocketPair());
-    // Since compatibility date 2026-ish (websocket_standard_binary_type), binary
-    // frames arrive as Blob unless we ask for ArrayBuffer. As Blobs, every
-    // player's position report failed to decode and other people saw them frozen.
+    // Newer compatibility dates deliver binary frames as Blob; room.js wants ArrayBuffer.
     server.binaryType = 'arraybuffer';
     server.accept();
     const seat = this.room.join({
