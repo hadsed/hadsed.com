@@ -8,6 +8,9 @@ import { jetGeometry, loadHeightmap } from '../assets/index.js';
 import { createWorld, WORLD_DEFAULTS } from '../world/index.js';
 import { createContrails } from './contrails.js';
 import { createCameraRig } from './camera.js';
+import { outlineMaterial } from './outline.js';
+import { createBoost } from './boost.js';
+import { FLAG } from '../net/protocol.js';
 
 const MAX_GHOSTS = 64;
 
@@ -43,20 +46,28 @@ export function createRenderer({ canvas, manifest, labels }) {
 
   // ---- jets ----
   const geo = jetGeometry(manifest.jet);
-  // Every jet looks the same, yours and everyone else's. A packed jet brings its paint
-  // (geo.userData.map: markings, insignia, panel lines); the procedural one is plain gold.
+  // Every jet is a black SR-71 with a thin gold outline, so it reads against
+  // dark sky and ground; yours gets a finer line than everyone else's. A packed
+  // jet brings its paint (geo.userData.map: markings, insignia, panel lines),
+  // darkened to the airframe's black.
   const paint = geo.userData.map || null;
-  const skin = paint
-    ? new THREE.MeshStandardMaterial({ color: 0xffffff, map: paint, emissive: gold, emissiveIntensity: 0.06, roughness: 0.5, metalness: 0.3 })
-    : new THREE.MeshStandardMaterial({ color: gold, emissive: gold, emissiveIntensity: 0.12, roughness: 0.4, metalness: 0.55 });
+  const skin = new THREE.MeshStandardMaterial({ color: paint ? 0x4a4a52 : 0x16171b, map: paint, roughness: 0.55, metalness: 0.35 });
   const me = new THREE.Mesh(geo, skin);
   scene.add(me);
+  const myLine = outlineMaterial({ color: gold, px: 1 });
+  const meLine = new THREE.Mesh(geo, myLine);
+  scene.add(meLine);
 
-  const ghostMat = skin;
-  const ghosts = new THREE.InstancedMesh(geo, ghostMat, MAX_GHOSTS);
+  const ghosts = new THREE.InstancedMesh(geo, skin, MAX_GHOSTS);
   ghosts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   ghosts.frustumCulled = false;
   scene.add(ghosts);
+  const ghostLine = outlineMaterial({ color: gold, px: 1.6 });
+  const ghostLines = new THREE.InstancedMesh(geo, ghostLine, MAX_GHOSTS);
+  ghostLines.instanceMatrix = ghosts.instanceMatrix;   // same matrices, drawn twice
+  ghostLines.frustumCulled = false;
+  scene.add(ghostLines);
+  const dpr = () => renderer.getPixelRatio();
 
   // Far away a jet is a few pixels; draw every remote as a gold point too.
   const dotPos = new Float32Array(MAX_GHOSTS * 3);
@@ -67,6 +78,7 @@ export function createRenderer({ canvas, manifest, labels }) {
   scene.add(dots);
 
   const trails = createContrails({ scene, gold, sky, max: MAX_GHOSTS + 1 });
+  const boost = createBoost({ scene, geo, gold, max: MAX_GHOSTS + 1 });
 
   // ---- camera: backdrop orbit and chase cam, one continuous move between them (camera.js) ----
   const rig = createCameraRig(camera);
@@ -100,7 +112,11 @@ export function createRenderer({ canvas, manifest, labels }) {
       viewQuat(self, time, tmpQ);
       me.position.set(self.pos[0], self.pos[1], self.pos[2]);
       me.quaternion.copy(tmpQ);
+      meLine.position.copy(me.position); meLine.quaternion.copy(tmpQ);
+      myLine.setViewport(canvas.width, canvas.height); ghostLine.setViewport(canvas.width, canvas.height);
+      myLine.px.value = 1 * dpr(); ghostLine.px.value = 1.6 * dpr();
 
+      rig.boosting = (self.flags & FLAG.BOOST) !== 0;
       rig.update(me.position, tmpQ, dt, camera.aspect);
       const camPos = camera.position;
 
@@ -114,6 +130,8 @@ export function createRenderer({ canvas, manifest, labels }) {
       let n = 0;
       trails.begin(time);
       trails.feed('self', self, tmpQ);
+      boost.begin(time, dt, camPos);
+      boost.feed('self', self, tmpQ, (self.flags & FLAG.BOOST) !== 0);
       for (const r of remotes) {
         if (!r.view || !r.visible || n >= MAX_GHOSTS) continue;
         viewQuat(r.view, time, tmpQ);
@@ -122,10 +140,12 @@ export function createRenderer({ canvas, manifest, labels }) {
         ghosts.setMatrixAt(n, m4);
         dotPos[n * 3] = v.x; dotPos[n * 3 + 1] = v.y; dotPos[n * 3 + 2] = v.z;
         trails.feed(r.id, r.view, tmpQ);
+        boost.feed(r.id, r.view, tmpQ, (r.view.flags & FLAG.BOOST) !== 0);
         n++;
       }
       trails.end();
-      ghosts.count = n;
+      boost.end();
+      ghosts.count = ghostLines.count = n;
       ghosts.instanceMatrix.needsUpdate = true;
       dotsGeo.setDrawRange(0, n);
       dotsGeo.attributes.position.needsUpdate = true;

@@ -183,10 +183,12 @@ function frame(nowMs) {
     const input = controls.read(STEP);
     if (input.pressed.waggle) waggleLeft = 1.2;
     copyJet(prev, jet);
-    step(jet, attract ? attractPilot.think(jet, remoteList, STEP) : flyIntent(input), STEP);
+    const it = attract ? attractPilot.think(jet, remoteList, STEP) : flyIntent(input);
+    step(jet, it, STEP);
     if (attract) attractPilot.hold(jet, STEP);
     waggleLeft = Math.max(0, waggleLeft - STEP);
-    jet.flags = waggleLeft > 0 ? FLAG.WAGGLE : 0;
+    jet.flags = (waggleLeft > 0 ? FLAG.WAGGLE : 0) | (it.boost ? FLAG.BOOST : 0);
+    if (!attract) rumble(it.boost);
     if (!helpHidden && input.active.size) { helpHidden = true; setTimeout(() => ($('help').style.opacity = 0.25), 6000); }
     acc -= STEP;
   }
@@ -281,6 +283,18 @@ function stopFollow() {
   follow = null;
   window.__flight.follow = null;
   $('following').hidden = true;
+}
+
+// Boost rumble on phones that allow it (Android; iOS Safari has no vibration
+// API). A hard kick when the burner lights, then a low pulse while it burns.
+let rumbling = false, rumbleNext = 0;
+function rumble(on) {
+  if (!navigator.vibrate) return;
+  const t = performance.now();
+  if (on && !rumbling) { navigator.vibrate([70, 30, 40]); rumbleNext = t + 400; }
+  else if (on && t >= rumbleNext) { navigator.vibrate(18); rumbleNext = t + 260; }
+  else if (!on && rumbling) navigator.vibrate(0);
+  rumbling = on;
 }
 
 // Turn this tick's input into stick commands: follow mode if it's on,

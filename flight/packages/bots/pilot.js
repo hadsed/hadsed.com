@@ -56,6 +56,7 @@ export function createPilot({ rng = Math.random, radius = 90000 } = {}) {
       me.modeLeft -= dt;
       me.wobble += dt;
       intent.yaw = 0;
+      intent.boost = false;
 
       if (me.modeLeft <= 0) {
         // Mostly wander; sometimes go keep a real person company.
@@ -86,8 +87,8 @@ export function createPilot({ rng = Math.random, radius = 90000 } = {}) {
       }
 
       me.waggleIn -= dt;
-      jet.flags = 0;
-      if (me.waggleIn < 0) { jet.flags = 1; if (me.waggleIn < -1.2) me.waggleIn = 40 + rng() * 120; }
+      jet.flags = intent.boost ? 2 : 0;   // FLAG.BOOST: everyone sees the burner
+      if (me.waggleIn < 0) { jet.flags |= 1; if (me.waggleIn < -1.2) me.waggleIn = 40 + rng() * 120; }
       return intent;
     },
   };
