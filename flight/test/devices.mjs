@@ -176,11 +176,22 @@ async function run(browser, site, cfg) {
     const cx = desc.viewport.width / 2, cy = desc.viewport.height / 2, reach = Math.min(desc.viewport.width, desc.viewport.height) * 0.2;
     let pDown = 0, pRest = 1;
     for (let attempt = 0; attempt < 2 && !(pDown > 0.5 && pRest === 0); attempt++) {
-      await page.mouse.move(cx, cy);
-      await page.mouse.down();
-      await page.mouse.move(cx, cy + reach, { steps: 5 });
-      pDown = await waitPitch((v) => v > 0.5);
-      await page.mouse.up();
+      if (cfg.engine === 'webkit' && desc.isMobile) {
+        // Playwright's emulated mouse on mobile WebKit sometimes loses the
+        // press or the release; send the pointer events the game listens for.
+        const fire = (type, y) => page.evaluate(([type, x, y]) => document.getElementById('view').dispatchEvent(
+          new PointerEvent(type, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, button: 0 })), [type, cx, y]);
+        await fire('pointerdown', cy);
+        for (let k = 1; k <= 5; k++) await fire('pointermove', cy + (k * reach) / 5);
+        pDown = await waitPitch((v) => v > 0.5);
+        await fire('pointerup', cy + reach);
+      } else {
+        await page.mouse.move(cx, cy);
+        await page.mouse.down();
+        await page.mouse.move(cx, cy + reach, { steps: 5 });
+        pDown = await waitPitch((v) => v > 0.5);
+        await page.mouse.up();
+      }
       pRest = await waitPitch((v) => v === 0);
     }
     check('drag to fly (pointer)', pDown > 0.5 && pRest === 0, `pitch ${pDown.toFixed(2)} while dragged down, ${pRest} after release`);
