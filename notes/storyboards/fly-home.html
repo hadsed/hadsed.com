@@ -32,6 +32,11 @@
   /* only while flying: a tapped button keeps :hover on touch screens, which kept it on over the site */
   body.flying #exit:hover, body.flying #exit:focus-visible { opacity: 1; }
   body.flying #exit { opacity: .7; pointer-events: auto; }
+  /* Phones: the flight HUD's "following ... stop following" row runs the full width at the top,
+     so Back to site moves to the free strip at the bottom center, between the gauges and Boost. */
+  @media (max-width: 640px) {
+    #exit { top: auto; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom)); }
+  }
 </style>
 </head>
 <body>
