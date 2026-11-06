@@ -31,7 +31,7 @@ const DEFAULTS = {
   style: 'grid', grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   drift: true, driftSpeed: 0.02,
-  scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true,
+  scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
 };
 const load = () => {
@@ -474,13 +474,25 @@ function styleSite() {
 function applySite() {
   frame.hidden = !S.site;
   frame.style.opacity = S.siteOpacity;
-  const gestures = S.scrollPan || S.sidePan || S.bgDrag || S.overscroll;
+  const gestures = S.scrollPan || S.sidePan || S.bgDrag;
+  logBox.hidden = !S.gestureLog;
   frame.style.pointerEvents = S.siteClick || gestures ? 'auto' : 'none';
   if (!S.scrollPan) { G.scrollYaw = 0; G.scrollPitch = 0; } else readScroll();
   if (!S.site) return;
   const want = new URL(S.sitePath || '/', location.href).href;
   if (frame.dataset.src !== want) { frame.dataset.src = want; frame.src = want; }
   styleSite();
+}
+// tiny on-screen event log for debugging gestures on devices we can't attach a debugger to
+const logBox = document.createElement('pre');
+logBox.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:3;margin:0;max-width:60vw;max-height:40vh;overflow:hidden;font:11px/1.3 ui-monospace,monospace;color:#e4c56f;background:rgba(8,10,14,.8);padding:6px 8px;border-radius:6px;pointer-events:none';
+logBox.hidden = true; document.body.appendChild(logBox);
+const logLines = [];
+function log(line) {
+  if (!S.gestureLog) return;
+  logLines.push(`${(performance.now() / 1000).toFixed(2)} ${line}  yaw ${(G.yaw / DEG).toFixed(1)}°`);
+  if (logLines.length > 18) logLines.shift();
+  logBox.textContent = logLines.join('\n');
 }
 function readScroll() {
   const w = frame.contentWindow; if (!w) return;
@@ -497,29 +509,27 @@ function wireGestures() {
   const w = frame.contentWindow, doc = frame.contentDocument;
   if (!doc || doc.__lab) return;
   doc.__lab = true;
-  doc.documentElement.style.overscrollBehaviorX = 'none';   // stop sideways swipes from navigating back
-  w.addEventListener('scroll', () => { if (S.scrollPan) { readScroll(); } }, { passive: true });
+  // No rubber-banding inside the mockup: Safari's elastic bounce (big with an iPad trackpad) dragged the
+  // whole page off the top and snapped it back. Also stops sideways swipes from navigating back.
+  for (const el of [doc.documentElement, doc.body]) el.style.overscrollBehavior = 'none';
+  w.addEventListener('scroll', () => { log(`scroll y ${Math.round(w.scrollY)}`); if (S.scrollPan) { readScroll(); } }, { passive: true });
+  for (const type of ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'gesturestart']) {
+    w.addEventListener(type, (e) => log(`${type} ${e.pointerType || ''}`), { passive: true });
+  }
   // A trackpad gesture is a burst of wheel events (finger, then momentum) with no gap longer than ~250 ms.
   // Each burst locks to one axis when it starts, so a vertical scroll's sideways noise can't pan, and
-  // remembers whether it began already pinned at an end, so momentum that merely arrives there doesn't spring.
-  let burst = { last: 0, axis: null, startedAtEnd: false };
+  // (The overscroll swing, idea 4, was removed at Had's call.)
+  let burst = { last: 0, axis: null };
   w.addEventListener('wheel', (e) => {
     const now = performance.now();
-    const el = doc.scrollingElement;
-    const atEnd = el.scrollTop + w.innerHeight >= el.scrollHeight - 2, atTop = el.scrollTop <= 0;
     const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0), dy = e.shiftKey ? 0 : e.deltaY;
-    if (now - burst.last > 250) burst = { last: now, axis: null, startedAtEnd: (atEnd && dy > 0) || (atTop && dy < 0) };
+    if (now - burst.last > 250) burst = { last: now, axis: null };
+    log(`wheel dx ${e.deltaX.toFixed(1)} dy ${e.deltaY.toFixed(1)} mode ${e.deltaMode} y ${Math.round(w.scrollY)}`);
     burst.last = now;
     if (!burst.axis && Math.hypot(dx, dy) > 2) burst.axis = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
     if (burst.axis === 'x') {
       if (S.sidePan) { G.sideYaw += dx * S.sideSens * 0.001; e.preventDefault(); }
       return;
-    }
-    if (S.overscroll && dy && burst.startedAtEnd) {
-      if ((atEnd && dy > 0) || (atTop && dy < 0)) {
-        G.spring = THREE.MathUtils.clamp(G.spring + dy * 0.0012, -25 * DEG, 25 * DEG);
-        G.lastOverscroll = performance.now();
-      }
     }
   }, { passive: false });
   // touch: a mostly horizontal swipe pans; vertical swipes scroll the page as usual
@@ -613,7 +623,7 @@ const SPEC = [
     ['sidePan', 'check', { label: '2. Sideways swipe pans' }],
     ['sideSens', 'range', { label: 'Sideways sensitivity', min: 0.1, max: 4, step: 0.05 }],
     ['bgDrag', 'check', { label: '3. Drag background (mouse)' }],
-    ['overscroll', 'check', { label: '4. Overscroll springs' }],
+    ['gestureLog', 'check', { label: 'Show event log (debug)' }],
   ]],
   ['Website', [
     ['site', 'check', { label: 'Show site on top' }],
