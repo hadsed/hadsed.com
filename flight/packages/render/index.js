@@ -135,7 +135,7 @@ export function createRenderer({ canvas, manifest, labels }) {
       let n = 0;
       trails.begin(time);
       trails.feed('self', self, tmpQ);
-      boost.begin(time, dt, camPos);
+      boost.begin(time, dt, camera, canvas.height);
       boost.feed('self', self, tmpQ, (self.flags & FLAG.BOOST) !== 0);
       for (const r of remotes) {
         if (!r.view || !r.visible || n >= MAX_GHOSTS) continue;
