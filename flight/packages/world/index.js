@@ -71,6 +71,7 @@ vec3 ramp(vec3 c, float gold){
 vec3 display(vec3 c, float gold){
   c *= uExposure;
   vec3 nat = natural(c);
+  if (uMono <= 0.0) return nat;            // uniform branch: the game's natural color skips the ramp
   vec3 m = mix(nat, ramp(c, gold), uMono);
   vec3 hue = nat - vec3(dot(nat, vec3(0.2126, 0.7152, 0.0722)));
   return max(m + hue * uChroma * uMono, 0.0);
@@ -134,7 +135,7 @@ export function loadTerrarium(url) {
   return terrariumCache.get(key);
 }
 
-export function createWorld({ segments = 512 } = {}) {
+export function createWorld({ segments = 512, near = 0.12 } = {}) {
   const sunDir = new THREE.Vector3(0, 1, 0);
   const U = {
     uCam: { value: new THREE.Vector3() }, uEarthR: { value: EARTH_R }, uOrigin: { value: new THREE.Vector3() },
@@ -190,7 +191,7 @@ export function createWorld({ segments = 512 } = {}) {
     uColor: { value: 1 }, uTexture: { value: 1 },
   };
   const terrain = new THREE.Mesh(
-    terrainGeometry(segments),
+    terrainGeometry(segments, 750000, near),
     new THREE.ShaderMaterial({
       uniforms: { ...U, ...TU },
       vertexShader: /* glsl */`
@@ -209,19 +210,19 @@ export function createWorld({ segments = 512 } = {}) {
           vec3 c = floor(t.rgb * 255.0 + 0.5);
           return c.r * 256.0 + c.g + c.b / 256.0 - 32768.0;
         }
-        float hAt(vec2 uv){
+        // height and its slope (per texel) from one bilinear cell: four fetches per vertex
+        vec3 hAt(vec2 uv){
           vec2 x = uv * float(uSize) - 0.5; vec2 i = floor(x), f = x - i; ivec2 b = ivec2(i);
-          return mix(mix(texH(b), texH(b + ivec2(1, 0)), f.x), mix(texH(b + ivec2(0, 1)), texH(b + ivec2(1, 1)), f.x), f.y);
+          float a = texH(b), bx = texH(b + ivec2(1, 0)), bz = texH(b + ivec2(0, 1)), c = texH(b + ivec2(1, 1));
+          return vec3(mix(mix(a, bx, f.x), mix(bz, c, f.x), f.y), mix(bx - a, c - bz, f.y), mix(bz - a, c - bx, f.x));
         }
         void main(){
           vec2 xz = position.xz + uShift;                  // render space
           vec2 wxz = xz + uOrigin.xz;                      // world space
           vec2 uv = wxz / uWidth + 0.5;
-          float h = hAt(uv);
-          float d = uTexel, m = uWidth * uTexel;
-          float hx = hAt(uv + vec2(d, 0)) - hAt(uv - vec2(d, 0));
-          float hz = hAt(uv + vec2(0, d)) - hAt(uv - vec2(0, d));
-          vN = normalize(vec3(-hx * uExag, 2.0 * m, -hz * uExag));
+          vec3 hg = hAt(uv);
+          float h = hg.x, m = uWidth * uTexel;
+          vN = normalize(vec3(-hg.y * uExag, m, -hg.z * uExag));
           vec3 w = vec3(xz.x, h * uExag - uOrigin.y, xz.y);
           vec2 rel = xz - uCam.xz;
           w.y -= dot(rel, rel) / (2.0 * uEarthR);
@@ -242,8 +243,9 @@ export function createWorld({ segments = 512 } = {}) {
         vec3 ground(vec3 n, float lit){
           float steep = 1.0 - n.y;
           vec2 q = vXZ / 900.0;
-          float fine = mix(0.5, fbm(q, 4), 1.0 - smoothstep(0.25, 0.9, max(fwidth(q.x), fwidth(q.y))));
-          float broad = fbm(vXZ / 12000.0 + 3.7, 4);
+          float fade = 1.0 - smoothstep(0.25, 0.9, max(fwidth(q.x), fwidth(q.y)));
+          float fine = fade > 0.0 ? mix(0.5, fbm(q, 3), fade) : 0.5;
+          float broad = fbm(vXZ / 12000.0 + 3.7, 3);
           float hs = vH / max(uSnowM, 1.0);              // 1 at the snowline
           float jitter = (broad - 0.5) * 0.35 + (fine - 0.5) * 0.12;
           vec3 valley = mix(vec3(0.13, 0.12, 0.075), vec3(0.24, 0.18, 0.11), uArid);
@@ -320,8 +322,8 @@ export function createWorld({ segments = 512 } = {}) {
         void main(){
           #include <logdepthbuf_fragment>
           vec2 q = vXZ / 4500.0;
-          float field = fbm(q * 0.18 + 4.0, 4);
-          float puff = fbm(q + vec2(fbm(q * 0.5, 3)) * 1.5, 6);
+          float field = fbm(q * 0.18 + 4.0, 3);
+          float puff = fbm(q + vec2(fbm(q * 0.5, 2)) * 1.5, 5);
           float a = smoothstep(0.86 - uCover * 0.4, 1.0 - uCover * 0.35, puff + (field - 0.5) * 0.7);
           float fog = 1.0 - exp(-vDist / (uHazeDist * 1.1));
           vec3 c = mix(vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff), mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono), fog);

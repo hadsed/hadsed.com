@@ -30,7 +30,9 @@ export function createRenderer({ canvas, manifest, labels }) {
   // Drawn straight to the screen (no post pass): the world shaders tone themselves, the sky to the
   // palette, the ground in natural color.
   const coarse = matchMedia('(pointer: coarse)').matches;
-  const world = createWorld({ segments: coarse ? 384 : 512 });
+  // 256 x 256 with the density pulled in under the camera: same ~350 m spacing nearby, a quarter of
+  // the vertices (software GL and weak phones are vertex-bound here).
+  const world = createWorld({ segments: 256, near: 0.06 });
   // The backdrop's look (navy monotone, ground color showing through). The monotone follows the camera
   // rig: full in the backdrop orbit, fading to natural color as Fly glides into the chase cam.
   world.setLook({ ...WORLD_DEFAULTS });
