@@ -6,7 +6,7 @@
 // model from being a standalone, ready-to-use file (no GLB, no textures, no node
 // tree, nothing a 3D tool opens), which is what the model's license asks for.
 // No three.js here so the packer can share it under Node.
-import { MeshoptDecoder } from '../../vendor/meshopt_decoder.mjs';
+import { MeshoptDecoder } from '../../vendor/meshopt_decoder.js';
 
 export const MAGIC = 'HJT1';
 const KEY = 0x5bd1d5a3;
