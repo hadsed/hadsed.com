@@ -94,14 +94,20 @@ float lines2(vec2 c){ vec2 fw = fwidth(c); vec2 g = abs(fract(c - 0.5) - 0.5) / 
 float lines1(float c){ float fw = fwidth(c); float g = abs(fract(c - 0.5) - 0.5) / max(fw, 1e-6);
   return (1.0 - min(g, 1.0)) * (1.0 - smoothstep(0.12, 0.45, fw)); }`;
 
-// One grid, dense under the camera (~350 m apart at n 512) and stretching out toward the horizon,
-// so a single draw covers 1,500 km.
-export function terrainGeometry(n = 512, R = 750000, a = 0.12) {
+// One grid, dense under the camera and stretching out toward the horizon, so a single draw covers
+// 1,500 km. The middle (`flat` of each half) is a uniform grid of `cell` meters; past it the spacing
+// grows smoothly (cubic) out to R. A moving camera shifts the grid in whole cells (see cellSize and
+// frame(shift)), so every vertex in the core lands exactly where a neighbor was and the ground under
+// you never changes; only far-off vertices, already sparse and hazy, resample.
+export function terrainGeometry(segments = 512, R = 750000, cell = 352, flat = 0.375) {
+  const n = segments + (segments % 2 ? 0 : 1);   // odd: a vertex sits under the camera
+  const h = (n - 1) / 2, K = Math.round(h * flat);
+  const c = (R - cell * h) / Math.pow(h - K, 3);
+  const at = (j) => { const a = Math.abs(j), x = a <= K ? cell * a : cell * a + c * Math.pow(a - K, 3); return Math.sign(j) * x; };
   const pos = new Float32Array(n * n * 3), idx = new Uint32Array((n - 1) * (n - 1) * 6);
-  const warp = (u) => R * u * (a + (1 - a) * u * u);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const k = (j * n + i) * 3;
-    pos[k] = warp((i / (n - 1)) * 2 - 1); pos[k + 2] = warp((j / (n - 1)) * 2 - 1);
+    pos[k] = at(i - h); pos[k + 2] = at(j - h);
   }
   let t = 0;
   for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
@@ -112,6 +118,7 @@ export function terrainGeometry(n = 512, R = 750000, a = 0.12) {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setIndex(new THREE.BufferAttribute(idx, 1));
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), R * 1.5);
+  g.userData.cell = cell;
   return g;
 }
 
@@ -156,7 +163,7 @@ function skyGeometry(r, cols = 96, rows = 96) {
   return g;
 }
 
-export function createWorld({ segments = 512, near = 0.12 } = {}) {
+export function createWorld({ segments = 512, cell = 352, flat = 0.375 } = {}) {
   const sunDir = new THREE.Vector3(0, 1, 0);
   const U = {
     uCam: { value: new THREE.Vector3() }, uEarthR: { value: EARTH_R }, uOrigin: { value: new THREE.Vector3() },
@@ -215,7 +222,7 @@ export function createWorld({ segments = 512, near = 0.12 } = {}) {
     uColor: { value: 1 }, uTexture: { value: 1 },
   };
   const terrain = new THREE.Mesh(
-    terrainGeometry(segments, 750000, near),
+    terrainGeometry(segments, 750000, cell, flat),
     new THREE.ShaderMaterial({
       uniforms: { ...U, ...TU },
       vertexShader: /* glsl */`
@@ -365,6 +372,8 @@ export function createWorld({ segments = 512, near = 0.12 } = {}) {
 
   return {
     uniforms: U, terrainUniforms: TU, sky, terrain, clouds, sunDir, look,
+    /** Grid spacing under the camera (m): shift the terrain in whole multiples of it. */
+    cellSize: cell,
     /** Any subset of WORLD_DEFAULTS' look keys: palette, tone, sun, haze, clouds, ground style. */
     setLook(o) {
       Object.assign(look, o);
@@ -392,8 +401,8 @@ export function createWorld({ segments = 512, near = 0.12 } = {}) {
     },
     /**
      * Call each frame with the camera that draws the world. origin: world position of render (0,0,0).
-     * shift: optional render-space xz to move the terrain grid under a moving camera (snap it to whole
-     * grid cells so heights don't shimmer).
+     * shift: optional render-space xz to move the terrain grid under a moving camera. Snap it to whole
+     * multiples of cellSize so the ground under the camera stays put.
      */
     frame(camera, origin = null, shift = null) {
       if (origin) U.uOrigin.value.copy(origin); else U.uOrigin.value.set(0, 0, 0);
