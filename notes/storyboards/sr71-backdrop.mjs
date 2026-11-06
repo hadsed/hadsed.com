@@ -484,7 +484,11 @@ function applySite() {
 }
 function readScroll() {
   const w = frame.contentWindow; if (!w) return;
-  const screens = w.scrollY / Math.max(w.innerHeight, 1);
+  // Clamp to the real scroll range: Safari's elastic bounce reports scrollY past either end for a
+  // moment, which made the view swing out and snap back.
+  const el = w.document.scrollingElement;
+  const maxY = Math.max(0, el.scrollHeight - w.innerHeight);
+  const screens = THREE.MathUtils.clamp(w.scrollY, 0, maxY) / Math.max(w.innerHeight, 1);
   G.scrollYaw = Math.min(screens * S.scrollDeg, S.scrollMax) * DEG;
   G.scrollPitch = Math.min(screens * S.scrollTilt, 8) * DEG;
 }
@@ -495,18 +499,25 @@ function wireGestures() {
   doc.__lab = true;
   doc.documentElement.style.overscrollBehaviorX = 'none';   // stop sideways swipes from navigating back
   w.addEventListener('scroll', () => { if (S.scrollPan) { readScroll(); } }, { passive: true });
+  // A trackpad gesture is a burst of wheel events (finger, then momentum) with no gap longer than ~250 ms.
+  // Each burst locks to one axis when it starts, so a vertical scroll's sideways noise can't pan, and
+  // remembers whether it began already pinned at an end, so momentum that merely arrives there doesn't spring.
+  let burst = { last: 0, axis: null, startedAtEnd: false };
   w.addEventListener('wheel', (e) => {
-    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
-    if (S.sidePan && Math.abs(dx) > Math.abs(e.deltaY) * 0.5 && dx) {
-      G.sideYaw += dx * S.sideSens * 0.001;
-      e.preventDefault();
+    const now = performance.now();
+    const el = doc.scrollingElement;
+    const atEnd = el.scrollTop + w.innerHeight >= el.scrollHeight - 2, atTop = el.scrollTop <= 0;
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0), dy = e.shiftKey ? 0 : e.deltaY;
+    if (now - burst.last > 250) burst = { last: now, axis: null, startedAtEnd: (atEnd && dy > 0) || (atTop && dy < 0) };
+    burst.last = now;
+    if (!burst.axis && Math.hypot(dx, dy) > 2) burst.axis = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
+    if (burst.axis === 'x') {
+      if (S.sidePan) { G.sideYaw += dx * S.sideSens * 0.001; e.preventDefault(); }
       return;
     }
-    if (S.overscroll && e.deltaY) {
-      const el = doc.scrollingElement;
-      const atEnd = el.scrollTop + w.innerHeight >= el.scrollHeight - 2, atTop = el.scrollTop <= 0;
-      if ((atEnd && e.deltaY > 0) || (atTop && e.deltaY < 0)) {
-        G.spring = THREE.MathUtils.clamp(G.spring + e.deltaY * 0.0012, -25 * DEG, 25 * DEG);
+    if (S.overscroll && dy && burst.startedAtEnd) {
+      if ((atEnd && dy > 0) || (atTop && dy < 0)) {
+        G.spring = THREE.MathUtils.clamp(G.spring + dy * 0.0012, -25 * DEG, 25 * DEG);
         G.lastOverscroll = performance.now();
       }
     }
