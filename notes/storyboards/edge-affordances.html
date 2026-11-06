@@ -32,16 +32,16 @@
 
   /* 1. Jet silhouette in the corner */
   .c-jet { right: calc(var(--edge) - 6px + env(safe-area-inset-right)); bottom: calc(var(--edge) - 6px + env(safe-area-inset-bottom)); width: 48px; height: 48px; }
-  .c-jet .jet { position: absolute; left: 50%; top: 50%; width: 17px; height: 32px; margin: -16px 0 0 -8.5px; color: var(--muted); opacity: .75;
-    transform: rotate(-38deg); transition: transform .45s var(--ease), color .25s, opacity .25s; }
+  .c-jet .jet { position: absolute; left: 50%; top: 50%; width: 34px; height: 18px; margin: -9px 0 0 -17px; color: var(--muted); opacity: .75;
+    transform: rotate(-128deg); transition: transform .45s var(--ease), color .25s, opacity .25s; }
   .c-jet .trail { position: absolute; left: 50%; top: 50%; width: 1px; height: 0; transform-origin: 0 0; transform: rotate(142deg) translateY(12px);
     background: linear-gradient(var(--glow), transparent); opacity: 0; transition: height .45s var(--ease), opacity .3s; }
   .c-jet .tip { position: absolute; right: 44px; bottom: 17px; font: 9px/1 var(--mono); letter-spacing: .18em; color: var(--glow); opacity: 0; transform: translateX(4px); transition: opacity .25s, transform .35s var(--ease); white-space: nowrap; }
-  .c-jet:hover .jet, .c-jet:focus-visible .jet { color: var(--glow); opacity: 1; transform: rotate(-38deg) translateY(-3px); }
+  .c-jet:hover .jet, .c-jet:focus-visible .jet { color: var(--glow); opacity: 1; transform: rotate(-128deg) translateY(-3px); }
   .c-jet:hover .trail, .c-jet:focus-visible .trail { height: 26px; opacity: .8; }
   .c-jet:hover .tip, .c-jet:focus-visible .tip { opacity: 1; transform: none; }
   body.entering[data-c="jet"] .c-jet .jet { transition: transform 1.6s cubic-bezier(.5, 0, .2, 1), opacity 1.6s ease-in, color .2s; color: var(--glow);
-    transform: translate(-42vw, -38vh) rotate(-38deg) scale(.35); opacity: 0; }
+    transform: translate(-42vw, -38vh) rotate(-128deg) scale(.35); opacity: 0; }
   body.entering[data-c="jet"] .c-jet .trail { transition: none; opacity: 0; }
 
   /* 2. HUD readout, bottom left; the same readout carries on inside the world */
@@ -128,6 +128,8 @@
   .sw-notes .k { color: var(--glow); font: 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; display: block; margin-bottom: 1px; }
   .sw-notes label { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--muted); cursor: pointer; }
   .sw-notes input { accent-color: var(--glow); }
+  .sw-places { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .sw-places label { margin-top: 6px; color: var(--text); }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 10px var(--mono); letter-spacing: .2em; color: var(--muted); z-index: 7; background: var(--bg); transition: opacity .6s; }
   #loading.done { opacity: 0; pointer-events: none; }
   @media (max-width: 640px) {
@@ -144,9 +146,10 @@
 </head>
 <body data-c="hud">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <!-- SR-71 planform, nose up: long chined nose, two mid-wing nacelles with spikes, blended delta -->
-  <symbol id="sr71" viewBox="0 0 52 100">
-    <path fill="currentColor" d="M26 0 L27 8 L28.6 20 L30.4 32 L32 42 L33 47 L33 45 L34.7 44.6 L36 39.5 L37.3 44.6 L39 45 L39.3 58 L51 87 L50.8 90 L39.3 92 L38.8 99 L33.2 99 L32.8 94 L28 96 L27 99.5 L26 100 L25 99.5 L24 96 L19.2 94 L18.8 99 L13.2 99 L12.7 92 L1.2 90 L1 87 L12.7 58 L13 45 L14.7 44.6 L16 39.5 L17.3 44.6 L19 45 L19 47 L20 42 L21.6 32 L23.4 20 L25 8 Z"/>
+  <!-- SR-71 planform, nose to the right. Traced from the public-domain USAF 3-view
+       (commons.wikimedia.org/wiki/File:Lockheed_SR-71A_3view.svg), mirrored for symmetry. -->
+  <symbol id="sr71" viewBox="0 0 100 52.46">
+    <path fill="currentColor" d="M0.1 26.2 L0.1 25.7 L0.9 25.7 L4.0 24.8 L5.7 18.2 L8.7 16.6 L8.9 15.8 L8.0 14.8 L7.9 14.4 L8.2 14.1 L9.1 13.8 L9.1 11.3 L10.1 10.8 L8.0 9.8 L7.7 9.4 L9.3 2.1 L10.3 0.7 L11.9 0.0 L13.6 0.3 L27.0 7.5 L31.7 7.6 L36.8 8.3 L40.3 9.2 L45.1 11.1 L45.5 11.9 L49.5 13.6 L49.7 14.2 L49.4 14.5 L45.5 15.2 L45.0 16.4 L43.7 16.6 L51.3 20.6 L74.5 20.7 L80.6 21.2 L90.0 22.7 L95.5 24.3 L98.5 25.7 L100.0 25.7 L99.8 26.1 L97.4 27.3 L93.3 28.8 L88.1 30.1 L81.8 31.1 L74.5 31.7 L51.3 31.8 L43.7 35.8 L45.0 36.0 L45.5 37.2 L49.4 37.9 L49.7 38.2 L49.5 38.7 L45.5 40.5 L45.1 41.3 L40.3 43.2 L36.8 44.1 L31.7 44.8 L27.0 44.9 L14.6 51.6 L12.4 52.4 L10.9 52.1 L9.6 50.8 L7.7 43.8 L7.7 43.0 L8.0 42.6 L10.1 41.6 L9.1 41.1 L9.1 38.5 L8.2 38.3 L7.9 37.9 L8.0 37.5 L8.9 36.6 L8.7 35.8 L5.7 34.2 L4.0 27.6 L0.6 26.6 Z"/>
   </symbol>
 </svg>
 
@@ -211,6 +214,8 @@
 
 <script>
 const CONCEPTS = [
+  { id: 'menu', name: 'Fly menu item', what: '"Fly" in the muted color with an SR-71 planform traced from the USAF three-view. Hover: it turns gold and the jet noses forward. Try the placements below.',
+    click: 'The site fades out, the camera pushes in and swings, and the world takes over. Esc or Back returns you to the page you left.' },
   { id: 'hud', name: 'HUD readout', what: 'A two-line instrument readout in the bottom-left margin: altitude, live heading (it follows the camera), Mach, and the site\'s gold orb winking as a status light. Hover adds "ENTER ›".',
     click: 'Site fades out, the camera pushes in and swings, and the readout stays put as the world\'s own HUD. Feels continuous because the control is already part of the world.' },
   { id: 'jet', name: 'SR-71 in the corner', what: 'A 28px SR-71 planform in the bottom-right corner, angled across the page. Hover: it noses forward, a short gold contrail draws behind it, "FLY" appears.',
@@ -219,8 +224,6 @@ const CONCEPTS = [
     click: 'Click, or drag it down like pulling a blind, and the site drops away. The tape stays as the world\'s heading indicator.' },
   { id: 'frame', name: 'Canopy corners', what: 'Four viewfinder brackets in the corners, framing the page as a window you are looking through. Hover any corner: all four turn gold and lock inward.',
     click: 'Brackets snap out to the edges as the site fades, so the frame you saw becomes the canopy you look through.' },
-  { id: 'menu', name: 'Menu item', what: 'A fifth menu entry, set apart from About / Portfolio / Experience / Blog by a gap and in the muted color, with a tiny jet glyph: "Fly".',
-    click: 'Same transition as the others. The most explicit: people will find it, but it reads as content navigation rather than an edge secret.' },
   { id: 'footer', name: 'Footer altitude', what: 'The footer reads "© 2026 Had Seddiqi · 85,000 ft". The altitude is the link and lights gold on hover, with the jet sliding in.',
     click: 'Same transition. Pure easter egg: almost nobody scrolls to it, the people who do get rewarded.' },
   { id: 'alt', name: 'Altimeter edge', what: 'A thin altimeter tape on the right edge, where a scrollbar would sit. Scrolling the page winds the altitude down from 85,000 ft. Hover: "DESCEND ›".',
@@ -235,7 +238,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 try { localStorage.removeItem('sr71-backdrop-v3'); } catch {}
 
 const params = new URLSearchParams(location.search);
-let ci = Math.max(0, CONCEPTS.findIndex((c) => c.id === params.get('c')));
+let ci = Math.max(0, CONCEPTS.findIndex((c) => c.id === (params.get('c') || 'menu')));
 let plain = params.get('bg') === 'plain';
 let notesOpen = params.has('notes') ? params.get('notes') !== '0' : innerWidth > 640;
 let state = 'site';   // site | entering | world | leaving
@@ -290,7 +293,7 @@ function applyBg() {
 }
 
 // Concepts 5 and 6 live inside the site page itself.
-const JET_SVG = '<svg viewBox="0 0 52 100" width="8" height="15" aria-hidden="true" style="vertical-align:-3px;margin-right:7px;transform:rotate(90deg)"><path fill="currentColor" d="' + document.querySelector('#sr71 path').getAttribute('d') + '"/></svg>';
+const JET_SVG = '<svg class="fly-jet" viewBox="0 0 100 52.46" aria-hidden="true"><path fill="currentColor" d="' + document.querySelector('#sr71 path').getAttribute('d') + '"/></svg>';
 function decorateSite() {
   const doc = siteDoc(); if (!doc || !doc.head) return;
   if (!doc.getElementById('edge-mock-site')) {
@@ -298,14 +301,19 @@ function decorateSite() {
     st.textContent = `
       .edge-only { display: none !important; }
       html[data-c="menu"] .edge-menu, html[data-c="footer"] .edge-foot { display: revert !important; }
-      .edge-menu { margin-top: 1.4rem !important; }
-      .edge-menu a { color: var(--muted); }
-      .edge-menu a:hover { color: var(--glow); text-decoration: none; }
+      .fly-jet { width: 22px; height: 11.5px; vertical-align: -1px; margin-right: 8px; transition: transform .35s cubic-bezier(.2,.7,.2,1); }
+      .edge-menu { margin: 1.4rem 0 0 !important; }
+      .edge-menu a { color: var(--muted); white-space: nowrap; }
+      .edge-menu a:hover, .edge-menu a:focus-visible { color: var(--glow); text-decoration: none; }
+      .edge-menu a:hover .fly-jet, .edge-menu a:focus-visible .fly-jet { transform: translateX(3px); }
+      html[data-place="rule"] .edge-menu { margin-top: 0.9rem !important; padding-top: 0.9rem; position: relative; }
+      html[data-place="rule"] .edge-menu::before { content: ""; position: absolute; left: 0; top: 0; width: 1.5rem; border-top: 1px solid var(--rule); opacity: .6; }
+      html[data-place="pinned"] .edge-menu { position: fixed; bottom: 2rem; margin: 0 !important; z-index: 2; }
       .edge-foot a { color: var(--muted); }
-      .edge-foot a svg { display: inline-block; width: 0; opacity: 0; margin-right: 0 !important; transition: all .35s cubic-bezier(.2,.7,.2,1); }
+      .edge-foot a svg { display: inline-block; width: 0; opacity: 0; margin-right: 0; transition: all .35s cubic-bezier(.2,.7,.2,1); }
       .edge-foot a:hover { color: var(--glow); text-decoration: none; }
-      .edge-foot a:hover svg { width: 8px; opacity: 1; margin-right: 6px !important; }
-      @media (max-width: 640px) { .edge-menu { margin-top: 0 !important; margin-left: auto !important; } }
+      .edge-foot a:hover svg { width: 21px; opacity: 1; margin-right: 7px; }
+      @media (max-width: 640px) { .edge-menu, html[data-place] .edge-menu { position: static; margin: 0 0 0 auto !important; padding-top: 0; } .edge-menu::before { display: none; } }
     `;
     doc.head.appendChild(st);
   }
@@ -322,7 +330,38 @@ function decorateSite() {
     foot.appendChild(span);
   }
   for (const a of doc.querySelectorAll('a[href="#fly"]')) a.onclick = (e) => { e.preventDefault(); enter(); };
+  if (!doc.__flyResize) { doc.__flyResize = true; doc.defaultView.addEventListener('resize', placeFly); }
+  placeFly();
   doc.documentElement.dataset.c = CONCEPTS[ci].id;
+}
+
+// Fly placements. "below", "rule" and "pinned" are pure CSS; "mid" and "end" line the item up
+// with the About text so the gap reads as deliberate rather than arbitrary.
+const PLACES = [
+  ['below', 'Below the menu', 'Where it is today: a small gap under Blog.'],
+  ['mid', 'Mid column', 'Drops to the first line of the second paragraph ("Lately I\'ve been..."), so it floats on its own but still lines up with text across the gutter.'],
+  ['rule', 'After a hairline', 'A short rule under Blog marks it as a different kind of link: you leave the pages and go somewhere.'],
+  ['end', 'Foot of the column', 'Sits at the bottom of the sidebar, level with the last line of the blurb. Scrolls away with the page.'],
+  ['pinned', 'Pinned to the bottom', 'Fixed at the bottom of the sidebar column, so it is always there, like a dock item, while the page scrolls.'],
+];
+let place = PLACES.some((p) => p[0] === params.get('place')) ? params.get('place') : 'below';
+function placeFly() {
+  const doc = siteDoc(); if (!doc || !doc.documentElement) return;
+  doc.documentElement.dataset.place = place;
+  const li = doc.querySelector('.edge-menu'); if (!li) return;
+  li.style.marginTop = ''; li.style.left = '';
+  const w = doc.defaultView;
+  if (w.innerWidth <= 640) return;
+  const ul = doc.querySelector('.menu ul');
+  const a = li.querySelector('a');
+  if (place === 'pinned') { li.style.left = ul.getBoundingClientRect().left + 'px'; return; }
+  const ps = doc.querySelectorAll('.blurb p');
+  if (!ps.length || (place !== 'mid' && place !== 'end')) return;
+  li.style.setProperty('margin-top', '0px', 'important');
+  const lh = parseFloat(w.getComputedStyle(ps[0]).lineHeight) || 22;
+  const target = place === 'mid' ? ps[Math.min(1, ps.length - 1)].getBoundingClientRect().top + lh / 2 : ps[ps.length - 1].getBoundingClientRect().bottom - lh / 2;
+  const ar = a.getBoundingClientRect(), now = ar.top + ar.height / 2;
+  li.style.setProperty('margin-top', Math.max(0, target - now) + 'px', 'important');
 }
 
 // ---------- instruments ----------
@@ -515,13 +554,17 @@ function setConcept(i) {
   $('#sw-name').innerHTML = `<small>${ci + 1}/${CONCEPTS.length}</small>${c.name}`;
   $('#sw-notes').innerHTML = `<p><span class="k">What you see</span>${c.what}</p><p><span class="k">On click</span>${c.click}</p>
     <p style="color:var(--muted)">Inside the world: drag to look, scroll or swipe up for the next world, Esc or Back to return.</p>
+    ${c.id === 'menu' ? `<p><span class="k">Placement</span></p><div class="sw-places">${PLACES.map(([id, name, what]) =>
+      `<label title="${what}"><input type="radio" name="place" value="${id}" ${id === place ? 'checked' : ''}> ${name}</label>`).join('')}</div>
+      <p class="sw-place-note" style="color:var(--muted);margin-top:4px">${PLACES.find((p) => p[0] === place)[2]}</p>` : ''}
     <label><input type="checkbox" id="sw-plain" ${plain ? 'checked' : ''}> Plain site (no backdrop behind it, like today)</label>`;
+  for (const r of $$('input[name="place"]')) r.onchange = () => { place = r.value; placeFly(); setConcept(ci); };
   $('#sw-plain').onchange = (e) => { plain = e.target.checked; applyBg(); writeUrl(); };
-  const d = siteDoc(); if (d) d.documentElement.dataset.c = c.id;
+  const d = siteDoc(); if (d && d.documentElement) d.documentElement.dataset.c = c.id;
   writeUrl();
 }
 function writeUrl() {
-  const q = new URLSearchParams({ c: CONCEPTS[ci].id }); if (plain) q.set('bg', 'plain'); if (!notesOpen) q.set('notes', '0');
+  const q = new URLSearchParams({ c: CONCEPTS[ci].id }); if (CONCEPTS[ci].id === 'menu') q.set('place', place); if (plain) q.set('bg', 'plain'); if (!notesOpen) q.set('notes', '0');
   history.replaceState(null, '', `?${q}`);
 }
 $('#sw-prev').onclick = () => setConcept(ci - 1);
