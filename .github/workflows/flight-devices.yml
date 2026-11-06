@@ -42,7 +42,7 @@ jobs:
         run: |
           npm i --no-save playwright@1.63.0
           npx playwright install-deps chromium webkit firefox
-          for i in 1 2 3; do timeout 240 npx playwright install chromium webkit firefox && break; echo "browser download stalled, retrying"; done
+          for i in 1 2 3; do timeout 240 npx playwright install chromium webkit firefox && exit 0; echo "browser download stalled, retrying"; done; exit 1
       - name: Start the room server (local Durable Objects)
         working-directory: flight/server
         run: |
