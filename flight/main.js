@@ -1,6 +1,7 @@
 // The only file that knows about every part. It wires controls -> sim -> net
 // -> render and runs the loop. Everything interesting lives in packages/.
-import { createControls, keyboard, pointerStick, gamepad, tilt } from './packages/controls/index.js';
+import { createControls, keyboard, pointerStick, gamepad, tilt, scripted } from './packages/controls/index.js';
+import { createAssist } from './packages/sim/assist.js';
 import { createJet, step, cloneJet, copyJet, lerpJet, STEP } from './packages/sim/index.js';
 import { connect } from './packages/net/client.js';
 import { createRemotes } from './packages/net/interp.js';
@@ -22,29 +23,36 @@ const world = manifest.worlds.find((w) => w.id === params.get('world')) || manif
 
 // ---- controls (the SDK knows nothing about jets; we name the axes here) ----
 const canvas = $('view');
-// Phones and tablets can steer by tilting; off until the TILT button is tapped.
-const tilter = tilt({ x: 'roll', y: 'pitch', range: 25 });
-// Drag like you are pulling the jet by its tail: down climbs, left banks right.
-const stick = pointerStick({ element: canvas, x: 'roll', y: 'pitch', invertX: true, radius: Math.min(innerWidth, innerHeight) * 0.18 });
+// Sabre-style steering (Halo: Reach): every input moves an aim point, and the
+// jet turns toward it, banking on its own. aimX + is right, aimY + is up.
+// Phones and tablets can also aim by tilting; off until TILT is tapped.
+const tilter = tilt({ x: 'aimX', y: 'aimY', range: 25 });
+// Drag toward where you want to go.
+const stick = pointerStick({ element: canvas, x: 'aimX', y: 'aimY', invertY: true, radius: Math.min(innerWidth, innerHeight) * 0.18 });
+const buttons = scripted('buttons');   // on-screen BOOST
 const controls = createControls({
-  axes: ['pitch', 'roll', 'yaw', 'throttle'],
-  actions: ['waggle'],
+  axes: ['aimX', 'aimY', 'throttle'],
+  actions: ['boost', 'waggle'],
   sources: [
     keyboard({
       axes: {
-        pitch: [['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']],
-        roll: [['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']],
-        yaw: ['KeyQ', 'KeyE'],
+        aimX: [['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']],
+        aimY: [['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']],
         throttle: ['KeyF', 'KeyR'],
       },
-      actions: { waggle: 'Space' },
+      actions: { boost: ['Space', 'ShiftLeft', 'ShiftRight'], waggle: 'KeyE' },
+      attack: 5, release: 8,
     }),
     stick,
-    gamepad({ axes: { roll: 0, pitch: 1, yaw: 2 }, buttons: { waggle: 0 } }),
+    // Right stick aims, left stick forward/back is throttle, A boosts, B waves.
+    gamepad({ axes: { aimX: 2, aimY: 3, throttle: 1 }, invert: { aimY: true, throttle: true }, buttons: { boost: 0, waggle: 1 } }),
     tilter,
+    buttons,
   ],
 });
-window.__flight = { controls };   // hook for voice/gesture experiments in the console
+const assist = createAssist();
+const aimIntent = { pitch: 0, roll: 0, yaw: 0, throttle: 0, boost: false };
+window.__flight = { controls, assist };   // hook for voice/gesture experiments in the console
 
 // iPad trackpads and Mac touchpads: a two-finger scroll or pinch would scroll
 // or zoom the page under the game. Safari ignores user-scalable=no, so cancel
@@ -76,6 +84,7 @@ const net = connect({
       if (!welcomed) {
         jet = createJet({ x: m.spawn.x, y: m.spawn.y, z: m.spawn.z, heading: m.spawn.heading });
         copyJet(prev, jet);
+        assist.reset(jet);   // aim where the new jet points
         welcomed = true;
       }
       remotes.clear(); roster.clear();
@@ -144,7 +153,8 @@ renderer.setWorld(world);
 // ---- loop: fixed 60 Hz sim, render interpolated, send at 10 Hz ----
 const remoteList = [];
 let acc = 0, last = performance.now(), sendAcc = 0, helpHidden = false;
-const stickDot = $('stick'), thr = $('thr').firstChild;
+const stickDot = $('stick'), thr = $('thr').firstChild, reticle = $('reticle');
+const aimDir = [0, 0, -1];
 
 function frame(nowMs) {
   requestAnimationFrame(frame);
@@ -155,7 +165,7 @@ function frame(nowMs) {
     const input = controls.read(STEP);
     if (input.pressed.waggle) waggleLeft = 1.2;
     copyJet(prev, jet);
-    step(jet, followAxes(input.axes), STEP);
+    step(jet, flyIntent(input), STEP);
     waggleLeft = Math.max(0, waggleLeft - STEP);
     jet.flags = waggleLeft > 0 ? FLAG.WAGGLE : 0;
     if (!helpHidden && input.active.size) { helpHidden = true; setTimeout(() => ($('help').style.opacity = 0.25), 6000); }
@@ -180,9 +190,25 @@ function frame(nowMs) {
   const st = stick.state;
   stickDot.style.display = st ? 'block' : 'none';
   if (st) { stickDot.style.left = `${st.cur.x}px`; stickDot.style.top = `${st.cur.y}px`; }
+
+  // Reticle: where the jet is headed. Hidden while the autopilot follows someone.
+  assist.direction(aimDir);
+  proj.set(view.pos[0] + aimDir[0] * 20000, view.pos[1] + aimDir[1] * 20000, view.pos[2] + aimDir[2] * 20000).project(renderer.camera);
+  const showReticle = !follow && proj.z < 1;
+  reticle.style.display = showReticle ? 'block' : 'none';
+  if (showReticle) reticle.style.transform = `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
 }
 requestAnimationFrame(frame);
 
+
+// ---- BOOST button (touch devices): hold to dash ----
+const boostBtn = $('boost');
+if (matchMedia('(pointer: coarse)').matches) {
+  boostBtn.hidden = false;
+  const hold = (on) => (e) => { e.preventDefault(); buttons.hold('boost', on); boostBtn.classList.toggle('on', on); };
+  boostBtn.addEventListener('pointerdown', hold(true));
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) boostBtn.addEventListener(t, hold(false));
+}
 
 // ---- tilt toggle (touch devices with motion sensors) ----
 const tiltBtn = $('tilt');
@@ -237,11 +263,24 @@ function stopFollow() {
   $('following').hidden = true;
 }
 
-function followAxes(axes) {
-  if (!follow) return axes;
-  if (Math.abs(axes.pitch) > 0.15 || Math.abs(axes.roll) > 0.15 || Math.abs(axes.yaw) > 0.15 || Math.abs(axes.throttle) > 0.15) { stopFollow(); return axes; }
+// Turn this tick's input into stick commands: follow mode if it's on,
+// otherwise the Sabre assist chasing the aim point.
+function flyIntent(input) {
+  const a = input.axes;
+  if (follow && (Math.abs(a.aimX) > 0.15 || Math.abs(a.aimY) > 0.15 || Math.abs(a.throttle) > 0.15 || input.actions.boost)) stopFollow();
+  if (follow) {
+    const it = followAxes();
+    if (it) { assist.reset(jet); return it; }
+  }
+  assist.update(aimIntent, jet, a.aimX, a.aimY, STEP);
+  aimIntent.throttle = a.throttle;
+  aimIntent.boost = input.actions.boost;
+  return aimIntent;
+}
+
+function followAxes() {
   const r = remotes.remotes.get(follow.id);
-  if (!r?.view || !r.visible) { stopFollow(); return axes; }
+  if (!r?.view || !r.visible) { stopFollow(); return null; }
   const d = escort(followIntent, jet, r.view, follow.side);
   const el = $('following');
   el.hidden = false;

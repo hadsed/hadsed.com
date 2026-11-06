@@ -25,6 +25,10 @@
   /* Its own HUD item, set apart from "you are" above it. */
   #following { margin-top: 14px; }
   #labels span.on { opacity: 1; }
+  #reticle { position: fixed; left: -11px; top: -11px; width: 20px; height: 20px; border: 1.5px solid var(--gold); border-radius: 50%; pointer-events: none; display: none; opacity: 0.85; }
+  #reticle::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px; background: var(--gold); border-radius: 50%; }
+  #boost { position: fixed; right: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 44px); font: inherit; letter-spacing: inherit; text-transform: uppercase; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; padding: 10px 14px; opacity: 0.6; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #boost.on { opacity: 1; background: rgba(228, 197, 111, 0.25); }
   #tilt { position: fixed; right: 16px; bottom: max(14px, env(safe-area-inset-bottom)); font: inherit; letter-spacing: inherit; text-transform: uppercase; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; padding: 6px 10px; opacity: 0.6; }
   #tilt.on { opacity: 1; background: rgba(228, 197, 111, 0.15); }
   #labels span { pointer-events: none; position: fixed; transform: translate(-50%, -150%); color: var(--gold); opacity: 0.75; white-space: nowrap; font-size: 10px; }
@@ -43,10 +47,12 @@
 <div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
 <!-- Model credit lives in the page source, not on screen; main.js fills it from the jet asset. -->
 <div id="credit" hidden></div>
+<div id="reticle"></div>
+<button id="boost" type="button" hidden>boost</button>
 <button id="tilt" type="button" hidden>tilt</button>
 <!-- Only shown when the browser cannot draw 3D. -->
 <div class="hud" id="help" hidden>
-  <span class="keys">W/S pitch · A/D roll · Q/E yaw · R/F throttle · Space wave<br>or </span>drag anywhere to fly<span class="keys"> · gamepad works too</span>
+  <span class="keys">WASD or arrows aim · R/F throttle · Space boost · E wave<br>or </span>drag toward where you want to go<span class="keys"> · gamepad works too</span>
 </div>
 <script type="module" src="main.js"></script>
 </body>

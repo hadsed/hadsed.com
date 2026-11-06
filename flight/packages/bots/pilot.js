@@ -1,4 +1,5 @@
-import { forwardOf, rightOf, rotate, clamp } from '../sim/index.js';
+import { forwardOf, rightOf, clamp } from '../sim/index.js';
+import { steerTo as steer } from '../sim/assist.js';
 
 // A bot pilot produces the same intent a keyboard or gesture would, and the
 // server feeds it to the same sim step. That is the whole trick to bots that
@@ -7,23 +8,7 @@ import { forwardOf, rightOf, rotate, clamp } from '../sim/index.js';
 // const pilot = createPilot({ rng });
 // const intent = pilot.think(jet, { dt, others });   // others: [{ id, jet, human }]
 
-const f = [0, 0, 0], r = [0, 0, 0], loc = [0, 0, 0];
-
-function steer(intent, jet, tx, ty, tz, aggressive = 1) {
-  // Target direction in the jet's own frame (inverse rotation).
-  const q = jet.q;
-  const inv = [-q[0], -q[1], -q[2], q[3]];
-  rotate(inv, tx - jet.pos[0], ty - jet.pos[1], tz - jet.pos[2], loc);
-  forwardOf(q, f); rightOf(q, r);
-  const bank = Math.asin(clamp(-r[1], -1, 1));
-  const nose = Math.asin(clamp(f[1], -1, 1));
-  const ahead = -loc[2], side = loc[0], up = loc[1];
-  const heading = Math.atan2(side, ahead);                 // + means target is to the right
-  const wantBank = clamp(heading * 1.6 * aggressive, -1.0, 1.0);
-  intent.roll = clamp((wantBank - bank) * 2.5, -1, 1);
-  const wantNose = clamp(Math.atan2(up, Math.hypot(side, ahead)), -0.35, 0.35);
-  intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
-}
+const f = [0, 0, 0], r = [0, 0, 0];
 
 // Fly to a slot off the leader's wing and hold it: 180 m out, 60 m back, 20 m up.
 // Used by bots (escorting people) and by players (click a jet to follow it).

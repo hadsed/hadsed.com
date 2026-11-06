@@ -1,0 +1,77 @@
+// Flight assists: turn "go that way" into stick inputs for the sim.
+//
+// steerTo() is the autopilot core: given a point in the world, it banks and
+// pitches the jet toward it. Bots use it, follow mode uses it, and the
+// point-to-steer controls below use it.
+//
+// createAssist() is Sabre-style steering (Halo: Reach): the player moves an
+// aim direction, and the jet chases it, banking into the turn on its own and
+// rolling level when it gets there. The player never manages roll.
+import { forwardOf, rightOf, rotate, clamp } from './index.js';
+
+const f = [0, 0, 0], r = [0, 0, 0], loc = [0, 0, 0];
+
+export function steerTo(intent, jet, tx, ty, tz, aggressive = 1) {
+  // Target direction in the jet's own frame (inverse rotation).
+  const q = jet.q;
+  const inv = [-q[0], -q[1], -q[2], q[3]];
+  rotate(inv, tx - jet.pos[0], ty - jet.pos[1], tz - jet.pos[2], loc);
+  forwardOf(q, f); rightOf(q, r);
+  const bank = Math.asin(clamp(-r[1], -1, 1));
+  const nose = Math.asin(clamp(f[1], -1, 1));
+  const ahead = -loc[2], side = loc[0], up = loc[1];
+  const heading = Math.atan2(side, ahead);                 // + means target is to the right
+  const wantBank = clamp(heading * 1.6 * aggressive, -1.0, 1.0);
+  intent.roll = clamp((wantBank - bank) * 2.5, -1, 1);
+  const wantNose = clamp(Math.atan2(up, Math.hypot(side, ahead)), -0.35, 0.35);
+  intent.pitch = clamp((wantNose - nose) * 3, -1, 1);
+  return intent;
+}
+
+// Compass heading of a jet: forward = (-sin h, 0, -cos h).
+export function headingOf(q) {
+  forwardOf(q, f);
+  return Math.atan2(-f[0], -f[2]);
+}
+
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+// const assist = createAssist();
+// assist.update(intent, jet, aimX, aimY, dt)   // aimX + right, aimY + up, in [-1, 1]
+// assist.direction(out)                         // where the reticle points
+export function createAssist({ rate = 1.3, maxAhead = 0.75, maxPitch = 0.45, settle = 0.12 } = {}) {
+  const aim = { yaw: null, pitch: 0 };
+  const api = {
+    aim,
+    // Point the aim where the nose already is (after follow mode, a respawn).
+    reset(jet) {
+      aim.yaw = headingOf(jet.q);
+      forwardOf(jet.q, f);
+      aim.pitch = clamp(Math.asin(clamp(f[1], -1, 1)), -maxPitch, maxPitch);
+    },
+    update(intent, jet, ax = 0, ay = 0, dt = 1 / 60) {
+      if (aim.yaw === null) api.reset(jet);
+      // The stick moves the aim; the aim stays put when you let go.
+      aim.yaw -= ax * rate * dt;
+      if (Math.abs(ay) > 0.05) aim.pitch += ay * rate * 0.6 * dt;
+      else aim.pitch -= Math.sign(aim.pitch) * Math.min(Math.abs(aim.pitch), settle * dt);   // drift back to level
+      aim.pitch = clamp(aim.pitch, -maxPitch, maxPitch);
+      // Keep the aim within reach of the nose so it can't wander behind you.
+      const h = headingOf(jet.q);
+      aim.yaw = h + clamp(wrap(aim.yaw - h), -maxAhead, maxAhead);
+      const d = api.direction(dir);
+      steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, 2.2);
+      intent.yaw = 0;
+      return intent;
+    },
+    direction(out = [0, 0, 0]) {
+      const cp = Math.cos(aim.pitch);
+      out[0] = -Math.sin(aim.yaw ?? 0) * cp;
+      out[1] = Math.sin(aim.pitch);
+      out[2] = -Math.cos(aim.yaw ?? 0) * cp;
+      return out;
+    },
+  };
+  const dir = [0, 0, 0];
+  return api;
+}
