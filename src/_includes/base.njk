@@ -52,6 +52,8 @@
   } | dump | safe }}
   </script>
   {%- endif %}
+  {#- Framed by the home's 3D backdrop: let it dress the page before first paint (no flicker on navigation). -#}
+  <script>try { if (window.frameElement && frameElement.id === 'site' && parent.__siteHook) parent.__siteHook(document); } catch (e) {}</script>
 </head>
 <body>
 <div class="page">
