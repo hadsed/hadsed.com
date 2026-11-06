@@ -40,6 +40,9 @@ export function createCameraRig(camera, {
     boosting: false,                        // set each frame; eases the boost pull-back in and out
     focus: null,                            // a Vector3 to keep in frame too (the jet you follow), or null
     orbit: { yaw: 0, pitch: 0, spin: 0 },   // yaw/pitch: gesture offsets; spin: accumulated drift
+    // Where the jet sits on screen in the orbit, as a fraction of the screen from center (+x right, +y down).
+    // The site backdrop can park it in a lighter corner of the page; the chase cam is always centered.
+    frame: { x: 0, y: 0 },
     get moving() { return rig.blend !== rig.target; },
     // Snap the chase cam onto the jet (respawn, first frame).
     reset() { ready = false; },
@@ -126,6 +129,9 @@ export function createCameraRig(camera, {
     const oFov = portrait ? orbitLens * Math.min(1.8, 1 / aspect) : orbitLens;
     const cFov = (portrait ? portraitChaseLens : chaseLens) + CHASE.boostLens * bk;
     const fov = oFov + (cFov - oFov) * k;
+    const fx = rig.frame.x * (1 - k), fy = rig.frame.y * (1 - k);
+    if (fx || fy) camera.setViewOffset(1000 * aspect, 1000, -fx * 1000 * aspect, -fy * 1000, 1000 * aspect, 1000);
+    else if (camera.view && camera.view.enabled) { camera.clearViewOffset(); }
     if (Math.abs(camera.fov - fov) > 1e-4 || camera.aspect !== aspect) {
       camera.fov = fov; camera.aspect = aspect; camera.updateProjectionMatrix();
     }

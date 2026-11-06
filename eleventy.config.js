@@ -59,6 +59,8 @@ export default function (eleventyConfig) {
       // staging home: site + backdrop + Fly, which hands over to the flight lab
       [`${lab}/fly-home.html`]: "lab/home/index.html",
     });
+    // the same page with a panel for tuning the wash and the jet (Had asked for a jig; staging home stays clean)
+    eleventyConfig.addPassthroughCopy({ [`${lab}/fly-home-jig.html`]: "lab/home-jig/index.html" });
   }
 
   // Branch previews (SITE_URL set) carry the SR-71 model shootout at /lab/sr71-models/.

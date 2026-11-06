@@ -91,12 +91,23 @@ function decorateSite() {
   }
   for (const a of doc.querySelectorAll('a[href="#fly"]')) a.onclick = (e) => { e.preventDefault(); enter(); };
   // Keep the address bar in step with the page shown inside, so a reload lands on the same page.
-  try { const p = doc.location.pathname; if (p && !p.startsWith('/lab/')) history.replaceState(null, '', `?p=${encodeURIComponent(p)}`); } catch {}
+  try { const p = doc.location.pathname; if (p && !p.startsWith('/lab/')) history.replaceState(null, '', `?p=${encodeURIComponent(p)}${JIG ? '&jig' : ''}${location.hash}`); } catch {}
 }
 
-// The site sits on a see-through navy wash over the sky, as Had tuned it on the jig: an ellipse
-// over most of the page, darker in the middle where the text sits and lighter toward the edges.
-const WASH = { center: 0.74, edge: 0.47, w: 93, h: 60, x: 50, y: 50 };
+// The site sits on a see-through navy wash over the sky: an ellipse over most of the page, darker in
+// the middle where the text sits and lighter toward the edges (Had's values from the jig). The jet
+// gets a pale rim light so its black airframe still reads under that, and can be parked off-center
+// (jx, jy: fraction of the screen from center, wide screens only).
+// /lab/home-jig/ opens this page with ?jig, which adds a panel to tune all of it; settings ride in the URL hash.
+// The jig's buttons: "Current staging" is the wash from before Had's values went in (lighter in the
+// middle); "Proposed" keeps his wash and makes the jet readable with the rim light and a lower framing.
+const PRESETS = {
+  staging:  { center: 0.44, edge: 0.68, w: 46, h: 40, x: 50, y: 52, rim: 0, jx: 0, jy: 0 },
+  proposed: { center: 0.74, edge: 0.47, w: 93, h: 60, x: 50, y: 50, rim: 1.4, jx: -0.14, jy: 0.16 },
+};
+const WASH = { center: 0.74, edge: 0.47, w: 93, h: 60, x: 50, y: 50, rim: 0, jx: 0, jy: 0 };   // what /lab/home/ shows
+const JIG = new URLSearchParams(location.search).has('jig');
+if (JIG) try { Object.assign(WASH, JSON.parse(decodeURIComponent(location.hash.slice(1)) || '{}')); } catch {}
 const washCss = () => `html, body { background: radial-gradient(ellipse ${WASH.w}% ${WASH.h}% at ${WASH.x}% ${WASH.y}%, rgba(28, 36, 51, ${WASH.center}), rgba(28, 36, 51, ${WASH.edge}) 100%) fixed !important; }`;
 function styleSite() {
   const doc = siteDoc(); if (!doc || !doc.head) return;
@@ -104,6 +115,13 @@ function styleSite() {
   if (!tag) { tag = doc.createElement('style'); tag.id = 'backdrop-wash'; doc.head.appendChild(tag); }
   tag.textContent = washCss();
 }
+// The jet's side of the settings, pushed into the backdrop renderer.
+function styleSky() {
+  const f = F(); if (!f || !f.renderer) return;
+  f.renderer.rimLight = WASH.rim;
+  f.renderer.rig.frame = innerWidth >= innerHeight ? { x: WASH.jx, y: WASH.jy } : { x: 0, y: 0 };
+}
+addEventListener('resize', styleSky);
 site.addEventListener('load', () => {
   styleSite(); decorateSite();
   try { wireGestures(site.contentWindow); } catch (err) { console.warn('gestures', err); }
@@ -116,7 +134,9 @@ site.addEventListener('load', () => {
 // The sky loads behind the site and fades up when it has settled next to a live jet (or found none).
 skyFrame.src = '../flight/?attract';
 const waitSky = setInterval(() => {
-  const f = F(); if (!f || !f.ready) return;
+  const f = F(); if (!f) return;
+  styleSky();
+  if (!f.ready) return;
   clearInterval(waitSky);
   skyFrame.classList.add('on');
   try { skyFrame.contentWindow.addEventListener('keydown', onKey); } catch {}
@@ -199,6 +219,47 @@ function leave() {
 function onKey(e) { if (e.key === 'Escape') leave(); }
 addEventListener('keydown', onKey);
 $('#exit').addEventListener('click', leave);
+// ---------- jig (only on /lab/home-jig/) ----------
+if (JIG) {
+  const panel = document.createElement('div');
+  panel.id = 'jig';
+  const rows = [
+    ['center', 'Darkness in the middle', 0, 1, 0.01], ['edge', 'Darkness at the edges', 0, 1, 0.01],
+    ['w', 'Ellipse width (%)', 10, 100, 1], ['h', 'Ellipse height (%)', 10, 100, 1],
+    ['x', 'Ellipse across (%)', 0, 100, 1], ['y', 'Ellipse down (%)', 0, 100, 1],
+    ['rim', 'Jet rim light', 0, 3, 0.05],
+    ['jx', 'Jet across (- left, + right)', -0.45, 0.45, 0.01], ['jy', 'Jet down (- up, + down)', -0.45, 0.45, 0.01],
+  ];
+  panel.innerHTML = '<b>Overlay</b>' + rows.map(([k, label, min, max, step]) =>
+    `<label>${label}<span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}"><output></output></span></label>`).join('') +
+    '<div class="row"><button type="button" data-preset="staging">Current staging</button><button type="button" data-preset="proposed">Proposed</button></div>' +
+    '<button type="button" id="jig-copy">Copy link with these settings</button><small id="jig-say"></small>';
+  document.body.appendChild(panel);
+  const st = document.createElement('style');
+  st.textContent = `#jig { position: fixed; z-index: 5; right: 12px; bottom: 12px; width: 260px; max-height: calc(100vh - 24px); overflow: auto; padding: 10px 12px; background: rgba(12,16,24,.88); color: #c8cdd5;
+    font: 12px/1.4 system-ui, sans-serif; border: 1px solid rgba(200,205,213,.2); border-radius: 8px; display: grid; gap: 6px; }
+    #jig label { display: grid; gap: 2px; } #jig span { display: flex; gap: 6px; align-items: center; } #jig input { flex: 1; }
+    #jig output { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+    #jig .row { display: flex; gap: 6px; } #jig .row button { flex: 1; }
+    #jig button { font: inherit; color: #e4c56f; background: none; border: 1px solid #e4c56f; border-radius: 5px; padding: 5px; cursor: pointer; }
+    body.flying #jig { display: none; }`;
+  document.head.appendChild(st);
+  const inputs = [...panel.querySelectorAll('input')];
+  const show = () => { for (const inp of inputs) { inp.value = WASH[inp.dataset.k]; inp.nextElementSibling.textContent = WASH[inp.dataset.k]; } };
+  const sync = () => { history.replaceState(null, '', `${location.search}#${encodeURIComponent(JSON.stringify(WASH))}`); styleSite(); styleSky(); };
+  for (const inp of inputs) inp.addEventListener('input', () => {
+    WASH[inp.dataset.k] = +inp.value; inp.nextElementSibling.textContent = inp.value; sync();
+  });
+  for (const btn of panel.querySelectorAll('[data-preset]')) btn.addEventListener('click', () => {
+    Object.assign(WASH, PRESETS[btn.dataset.preset]); show(); sync();
+  });
+  show();
+  panel.querySelector('#jig-copy').addEventListener('click', async () => {
+    const say = panel.querySelector('#jig-say');
+    try { await navigator.clipboard.writeText(location.href); say.textContent = 'Copied. Send it to me.'; }
+    catch { say.textContent = location.href; }
+  });
+}
 </script>
 </body>
 </html>
