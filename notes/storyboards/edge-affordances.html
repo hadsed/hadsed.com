@@ -308,7 +308,16 @@ function decorateSite() {
       .edge-menu a:hover .fly-jet, .edge-menu a:focus-visible .fly-jet { transform: translateX(3px); }
       html[data-place="rule"] .edge-menu { margin-top: 0.9rem !important; padding-top: 0.9rem; position: relative; }
       html[data-place="rule"] .edge-menu::before { content: ""; position: absolute; left: 0; top: 0; width: 1.5rem; border-top: 1px solid var(--rule); opacity: .6; }
-      html[data-place="pinned"] .edge-menu { position: fixed; bottom: 2rem; margin: 0 !important; z-index: 2; }
+      /* Sticky sidebar: the whole menu column holds still at full viewport height while the page
+         scrolls, with Fly at its foot. Fixed rather than sticky, because on short pages the grid row
+         is no taller than the menu, which leaves sticky nothing to stick within. */
+      @media (min-width: 641px) {
+        html[data-place="pinned"] .menu { position: fixed; top: 0; bottom: 0; z-index: 2; width: var(--menu-width);
+          left: max(1.5rem, calc((100% - 64rem) / 2 + 1.5rem)); padding: 3rem 0 2rem; display: flex; flex-direction: column; }
+        html[data-place="pinned"] main { grid-column: 2; }
+        html[data-place="pinned"] .menu ul { flex: 1; display: flex; flex-direction: column; }
+        html[data-place="pinned"] .edge-menu { margin: auto 0 0 !important; }
+      }
       .edge-foot a { color: var(--muted); }
       .edge-foot a svg { display: inline-block; width: 0; opacity: 0; margin-right: 0; transition: all .35s cubic-bezier(.2,.7,.2,1); }
       .edge-foot a:hover { color: var(--glow); text-decoration: none; }
@@ -342,9 +351,9 @@ const PLACES = [
   ['mid', 'Mid column', 'Drops to the first line of the second paragraph ("Lately I\'ve been..."), so it floats on its own but still lines up with text across the gutter.'],
   ['rule', 'After a hairline', 'A short rule under Blog marks it as a different kind of link: you leave the pages and go somewhere.'],
   ['end', 'Foot of the column', 'Sits at the bottom of the sidebar, level with the last line of the blurb. Scrolls away with the page.'],
-  ['pinned', 'Pinned to the bottom', 'Fixed at the bottom of the sidebar column, so it is always there, like a dock item, while the page scrolls.'],
+  ['pinned', 'Sticky sidebar', 'The whole sidebar holds still at full screen height while the page scrolls, with Fly at its foot, like a dock.'],
 ];
-let place = PLACES.some((p) => p[0] === params.get('place')) ? params.get('place') : 'below';
+let place = PLACES.some((p) => p[0] === params.get('place')) ? params.get('place') : 'pinned';
 function placeFly() {
   const doc = siteDoc(); if (!doc || !doc.documentElement) return;
   doc.documentElement.dataset.place = place;
@@ -354,7 +363,6 @@ function placeFly() {
   if (w.innerWidth <= 640) return;
   const ul = doc.querySelector('.menu ul');
   const a = li.querySelector('a');
-  if (place === 'pinned') { li.style.left = ul.getBoundingClientRect().left + 'px'; return; }
   const ps = doc.querySelectorAll('.blurb p');
   if (!ps.length || (place !== 'mid' && place !== 'end')) return;
   li.style.setProperty('margin-top', '0px', 'important');
