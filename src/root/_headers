@@ -1,0 +1,7 @@
+# Keep the pages.dev production alias and branch previews out of search
+# results so hadsed.com is the only copy that gets indexed.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
