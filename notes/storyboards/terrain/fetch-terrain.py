@@ -18,12 +18,13 @@ URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
 N = 4  # tiles per side
 
 REGIONS = [
-    # id, label, lat, lon, zoom (picked so each block covers roughly 140 to 260 km)
-    ('sierra', 'Sierra Nevada', 37.25, -118.75, 9),
-    ('alps', 'Alps, Valais', 46.05, 7.65, 9),
-    ('himalaya', 'Himalaya, Everest', 27.95, 86.95, 9),
-    ('grandcanyon', 'Grand Canyon', 36.15, -112.15, 9),
-    ('denali', 'Alaska Range, Denali', 63.05, -151.0, 8),
+    # id, label, lat, lon, zoom (picked so each block covers roughly 140 to 260 km),
+    # snowline in m and how arid the ground is (0 to 1), for the natural ground color
+    ('sierra', 'Sierra Nevada', 37.25, -118.75, 9, 3500, 0.3),
+    ('alps', 'Alps, Valais', 46.05, 7.65, 9, 2900, 0),
+    ('himalaya', 'Himalaya, Everest', 27.95, 86.95, 9, 5400, 0.15),
+    ('grandcanyon', 'Grand Canyon', 36.15, -112.15, 9, 3300, 1),
+    ('denali', 'Alaska Range, Denali', 63.05, -151.0, 8, 1900, 0),
 ]
 EARTH_C = 40075016.686
 
@@ -42,7 +43,7 @@ def fetch(z, x, y):
 
 def main():
     manifest = []
-    for rid, label, lat, lon, z in REGIONS:
+    for rid, label, lat, lon, z, snow, arid in REGIONS:
         fx, fy = tile_xy(lat, lon, z)
         x0, y0 = math.floor(fx - N / 2 + 0.5), math.floor(fy - N / 2 + 0.5)
         img = Image.new('RGB', (256 * N, 256 * N))
@@ -61,7 +62,7 @@ def main():
         manifest.append({'id': rid, 'label': label, 'lat': lat, 'lon': lon, 'zoom': z,
                          'size': img.width, 'metersPerPixel': round(mpp, 2),
                          'widthKm': round(mpp * img.width / 1000, 1),
-                         'minM': round(min(heights)), 'maxM': round(max(heights)),
+                         'minM': round(min(heights)), 'maxM': round(max(heights)), 'snowM': snow, 'arid': arid,
                          'peakKm': [round(((pi + 0.5) / 128 - 0.5) * mpp * img.width / 1000, 1),
                                     round(((pj + 0.5) / 128 - 0.5) * mpp * img.width / 1000, 1)]})
         print(manifest[-1])

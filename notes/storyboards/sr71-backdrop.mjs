@@ -3,9 +3,9 @@
 // navy monotone with a gold highlight (both adjustable), so it can sit quietly behind the site.
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.min.js';
-
-const EARTH_R = 6371000;
-const STORE = 'sr71-backdrop-v3';
+import { createSiteGestures } from './site-gestures.mjs';
+import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
+const STORE = 'sr71-backdrop-v4';   // v4: natural ground color became the default
 
 // ---------- settings ----------
 const PRESETS = {
@@ -22,14 +22,14 @@ const STYLES = {
   shadedgrid: { grid: 0.6, contour: 0, shade: 1, tint: 0, slope: 0, lineBright: 0.6 },
   topo: { grid: 0.45, contour: 1, shade: 0.6, tint: 1, tintContrast: 1.3, tintPivot: 0.45, slope: 0.35, lineBright: 0.015, contourStep: 200 },
   topoglow: { grid: 0.6, contour: 0.9, shade: 0.5, tint: 0.6, tintContrast: 1.2, tintPivot: 0.6, slope: 0.2, lineBright: 0.7 },
+  // Had's navy grid (2026-11-06) and the same lines over natural ground
+  navygrid: { grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, tint: 0, slope: 0, color: 0, texture: 0, mono: 1 },
+  natural: { grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, tint: 0, slope: 0, color: 1, texture: 1, mono: 0 },
 };
 // Defaults = the look Had landed on 2026-11-05 (iPad), with altitude at the SR-71's ~85k ft ceiling.
+// The look itself (tone, scene, ground) lives in the shared world module, so the flight lab matches.
 const DEFAULTS = {
-  preset: 'site', ...PRESETS.site,
-  midPoint: 0.56, hlStart: 0.61, hlAmount: 0.85, mono: 1, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
-  region: 'sierra', altitudeFt: 85000, exag: 1, offsetX: 79, offsetZ: -69.1, sunAz: 41, sunEl: 18, haze: 130, clouds: 0.54, fov: 23,
-  style: 'grid', grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
-  tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
+  preset: 'site', ...WORLD_DEFAULTS, style: 'natural',
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -57,226 +57,27 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.5 : 2));
 renderer.autoClear = false;
 renderer.setClearColor(0x000000, 0);
 
-const sunDir = new THREE.Vector3();
-const shared = {
-  uCam: { value: new THREE.Vector3() },
-  uEarthR: { value: EARTH_R },
-  uSun: { value: sunDir },
-  uHaze: { value: new THREE.Vector3(0.50, 0.56, 0.66) },
-  uHazeDist: { value: 210000 },
-  uCover: { value: 0.5 },
-  uDip: { value: 0 },
-};
+const world = createWorld({ segments: coarse ? 384 : 512 });   // sky, terrain, cloud deck, monotone pass (shared with the flight lab)
+const sunDir = world.sunDir;
+const origin = new THREE.Vector3();   // the jet's world position; render space is centered on it
 
 // ---------- far scene: sky, ground, cloud deck ----------
 const farScene = new THREE.Scene();
 const farCam = new THREE.PerspectiveCamera(34, 1, 50, 3.0e6);
+farScene.add(world.sky, world.terrain, world.clouds);
 
-const NOISE = /* glsl */`
-float hash(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 34.23); return fract(p.x * p.y); }
-float vnoise(vec2 p){
-  vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
-}
-const mat2 ROT = mat2(0.8, -0.6, 0.6, 0.8);
-float fbm(vec2 p, int oct){
-  float a = 0.5, s = 0.0;
-  for (int i = 0; i < 8; i++){ if (i >= oct) break; s += a * vnoise(p); p = ROT * p * 2.03 + 17.1; a *= 0.5; }
-  return s;
-}
-float ridged(vec2 p, int oct){
-  float a = 0.5, s = 0.0;
-  for (int i = 0; i < 8; i++){ if (i >= oct) break; float n = 1.0 - abs(vnoise(p) * 2.0 - 1.0); s += a * n * n; p = ROT * p * 2.11 + 5.3; a *= 0.5; }
-  return s;
-}`;
-
-// Bends a flat plane down with the Earth's curvature relative to the camera, so the horizon
-// lands where it would from altitude (about 4.4 degrees below level at 60k ft, 5.2 at 85k).
-const CURVED_VERT = /* glsl */`
-uniform vec3 uCam; uniform float uEarthR;
-varying vec2 vXZ; varying float vDist;
-void main(){
-  vec4 w = modelMatrix * vec4(position, 1.0);
-  vec2 rel = w.xz - uCam.xz;
-  w.y -= dot(rel, rel) / (2.0 * uEarthR);
-  vXZ = w.xz; vDist = distance(w.xyz, uCam);
-  gl_Position = projectionMatrix * viewMatrix * w;
-}`;
-
-const sky = new THREE.Mesh(
-  new THREE.SphereGeometry(2.5e6, 48, 24),
-  new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, uniforms: shared,
-    vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`,
-    fragmentShader: /* glsl */`
-      uniform vec3 uSun, uHaze; uniform float uDip; varying vec3 vDir;
-      void main(){
-        vec3 d = normalize(vDir);
-        float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;       // angle above the true horizon
-        vec3 zenith = vec3(0.010, 0.020, 0.055);             // near-space dark blue
-        // at 85k ft most of the air is below you: a thin bright band at the horizon, dark navy by ~20 degrees up
-        vec3 c = mix(uHaze, zenith, 1.0 - exp(-max(el, 0.0) * 9.0));
-        c += vec3(0.30) * exp(-abs(el) * 70.0);              // bright limb on the horizon
-        float sun = max(dot(d, uSun), 0.0);
-        c += vec3(0.35) * pow(sun, 12.0) + vec3(3.0) * pow(sun, 2500.0);
-        c = mix(c, uHaze * 0.9, smoothstep(0.0, -0.03, el));
-        gl_FragColor = vec4(c, 0.0);
-      }`,
-  }),
-);
-farScene.add(sky);
-
-// ---------- ground: real elevation drawn as a terrain grid ----------
-// Heights come from stitched AWS terrain tiles (terrain/*.png, terrarium encoding), mirrored past the
-// region edge so the ground runs to the horizon. The mesh is one grid whose vertices are dense under
-// the jet (~280 m apart) and stretch out toward the horizon, so a single draw covers 1,500 km.
-function terrainGeometry(n = coarse ? 384 : 512, R = 750000, a = 0.12) {
-  const pos = new Float32Array(n * n * 3), idx = new Uint32Array((n - 1) * (n - 1) * 6);
-  const warp = (u) => R * u * (a + (1 - a) * u * u);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const k = (j * n + i) * 3;
-    pos[k] = warp((i / (n - 1)) * 2 - 1); pos[k + 2] = warp((j / (n - 1)) * 2 - 1);
-  }
-  let t = 0;
-  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
-    const v = j * n + i;
-    idx.set([v, v + n, v + 1, v + 1, v + n, v + n + 1], t); t += 6;
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setIndex(new THREE.BufferAttribute(idx, 1));
-  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), R * 1.5);
-  return g;
-}
-const terrainU = {
-  uHeight: { value: null }, uSize: { value: 1024 }, uWidth: { value: 250000 }, uTexel: { value: 1 / 1024 }, uOffset: { value: new THREE.Vector2() },
-  uExag: { value: 1.5 }, uGroundY: { value: -18000 }, uMaxH: { value: 4000 },
-  uGrid: { value: 1 }, uGridSize: { value: 2000 }, uContour: { value: 0 }, uContourStep: { value: 200 },
-  uShade: { value: 0.35 }, uLineBright: { value: 0.6 }, uLineGold: { value: 0 },
-  uTint: { value: 0 }, uTintContrast: { value: 1 }, uTintPivot: { value: 0.5 }, uSlope: { value: 0 },
-};
-const ground = new THREE.Mesh(
-  terrainGeometry(),
-  new THREE.ShaderMaterial({
-    uniforms: { ...shared, ...terrainU },
-    vertexShader: /* glsl */`
-      uniform vec3 uCam; uniform float uEarthR, uWidth, uTexel, uExag, uGroundY; uniform vec2 uOffset; uniform sampler2D uHeight; uniform int uSize;
-      varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
-      // Heights stay in their terrarium RGB encoding on the GPU (no CPU decode): fetch exact texels,
-      // mirror past the edges, decode, then interpolate.
-      float texH(ivec2 p){
-        int n = uSize; p = ivec2(mod(vec2(p), float(2 * n)));
-        if (p.x >= n) p.x = 2 * n - 1 - p.x;
-        if (p.y >= n) p.y = 2 * n - 1 - p.y;
-        vec3 c = floor(texelFetch(uHeight, p, 0).rgb * 255.0 + 0.5);
-        return c.r * 256.0 + c.g + c.b / 256.0 - 32768.0;
-      }
-      float hAt(vec2 uv){
-        vec2 x = uv * float(uSize) - 0.5; vec2 i = floor(x), f = x - i; ivec2 b = ivec2(i);
-        return mix(mix(texH(b), texH(b + ivec2(1, 0)), f.x), mix(texH(b + ivec2(0, 1)), texH(b + ivec2(1, 1)), f.x), f.y);
-      }
-      void main(){
-        vec2 xz = position.xz;                          // camera stays within ~1 km of the origin
-        vec2 data = xz + uOffset;
-        vec2 uv = data / uWidth + 0.5;
-        float h = hAt(uv);
-        float d = uTexel, m = uWidth * uTexel;
-        float hx = hAt(uv + vec2(d, 0)) - hAt(uv - vec2(d, 0));
-        float hz = hAt(uv + vec2(0, d)) - hAt(uv - vec2(0, d));
-        vN = normalize(vec3(-hx * uExag, 2.0 * m, -hz * uExag));
-        vec3 w = vec3(xz.x, uGroundY + h * uExag, xz.y);
-        vec2 rel = xz - uCam.xz;
-        w.y -= dot(rel, rel) / (2.0 * uEarthR);
-        vXZ = data; vH = h; vDist = distance(w, uCam);
-        gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
-      }`,
-    fragmentShader: /* glsl */`
-      uniform vec3 uSun, uHaze; uniform float uHazeDist, uMaxH, uGrid, uGridSize, uContour, uContourStep, uShade, uLineBright, uLineGold;
-      uniform float uTint, uTintContrast, uTintPivot, uSlope;
-      varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
-      // anti-aliased lines that fade out before they get denser than a couple of pixels
-      float lines2(vec2 c){ vec2 fw = fwidth(c); vec2 g = abs(fract(c - 0.5) - 0.5) / max(fw, 1e-6);
-        return (1.0 - min(min(g.x, g.y), 1.0)) * (1.0 - smoothstep(0.12, 0.45, max(fw.x, fw.y))); }
-      float lines1(float c){ float fw = fwidth(c); float g = abs(fract(c - 0.5) - 0.5) / max(fw, 1e-6);
-        return (1.0 - min(g, 1.0)) * (1.0 - smoothstep(0.12, 0.45, fw)); }
-      void main(){
-        vec3 n = normalize(vN);
-        float grid = max(lines2(vXZ / uGridSize) * 0.55, lines2(vXZ / (uGridSize * 5.0)));
-        float contour = max(lines1(vH / uContourStep) * 0.55, lines1(vH / (uContourStep * 5.0)));
-        float ink = clamp(grid * uGrid + contour * uContour, 0.0, 1.0);
-        float lit = clamp(dot(n, uSun), 0.0, 1.0);
-        float rise = clamp(vH / uMaxH, 0.0, 1.0);
-        vec3 shaded = vec3(0.10, 0.11, 0.12) * (0.25 + 1.6 * lit) * (0.7 + 0.6 * rise);
-        vec3 c = mix(vec3(0.028, 0.032, 0.04) * (0.8 + 0.5 * rise), shaded, uShade);
-        // hypsometric tint, after kaolti/monolith-terrain (MIT): fill brightness follows height, contrast set around a pivot
-        float rampT = clamp(0.5 + (rise - uTintPivot) * uTintContrast, 0.0, 1.0);
-        vec3 hyp = vec3(mix(0.03, 0.42, rampT)) * mix(1.0, 0.45 + 0.9 * lit, uShade);
-        c = mix(c, hyp, uTint);
-        c *= 1.0 - uSlope * smoothstep(0.25, 0.8, 1.0 - n.y);   // steep faces darken, like hachures
-        // lines are ink of a set brightness: low values give dark ink on a pale sheet, high values glow on dark ground
-        c = mix(c, vec3(uLineBright) * (0.75 + 0.5 * rise), ink);
-        float fog = 1.0 - exp(-vDist / uHazeDist);
-        c = mix(c, uHaze, fog * fog * 0.9 + fog * 0.1);
-        gl_FragColor = vec4(c, ink * uLineGold * (1.0 - fog));   // alpha marks lines the final pass may turn gold
-      }`,
-  }),
-);
-ground.frustumCulled = false;
-ground.visible = false;
-farScene.add(ground);
-
+// Real elevation (terrain/*.webp, terrarium encoding), mirrored past the region edge so the ground runs to the horizon.
 const REGIONS = {};
 const regionList = fetch('terrain/regions.json').then((r) => r.json()).then((list) => { for (const r of list) REGIONS[r.id] = r; return list; });
-const heightCache = {};
 async function loadRegion(id) {
   const list = await regionList;
   const r = REGIONS[id] || list[0];
-  if (!heightCache[r.id]) {
-    heightCache[r.id] = (async () => {
-      const blob = await (await fetch(`terrain/${r.id}.webp`)).blob();
-      const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none', imageOrientation: 'none' });
-      const tex = new THREE.Texture(bmp);
-      tex.colorSpace = THREE.NoColorSpace; tex.flipY = false;
-      tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
-      return tex;
-    })();
-  }
-  const tex = await heightCache[r.id];
-  terrainU.uHeight.value = tex;
-  terrainU.uWidth.value = r.metersPerPixel * r.size;
-  terrainU.uTexel.value = 1 / r.size;
-  terrainU.uSize.value = r.size;
-  terrainU.uMaxH.value = r.maxM;
-  ground.visible = true;
+  world.setHeight(await loadTerrarium(`terrain/${r.id}.webp`), r);
   reveal();
   document.getElementById('credit').textContent = `${r.label} · ${r.lat.toFixed(2)}°, ${r.lon.toFixed(2)}° · ${r.widthKm} km of real elevation, mirrored past the edges. Terrain: AWS Terrain Tiles (SRTM, USGS 3DEP, GMTED and others).`;
   dirty = true;
   return r;
 }
-
-// Scattered cumulus about 7 km up: parallax against the ground as the view moves.
-const clouds = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.2e6, 1.2e6, 240, 240),
-  new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, uniforms: shared, vertexShader: CURVED_VERT,
-    blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-    blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
-    fragmentShader: /* glsl */`
-      uniform vec3 uHaze; uniform float uHazeDist, uCover; varying vec2 vXZ; varying float vDist;
-      ${NOISE}
-      void main(){
-        vec2 q = vXZ / 4500.0;
-        float field = fbm(q * 0.18 + 4.0, 4);
-        float puff = fbm(q + vec2(fbm(q * 0.5, 3)) * 1.5, 6);
-        float a = smoothstep(0.86 - uCover * 0.4, 1.0 - uCover * 0.35, puff + (field - 0.5) * 0.7);
-        float fog = 1.0 - exp(-vDist / (uHazeDist * 1.1));
-        vec3 c = mix(vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff), uHaze, fog);
-        gl_FragColor = vec4(c, a * 0.9 * (1.0 - fog * 0.6) * step(0.001, uCover));
-      }`,
-  }),
-);
-clouds.rotation.x = -Math.PI / 2;
-farScene.add(clouds);
 
 // ---------- near scene: the aircraft ----------
 // Original low-poly proxy (same blocking as the directing room). Local forward is -Z. Not flight-accurate.
@@ -353,51 +154,7 @@ plane.position.z = 2;
 })();
 
 // ---------- monotone composite ----------
-const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
-const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
-const postU = {
-  tColor: { value: rt.texture },
-  uShadow: { value: new THREE.Vector3() }, uMid: { value: new THREE.Vector3() },
-  uLight: { value: new THREE.Vector3() }, uHigh: { value: new THREE.Vector3() },
-  uMidPoint: { value: 0.42 }, uHlStart: { value: 0.8 }, uHlAmount: { value: 0.85 },
-  uMono: { value: 1 }, uExposure: { value: 1 }, uContrast: { value: 1 },
-  uGrain: { value: 0.018 }, uVignette: { value: 0.45 }, uRes: { value: new THREE.Vector2(1, 1) },
-};
-const post = new THREE.Mesh(
-  new THREE.PlaneGeometry(2, 2),
-  new THREE.ShaderMaterial({
-    depthTest: false, depthWrite: false, uniforms: postU,
-    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
-    fragmentShader: /* glsl */`
-      uniform sampler2D tColor; uniform vec3 uShadow, uMid, uLight, uHigh;
-      uniform float uMidPoint, uHlStart, uHlAmount, uMono, uExposure, uContrast, uGrain, uVignette; uniform vec2 uRes;
-      varying vec2 vUv;
-      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-      vec3 toLinear(vec3 c){ return pow(c, vec3(2.2)); }
-      void main(){
-        vec4 src = texture2D(tColor, vUv);
-        vec3 c = src.rgb * uExposure;
-        float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-        l = l / (1.0 + l);                       // soft rolloff on the sun and horizon limb
-        l = pow(clamp(l * 1.55, 0.0, 1.0), 0.85);
-        l = clamp((l - 0.5) * uContrast + 0.5, 0.0, 1.0);
-        // three-stop ramp: shadow -> mid (site navy) -> light
-        vec3 ramp = l < uMidPoint ? mix(uShadow, uMid, l / uMidPoint) : mix(uMid, uLight, (l - uMidPoint) / (1.0 - uMidPoint));
-        // gold only on the brightest values: sun, limb, glints
-        float hl = smoothstep(uHlStart, min(uHlStart + 0.18, 1.0), l) * uHlAmount;
-        ramp = mix(ramp, uHigh, max(hl, clamp(src.a, 0.0, 1.0)));
-        // mono = 1 is pure tone mapping; lower lets the original colour back in
-        vec3 orig = pow(clamp(c / (1.0 + c) * 1.55, 0.0, 1.0), vec3(2.2 * 0.85 / 2.2));
-        vec3 m = mix(orig, ramp, uMono);
-        vec2 v = vUv - 0.5; m *= 1.0 - uVignette * dot(v, v) * 1.6;
-        m = pow(m, vec3(1.0 / 2.2));
-        m += (h(vUv * uRes) - 0.5) * uGrain;     // fine grain; also kills gradient banding
-        gl_FragColor = vec4(m, 1.0);
-      }`,
-  }),
-);
-const postScene = new THREE.Scene(); postScene.add(post);
-const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const post = createPost(renderer, world, { skipWhenOff: false });   // keep the pass: the site wants the vignette
 
 // ---------- camera controls ----------
 camera.position.set(52, 14, -48);   // ahead of the right wing looking back along the fuselage
@@ -416,28 +173,13 @@ let userBusy = false;
 let dirty = true;
 let loadedRegion = null;
 function apply() {
-  postU.uShadow.value.copy(col(S.shadow)); postU.uMid.value.copy(col(S.mid));
-  postU.uLight.value.copy(col(S.light)); postU.uHigh.value.copy(col(S.highlight));
-  for (const k of ['midPoint', 'hlStart', 'hlAmount', 'mono', 'exposure', 'contrast', 'grain', 'vignette']) {
-    postU['u' + k[0].toUpperCase() + k.slice(1)].value = +S[k];
-  }
-  const az = THREE.MathUtils.degToRad(S.sunAz), el = THREE.MathUtils.degToRad(S.sunEl);
-  sunDir.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize();
+  world.setLook(S);
+  post.setLook(S);
   sunLight.position.copy(sunDir).multiplyScalar(100);
   const altitude = S.altitudeFt * 0.3048;
-  terrainU.uGroundY.value = -altitude;
-  terrainU.uExag.value = +S.exag;
-  for (const k of ['grid', 'gridSize', 'contour', 'contourStep', 'shade', 'lineBright', 'lineGold', 'tint', 'tintContrast', 'tintPivot', 'slope']) {
-    terrainU['u' + k[0].toUpperCase() + k.slice(1)].value = +S[k];
-  }
   const reg = REGIONS[S.region];
-  if (reg) terrainU.uOffset.value.set((S.offsetX ?? reg.peakKm[0]) * 1000, (S.offsetZ ?? reg.peakKm[1]) * 1000);
+  if (reg) origin.set((S.offsetX ?? reg.peakKm[0]) * 1000, altitude, (S.offsetZ ?? reg.peakKm[1]) * 1000);
   if (loadedRegion !== S.region) { loadedRegion = S.region; loadRegion(S.region).then(() => { apply(); sync(); }); }
-  clouds.position.y = -altitude + 7000;
-  clouds.visible = altitude > 8000;
-  shared.uDip.value = Math.acos(EARTH_R / (EARTH_R + Math.max(altitude, 1)));
-  shared.uHazeDist.value = S.haze * 1000;
-  shared.uCover.value = +S.clouds;
   controls.autoRotate = !!S.drift;
   controls.autoRotateSpeed = +S.driftSpeed;
   resize();
@@ -450,8 +192,7 @@ function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
   const pr = renderer.getPixelRatio();
-  rt.setSize(Math.floor(w * pr), Math.floor(h * pr));
-  postU.uRes.value.set(w * pr, h * pr);
+  post.setSize(w, h, pr);
   const aspect = w / h;
   const fov = aspect < 1 ? S.fov * Math.min(1.8, 1 / aspect) : +S.fov;  // portrait phones: widen so the jet fits
   for (const c of [farCam, camera]) { c.aspect = aspect; c.fov = fov; c.updateProjectionMatrix(); }
@@ -462,29 +203,12 @@ addEventListener('resize', resize);
 // ---------- gesture offsets ----------
 // The orbit controls own the base view. Gestures on the site add a yaw/pitch offset on top, applied
 // to a separate render camera, so scroll-mapped pan is a pure function of page position and always reverses.
-const G = { yaw: 0, pitch: 0, scrollYaw: 0, scrollPitch: 0, sideYaw: 0, dragPitch: 0, spring: 0, bounce: 0, wheelOver: 0, lastOverscroll: 0 };
 const viewCam = camera.clone();
 const sph = new THREE.Spherical(), offV = new THREE.Vector3();
 const DEG = Math.PI / 180;
-let lastStep = performance.now();
-const OVER_MAX = 20 * Math.PI / 180;
-function stepGestures() {
-  const now = performance.now(), dt = Math.min((now - lastStep) / 1000, 0.1); lastStep = now;
-  // overscroll springs back once the wheel goes quiet (time-based, so it feels the same at any frame rate)
-  // Overscroll pan follows a rubber-band curve (tanh), so it starts proportional and can never jump past
-  // OVER_MAX. Two sources: the browser's own elastic bounce (Safari, Mac Chrome; smooth and eased by the
-  // browser, works for finger and trackpad alike) and, where there is no bounce, wheel input at the ends.
-  if (now - G.lastOverscroll > 140) G.wheelOver *= Math.exp(-dt / 0.3);
-  if (Math.abs(G.wheelOver) < 0.5) G.wheelOver = 0;
-  const px = Math.abs(G.bounce) > Math.abs(G.wheelOver) ? G.bounce : G.wheelOver;
-  G.spring = S.overscroll ? OVER_MAX * Math.tanh(px / 450) : 0;
-  const yaw = G.scrollYaw + G.sideYaw + G.spring, pitch = G.scrollPitch + G.dragPitch;
-  const k = 1 - Math.exp(-dt / 0.18);   // smoothing toward the target offset
-  const ny = G.yaw + (yaw - G.yaw) * k, np = G.pitch + (pitch - G.pitch) * k;
-  const moving = Math.abs(ny - G.yaw) > 1e-5 || Math.abs(np - G.pitch) > 1e-5;
-  G.yaw = ny; G.pitch = np;
-  return moving;
-}
+const gestures = createSiteGestures(S, { log: (line) => log(line) });
+const G = gestures.G;
+
 function render() {
   offV.copy(camera.position).sub(controls.target);
   sph.setFromVector3(offV);
@@ -495,22 +219,20 @@ function render() {
   viewCam.updateProjectionMatrix();
   viewCam.up.set(0, 1, 0); viewCam.lookAt(controls.target);
   farCam.position.copy(viewCam.position); farCam.quaternion.copy(viewCam.quaternion);
-  shared.uCam.value.copy(viewCam.position);
-  sky.position.copy(viewCam.position);
-  renderer.setRenderTarget(rt);
-  renderer.clear();
-  renderer.render(farScene, farCam);
-  renderer.clearDepth();
-  renderer.render(nearScene, viewCam);
-  renderer.setRenderTarget(null);
-  renderer.render(postScene, postCam);
+  world.frame(farCam, origin);
+  post.render(() => {
+    renderer.clear();
+    renderer.render(farScene, farCam);
+    renderer.clearDepth();
+    renderer.render(nearScene, viewCam);
+  });
 }
 
 // Compile every shader before the first visible frame, then fade the scene in under the site.
 let revealed = false;
 async function reveal() {
   if (revealed) return; revealed = true;
-  try { await Promise.all([renderer.compileAsync(farScene, farCam), renderer.compileAsync(nearScene, viewCam), renderer.compileAsync(postScene, postCam)]); } catch {}
+  try { await Promise.all([renderer.compileAsync(farScene, farCam), renderer.compileAsync(nearScene, viewCam), renderer.compileAsync(post.scene, post.camera)]); } catch {}
   render();
   requestAnimationFrame(() => canvas.classList.add('ready'));
 }
@@ -529,7 +251,7 @@ function loop() {
   requestAnimationFrame(loop);
   if (S.drift && !userBusy && !reduceMotion) dirty = true;
   if (controls.update()) dirty = true;
-  if (stepGestures()) dirty = true;
+  if (gestures.step()) dirty = true;
   if (!dirty) return;
   dirty = false;
   if (!revealed) return;
@@ -570,82 +292,10 @@ function log(line) {
   if (logLines.length > 18) logLines.shift();
   logBox.textContent = logLines.join('\n');
 }
-function readScroll() {
-  const w = frame.contentWindow; if (!w) return;
-  // Clamp to the real scroll range: Safari's elastic bounce reports scrollY past either end for a
-  // moment, which made the view swing out and snap back.
-  const el = w.document.scrollingElement;
-  const maxY = Math.max(0, el.scrollHeight - w.innerHeight);
-  const screens = THREE.MathUtils.clamp(w.scrollY, 0, maxY) / Math.max(w.innerHeight, 1);
-  G.bounce = w.scrollY < 0 ? w.scrollY : w.scrollY > maxY ? w.scrollY - maxY : 0;   // elastic overshoot in px
-  G.scrollYaw = S.scrollPan ? Math.min(screens * S.scrollDeg, S.scrollMax) * DEG : 0;
-  G.scrollPitch = S.scrollPan ? Math.min(screens * S.scrollTilt, 8) * DEG : 0;
-}
-const NOT_BACKGROUND = 'a, button, input, textarea, select, label, p, h1, h2, h3, h4, h5, li, img, svg, figure, pre, code, blockquote, time, .card, [class*="project"]';
-function wireGestures() {
-  const w = frame.contentWindow, doc = frame.contentDocument;
-  if (!doc || doc.__lab) return;
-  doc.__lab = true;
-  // Keep vertical rubber-banding (it drives the overscroll pan); stop sideways swipes from navigating back.
-  for (const el of [doc.documentElement, doc.body]) el.style.overscrollBehaviorX = 'none';
-  w.addEventListener('scroll', () => { log(`scroll y ${Math.round(w.scrollY)}`); readScroll(); }, { passive: true });
-  for (const type of ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'gesturestart']) {
-    w.addEventListener(type, (e) => log(`${type} ${e.pointerType || ''}`), { passive: true });
-  }
-  // A trackpad gesture is a burst of wheel events (finger, then momentum) with no gap longer than ~250 ms.
-  // Each burst locks to one axis when it starts, so a vertical scroll's sideways noise can't pan, and
-  // Wheel bursts that start pinned at an end feed the overscroll pan, capped per event so one big
-  // trackpad delta can't jump it (the old bug: ~25 degrees in two events, then a snap back).
-  let burst = { last: 0, axis: null, startedAtEnd: false };
-  w.addEventListener('wheel', (e) => {
-    const now = performance.now();
-    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0), dy = e.shiftKey ? 0 : e.deltaY;
-    const el = doc.scrollingElement, maxY = Math.max(0, el.scrollHeight - w.innerHeight);
-    const atEnd = w.scrollY >= maxY - 2, atTop = w.scrollY <= 0;
-    if (now - burst.last > 250) burst = { last: now, axis: null, startedAtEnd: (atEnd && dy > 0) || (atTop && dy < 0) };
-    log(`wheel dx ${e.deltaX.toFixed(1)} dy ${e.deltaY.toFixed(1)} mode ${e.deltaMode} y ${Math.round(w.scrollY)}`);
-    burst.last = now;
-    if (!burst.axis && Math.hypot(dx, dy) > 2) burst.axis = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
-    if (burst.axis === 'x') {
-      if (S.sidePan) { G.sideYaw += dx * S.sideSens * 0.001; e.preventDefault(); }
-      return;
-    }
-    if (burst.startedAtEnd && ((atEnd && dy > 0) || (atTop && dy < 0))) {
-      G.wheelOver = THREE.MathUtils.clamp(G.wheelOver + THREE.MathUtils.clamp(dy, -40, 40) * 0.5, -1500, 1500);
-      G.lastOverscroll = now;
-    }
-  }, { passive: false });
-  // touch: a mostly horizontal swipe pans; vertical swipes scroll the page as usual
-  let t0 = null, axis = null;
-  w.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY }; axis = null; } }, { passive: true });
-  w.addEventListener('touchmove', (e) => {
-    if (!S.sidePan || !t0 || e.touches.length !== 1) return;
-    const x = e.touches[0].clientX, y = e.touches[0].clientY, dx = x - t0.x, dy = y - t0.y;
-    if (!axis && Math.hypot(dx, dy) > 8) axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y';
-    if (axis === 'x') { G.sideYaw -= dx * S.sideSens * 0.003; t0 = { x, y }; e.preventDefault(); }
-  }, { passive: false });
-  w.addEventListener('touchend', () => { t0 = null; }, { passive: true });
-  // mouse/pen: drag on empty background orbits in any direction
-  let drag = null;
-  w.addEventListener('pointerdown', (e) => {
-    if (!S.bgDrag || e.pointerType === 'touch' || e.button !== 0 || e.target.closest(NOT_BACKGROUND)) return;
-    drag = { x: e.clientX, y: e.clientY }; doc.documentElement.style.cursor = 'grabbing'; e.preventDefault();
-  });
-  w.addEventListener('pointermove', (e) => {
-    if (!drag) {
-      if (S.bgDrag && e.pointerType !== 'touch') doc.documentElement.style.cursor = e.target.closest(NOT_BACKGROUND) ? '' : 'grab';
-      return;
-    }
-    G.sideYaw -= (e.clientX - drag.x) * 0.004;
-    G.dragPitch = THREE.MathUtils.clamp(G.dragPitch + (e.clientY - drag.y) * 0.003, -0.6, 0.6);
-    drag = { x: e.clientX, y: e.clientY };
-  });
-  w.addEventListener('pointerup', () => { drag = null; doc.documentElement.style.cursor = ''; });
-  readScroll();
-}
+const readScroll = () => gestures.readScroll(frame.contentWindow);
 frame.addEventListener('load', () => {
   styleSite();
-  try { wireGestures(); } catch (err) { console.warn('gestures', err); }
+  try { gestures.wire(frame.contentWindow); } catch (err) { console.warn('gestures', err); }
   // keep the overlay styled when clicking through to other site pages
   try { frame.contentWindow.addEventListener('pageshow', styleSite); } catch {}
 });
@@ -681,7 +331,9 @@ const SPEC = [
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
   ]],
   ['Ground', [
-    ['style', 'select', { label: 'Style', options: [['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid'], ['topo', 'Topo sheet (dark ink)'], ['topoglow', 'Topo, glowing lines']] }],
+    ['style', 'select', { label: 'Style', options: [['natural', 'Natural ground + grid'], ['navygrid', 'Navy grid (monotone)'], ['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid'], ['topo', 'Topo sheet (dark ink)'], ['topoglow', 'Topo, glowing lines']] }],
+    ['color', 'range', { label: 'Natural color (forest, rock, snow)', min: 0, max: 1, step: 0.01 }],
+    ['texture', 'range', { label: 'Ground texture', min: 0, max: 1, step: 0.01 }],
     ['grid', 'range', { label: 'Grid lines', min: 0, max: 1, step: 0.01 }],
     ['gridSize', 'range', { label: 'Grid spacing (m)', min: 250, max: 10000, step: 250 }],
     ['contour', 'range', { label: 'Contour lines', min: 0, max: 1, step: 0.01 }],

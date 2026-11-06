@@ -48,9 +48,12 @@ export default function (eleventyConfig) {
     eleventyConfig.addPassthroughCopy({
       [`${lab}/sr71-backdrop.html`]: "lab/sr71/index.html",
       [`${lab}/sr71-backdrop.mjs`]: "lab/sr71/sr71-backdrop.mjs",
+      [`${lab}/site-gestures.mjs`]: "lab/sr71/site-gestures.mjs",
       [`${lab}/vendor/*.min.js`]: "lab/sr71/vendor",
       [`${lab}/terrain/regions.json`]: "lab/sr71/terrain/regions.json",
       [`${lab}/terrain/*.webp`]: "lab/sr71/terrain",
+      // shared sky/terrain/tone module, the same file the flight lab uses
+      "flight/packages/world/*.js": "lab/sr71/world",
       // edge-affordance mockups that sit on top of the lab
       [`${lab}/edge-affordances.html`]: "lab/edge/index.html",
       // staging home: site + backdrop + Fly, which hands over to the flight lab

@@ -17,7 +17,9 @@
       "metersPerPixel": 243.38,
       "minM": 30,
       "maxM": 4310,
-      "exaggeration": 1.5
+      "exaggeration": 1.5,
+      "snowM": 3500,
+      "arid": 0.3
     }
   ]
 }
