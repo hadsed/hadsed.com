@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
 import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
-const STORE = 'sr71-backdrop-v4';   // v4: natural ground color became the default
+const STORE = 'sr71-backdrop-v5';   // v5: navy monotone with ground color showing through
 
 // ---------- settings ----------
 const PRESETS = {
@@ -23,13 +23,14 @@ const STYLES = {
   topo: { grid: 0.45, contour: 1, shade: 0.6, tint: 1, tintContrast: 1.3, tintPivot: 0.45, slope: 0.35, lineBright: 0.015, contourStep: 200 },
   topoglow: { grid: 0.6, contour: 0.9, shade: 0.5, tint: 0.6, tintContrast: 1.2, tintPivot: 0.6, slope: 0.2, lineBright: 0.7 },
   // Had's navy grid (2026-11-06) and the same lines over natural ground
-  navygrid: { grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, tint: 0, slope: 0, color: 0, texture: 0, mono: 1 },
-  natural: { grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, tint: 0, slope: 0, color: 1, texture: 1, mono: 0 },
+  navygrid: { grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, tint: 0, slope: 0, color: 0, texture: 0, mono: 1, chroma: 0 },
+  navycolor: { grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, tint: 0, slope: 0, color: 1, texture: 1, mono: 1, chroma: 0.7 },
+  natural: { grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, tint: 0, slope: 0, color: 1, texture: 1, mono: 0, chroma: 0 },
 };
 // Defaults = the look Had landed on 2026-11-05 (iPad), with altitude at the SR-71's ~85k ft ceiling.
 // The look itself (tone, scene, ground) lives in the shared world module, so the flight lab matches.
 const DEFAULTS = {
-  preset: 'site', ...WORLD_DEFAULTS, style: 'natural',
+  preset: 'site', ...WORLD_DEFAULTS, style: 'navycolor',
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -313,6 +314,7 @@ const SPEC = [
     ['hlStart', 'range', { label: 'Highlight starts at', min: 0.4, max: 1, step: 0.01 }],
     ['hlAmount', 'range', { label: 'Highlight strength', min: 0, max: 1, step: 0.01 }],
     ['mono', 'range', { label: 'Monotone', min: 0, max: 1, step: 0.01 }],
+    ['chroma', 'range', { label: 'Color through the monotone', min: 0, max: 2, step: 0.01 }],
     ['exposure', 'range', { label: 'Exposure', min: 0.3, max: 3, step: 0.01 }],
     ['contrast', 'range', { label: 'Contrast', min: 0.5, max: 2, step: 0.01 }],
     ['vignette', 'range', { label: 'Vignette', min: 0, max: 1.2, step: 0.01 }],
@@ -331,7 +333,7 @@ const SPEC = [
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
   ]],
   ['Ground', [
-    ['style', 'select', { label: 'Style', options: [['natural', 'Natural ground + grid'], ['navygrid', 'Navy grid (monotone)'], ['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid'], ['topo', 'Topo sheet (dark ink)'], ['topoglow', 'Topo, glowing lines']] }],
+    ['style', 'select', { label: 'Style', options: [['navycolor', 'Navy, with ground color'], ['navygrid', 'Navy grid (monotone)'], ['natural', 'Natural ground + grid'], ['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid'], ['topo', 'Topo sheet (dark ink)'], ['topoglow', 'Topo, glowing lines']] }],
     ['color', 'range', { label: 'Natural color (forest, rock, snow)', min: 0, max: 1, step: 0.01 }],
     ['texture', 'range', { label: 'Ground texture', min: 0, max: 1, step: 0.01 }],
     ['grid', 'range', { label: 'Grid lines', min: 0, max: 1, step: 0.01 }],

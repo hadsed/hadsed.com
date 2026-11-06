@@ -31,7 +31,9 @@ export function createRenderer({ canvas, manifest, labels }) {
   // palette, the ground in natural color.
   const coarse = matchMedia('(pointer: coarse)').matches;
   const world = createWorld({ segments: coarse ? 384 : 512 });
-  world.setLook({ ...WORLD_DEFAULTS, mono: 0, haze: 160, grid: 0.45, gridSize: 500, contour: 0.3, contourStep: 150, lineBright: 0.6 });
+  // The backdrop's look (navy monotone, ground color showing through). The monotone follows the camera
+  // rig: full in the backdrop orbit, fading to natural color as Fly glides into the chase cam.
+  world.setLook({ ...WORLD_DEFAULTS });
   world.uniforms.uDirect.value = 1;
   scene.add(world.sky, world.terrain, world.clouds);
   sun.position.copy(world.sunDir);
@@ -104,6 +106,7 @@ export function createRenderer({ canvas, manifest, labels }) {
       const snap = 2500;
       shift.set(Math.round(camPos.x / snap) * snap, Math.round(camPos.z / snap) * snap);
       world.frame(camera, null, shift);
+      world.uniforms.uMono.value = 1 - Math.min(Math.max(rig.blend, 0), 1);
 
       // Ghosts
       let n = 0;

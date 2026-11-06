@@ -24,11 +24,11 @@ import * as THREE from 'three';
 export const EARTH_R = 6371000;
 
 // The backdrop look Had landed on (2026-11-05/06): Sierra, 85k ft, grid 250 m, contours 175 m.
-// 2026-11-06: natural ground color under the palette sky (mono 0, color 1). mono 1 + color 0 is the
-// original navy terrain grid.
+// 2026-11-06: navy monotone stays dominant, natural ground color bleeds through it (chroma). Chroma 0 +
+// color 0 is the original navy terrain grid; mono 0 is full natural color.
 export const WORLD_DEFAULTS = {
   shadow: '#07090e', mid: '#1c2433', light: '#c8cdd5', highlight: '#e4c56f',
-  midPoint: 0.56, hlStart: 0.61, hlAmount: 0.85, mono: 0, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
+  midPoint: 0.56, hlStart: 0.61, hlAmount: 0.85, mono: 1, chroma: 0.7, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
   region: 'sierra', altitudeFt: 85000, exag: 1, offsetX: 79, offsetZ: -69.1, sunAz: 41, sunEl: 18, haze: 130, clouds: 0.54, fov: 23,
   grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
@@ -53,7 +53,7 @@ float fbm(vec2 p, int oct){
 // The palette ramp, shared by the post pass and by the shaders when they finish themselves (direct).
 const TONE = /* glsl */`
 uniform vec3 uShadow, uMid, uLight, uHigh;
-uniform float uMidPoint, uHlStart, uHlAmount, uMono, uExposure, uContrast, uDirect;
+uniform float uMidPoint, uHlStart, uHlAmount, uMono, uExposure, uContrast, uDirect, uChroma;
 // natural color, on the same brightness curve the ramp uses (so mono 0 and 1 match in brightness)
 vec3 natural(vec3 c){ return pow(clamp(c / (1.0 + c) * 1.55, 0.0, 1.0), vec3(0.85 * 2.2)); }
 vec3 naturalInv(vec3 y){ vec3 t = pow(clamp(y, 0.0, 0.999), vec3(1.0 / (0.85 * 2.2))) / 1.55; return t / (1.0 - t); }
@@ -66,7 +66,15 @@ vec3 ramp(vec3 c, float gold){
   float hl = smoothstep(uHlStart, min(uHlStart + 0.18, 1.0), l) * uHlAmount;   // gold on the brightest values
   return mix(r, uHigh, max(hl, clamp(gold, 0.0, 1.0)));
 }
-vec3 display(vec3 c, float gold){ c *= uExposure; return mix(natural(c), ramp(c, gold), uMono); }
+// The navy ramp sets brightness; chroma adds the scene's own hue on top (its color minus its grey),
+// so forests read green and snow white while the monotone stays dominant.
+vec3 display(vec3 c, float gold){
+  c *= uExposure;
+  vec3 nat = natural(c);
+  vec3 m = mix(nat, ramp(c, gold), uMono);
+  vec3 hue = nat - vec3(dot(nat, vec3(0.2126, 0.7152, 0.0722)));
+  return max(m + hue * uChroma * uMono, 0.0);
+}
 // surfaces: linear color + gold mask for the post pass, or finished display color when direct
 vec4 finish(vec3 c, float gold){ return uDirect > 0.5 ? vec4(pow(display(c, gold), vec3(1.0 / 2.2)), 1.0) : vec4(c, gold); }
 // the sky: always on the palette. For the post pass it writes a color the pass maps back to the
@@ -74,7 +82,8 @@ vec4 finish(vec3 c, float gold){ return uDirect > 0.5 ? vec4(pow(display(c, gold
 vec4 finishSky(vec3 c){
   vec3 toned = ramp(c * uExposure, 0.0);
   if (uDirect > 0.5) return vec4(pow(toned, vec3(1.0 / 2.2)), 1.0);
-  return vec4(mix(naturalInv(toned) / uExposure, c, uMono), 0.0);
+  vec3 grey = vec3(dot(c, vec3(0.2126, 0.7152, 0.0722)));
+  return vec4(mix(naturalInv(toned) / uExposure, grey, uMono), 0.0);
 }`;
 
 const LINES = /* glsl */`
@@ -134,7 +143,7 @@ export function createWorld({ segments = 512 } = {}) {
     uShadow: { value: col(WORLD_DEFAULTS.shadow) }, uMid: { value: col(WORLD_DEFAULTS.mid) },
     uLight: { value: col(WORLD_DEFAULTS.light) }, uHigh: { value: col(WORLD_DEFAULTS.highlight) },
     uMidPoint: { value: 0.56 }, uHlStart: { value: 0.61 }, uHlAmount: { value: 0.85 },
-    uMono: { value: 1 }, uExposure: { value: 1.12 }, uContrast: { value: 1.13 }, uDirect: { value: 0 },
+    uMono: { value: 1 }, uExposure: { value: 1.12 }, uContrast: { value: 1.13 }, uDirect: { value: 0 }, uChroma: { value: 0.6 },
   };
 
   // ---- sky: thin bright air at the horizon, near-space navy overhead, a sun and the limb ----
@@ -273,7 +282,8 @@ export function createWorld({ segments = 512 } = {}) {
           // lines are ink of a set brightness: low values give dark ink, high values glow
           c = mix(c, vec3(uLineBright) * (0.75 + 0.5 * rise), ink * (1.0 - 0.45 * uColor * (1.0 - uMono)));
           float fog = 1.0 - exp(-vDist / uHazeDist);
-          c = mix(c, uHaze * mix(1.0, 0.8, uColor), fog * fog * 0.9 + fog * 0.1);
+          vec3 haze = mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono);
+          c = mix(c, haze * mix(1.0, 0.8, uColor), fog * fog * 0.9 + fog * 0.1);
           gl_FragColor = finish(c, ink * uLineGold * (1.0 - fog));   // gold mask: lines the tone may turn gold
         }`,
     }),
@@ -314,7 +324,7 @@ export function createWorld({ segments = 512 } = {}) {
           float puff = fbm(q + vec2(fbm(q * 0.5, 3)) * 1.5, 6);
           float a = smoothstep(0.86 - uCover * 0.4, 1.0 - uCover * 0.35, puff + (field - 0.5) * 0.7);
           float fog = 1.0 - exp(-vDist / (uHazeDist * 1.1));
-          vec3 c = mix(vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff), uHaze, fog);
+          vec3 c = mix(vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff), mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono), fog);
           gl_FragColor = vec4(finish(c, 0.0).rgb, a * 0.9 * (1.0 - fog * 0.6) * step(0.001, uCover));
         }`,
     }),
@@ -324,7 +334,7 @@ export function createWorld({ segments = 512 } = {}) {
 
   const look = { ...WORLD_DEFAULTS };
   const TERRAIN_KEYS = ['grid', 'gridSize', 'contour', 'contourStep', 'shade', 'lineBright', 'lineGold', 'tint', 'tintContrast', 'tintPivot', 'slope', 'color', 'texture'];
-  const TONE_KEYS = ['midPoint', 'hlStart', 'hlAmount', 'mono', 'exposure', 'contrast'];
+  const TONE_KEYS = ['midPoint', 'hlStart', 'hlAmount', 'mono', 'chroma', 'exposure', 'contrast'];
   const uName = (k) => 'u' + k[0].toUpperCase() + k.slice(1);
 
   return {
