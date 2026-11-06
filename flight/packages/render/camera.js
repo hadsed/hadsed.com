@@ -21,6 +21,10 @@ const LAB_SCALE = 32.7 / 24.5;
 const ORBIT_OFFSET = new THREE.Vector3(52, 14, -49).multiplyScalar(LAB_SCALE);
 const ORBIT_TARGET = new THREE.Vector3(0, 0, 1).multiplyScalar(LAB_SCALE);
 
+// Chase pose in the jet's frame, meters: behind, above, look-ahead. On boost
+// the camera falls back and the lens opens, so the burst reads as speed.
+export const CHASE = { back: 46, up: 15, look: 34, boostBack: 74, boostUp: 19, boostLens: 9 };
+
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -33,6 +37,7 @@ export function createCameraRig(camera, {
 } = {}) {
   const rig = {
     blend: 1, target: 1,                    // chase by default; the backdrop sets both to 0
+    boosting: false,                        // set each frame; eases the boost pull-back in and out
     orbit: { yaw: 0, pitch: 0, spin: 0 },   // yaw/pitch: gesture offsets; spin: accumulated drift
     get moving() { return rig.blend !== rig.target; },
     // Snap the chase cam onto the jet (respawn, first frame).
@@ -45,7 +50,7 @@ export function createCameraRig(camera, {
   // at Mach 2.7, more on boost), which left the jet a speck 200 m ahead.
   const camOff = new THREE.Vector3(), lookOff = new THREE.Vector3(), camUp = new THREE.Vector3(0, 1, 0);
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
-  let ready = false;
+  let ready = false, bk = 0;
   // The orbit follows the jet's heading slowly, so autopilot turns don't whip it around.
   let heading = null;
 
@@ -59,9 +64,12 @@ export function createCameraRig(camera, {
     // ---- chase pose (always tracked, so arriving at it is seamless) ----
     fwd.set(0, 0, -1).applyQuaternion(jetQ);
     up.set(0, 1, 0).applyQuaternion(jetQ);
-    v.copy(fwd).multiplyScalar(-52).addScaledVector(up, 10);
+    // Boost pull-back: quick to open up, slower to settle back in.
+    bk += ((rig.boosting ? 1 : 0) - bk) * (1 - Math.exp(-dt * (rig.boosting ? 2.2 : 1.2)));
+    const back = CHASE.back + (CHASE.boostBack - CHASE.back) * bk, high = CHASE.up + (CHASE.boostUp - CHASE.up) * bk;
+    v.copy(fwd).multiplyScalar(-back).addScaledVector(up, high);
     camOff.lerp(v, ready ? 1 - Math.exp(-dt * 6) : 1);
-    lookOff.lerp(v.copy(fwd).multiplyScalar(120), ready ? 1 - Math.exp(-dt * 10) : 1);
+    lookOff.lerp(v.copy(fwd).multiplyScalar(CHASE.look), ready ? 1 - Math.exp(-dt * 10) : 1);
     camUp.lerp(up, ready ? 1 - Math.exp(-dt * 3) : 1).normalize();
     camPos.copy(jetPos).add(camOff);
     camLook.copy(jetPos).add(lookOff);
@@ -106,7 +114,7 @@ export function createCameraRig(camera, {
     // Lens: the backdrop widens in portrait so the jet fits, the chase cam too.
     const portrait = aspect < 1;
     const oFov = portrait ? orbitLens * Math.min(1.8, 1 / aspect) : orbitLens;
-    const cFov = portrait ? portraitChaseLens : chaseLens;
+    const cFov = (portrait ? portraitChaseLens : chaseLens) + CHASE.boostLens * bk;
     const fov = oFov + (cFov - oFov) * k;
     if (Math.abs(camera.fov - fov) > 1e-4 || camera.aspect !== aspect) {
       camera.fov = fov; camera.aspect = aspect; camera.updateProjectionMatrix();
