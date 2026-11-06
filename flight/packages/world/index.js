@@ -135,6 +135,27 @@ export function loadTerrarium(url) {
   return terrariumCache.get(key);
 }
 
+// A sphere with rings bunched toward the horizon (elevation ~ t^2), so per-vertex shading keeps
+// the thin limb crisp.
+function skyGeometry(r, cols = 96, rows = 96) {
+  const pos = [], idx = [];
+  for (let j = 0; j <= rows; j++) {
+    const t = (j / rows) * 2 - 1, el = Math.sign(t) * t * t * Math.PI / 2;
+    for (let i = 0; i <= cols; i++) {
+      const az = (i / cols) * Math.PI * 2;
+      pos.push(r * Math.cos(el) * Math.sin(az), r * Math.sin(el), r * Math.cos(el) * Math.cos(az));
+    }
+  }
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const a = j * (cols + 1) + i, b = a + cols + 1;
+    idx.push(a, a + 1, b, a + 1, b + 1, b);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  return g;
+}
+
 export function createWorld({ segments = 512, near = 0.12 } = {}) {
   const sunDir = new THREE.Vector3(0, 1, 0);
   const U = {
@@ -148,34 +169,37 @@ export function createWorld({ segments = 512, near = 0.12 } = {}) {
   };
 
   // ---- sky: thin bright air at the horizon, near-space navy overhead, a sun and the limb ----
+  // The sky is smooth, so it is shaded per vertex on a sphere whose rings crowd in at the horizon
+  // (where the limb is a fraction of a degree thick); only the sun disk is worked out per pixel.
+  // Drawn first, behind everything, with no depth test, depth write or log-depth.
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(1.5e6, 48, 24),
+    skyGeometry(1.5e6),
     new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, uniforms: U,
+      side: THREE.DoubleSide, depthWrite: false, depthTest: false, uniforms: U,
       vertexShader: /* glsl */`
-        #include <common>
-        #include <logdepthbuf_pars_vertex>
-        varying vec3 vDir;
-        void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          #include <logdepthbuf_vertex>
-        }`,
-      fragmentShader: /* glsl */`
-        #include <logdepthbuf_pars_fragment>
-        uniform vec3 uSun, uHaze; uniform float uDip, uSkyK; varying vec3 vDir;
+        uniform vec3 uSun, uHaze; uniform float uDip, uSkyK;
+        varying vec3 vDir; varying vec4 vSky;
         ${TONE}
         void main(){
-          #include <logdepthbuf_fragment>
-          vec3 d = normalize(vDir);
+          vec3 d = normalize(position); vDir = d;
           float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;       // angle above the true horizon
           vec3 zenith = vec3(0.010, 0.020, 0.055);             // near-space dark blue
           // high up most of the air is below you: a thin bright band at the horizon, navy by ~20 degrees up.
           // Lower down (uSkyK smaller) the bright band widens.
           vec3 c = mix(uHaze, zenith, 1.0 - exp(-max(el, 0.0) * uSkyK));
           c += vec3(0.30) * exp(-abs(el) * 70.0);              // bright limb on the horizon
-          float sun = max(dot(d, uSun), 0.0);
-          c += vec3(0.35) * pow(sun, 12.0) + vec3(3.0) * pow(sun, 2500.0);
+          c += vec3(0.35) * pow(max(dot(d, uSun), 0.0), 12.0); // glow around the sun
           c = mix(c, uHaze * 0.9, smoothstep(0.0, -0.03, el));
-          gl_FragColor = finishSky(c);
+          vSky = finishSky(c);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: /* glsl */`
+        uniform vec3 uSun, uHigh; uniform float uDirect; varying vec3 vDir; varying vec4 vSky;
+        void main(){
+          float disk = pow(max(dot(normalize(vDir), uSun), 0.0), 2500.0);
+          // the disk is far past white: in the post pass the tone turns it to highlight; direct, draw that
+          gl_FragColor = uDirect > 0.5 ? vec4(mix(vSky.rgb, pow(uHigh, vec3(1.0 / 2.2)), min(disk * 3.0, 1.0)), 1.0)
+                                       : vec4(vSky.rgb + vec3(3.0) * disk, vSky.a);
         }`,
     }),
   );
@@ -244,8 +268,8 @@ export function createWorld({ segments = 512, near = 0.12 } = {}) {
           float steep = 1.0 - n.y;
           vec2 q = vXZ / 900.0;
           float fade = 1.0 - smoothstep(0.25, 0.9, max(fwidth(q.x), fwidth(q.y)));
-          float fine = fade > 0.0 ? mix(0.5, fbm(q, 3), fade) : 0.5;
-          float broad = fbm(vXZ / 12000.0 + 3.7, 3);
+          float fine = mix(0.5, fbm(q, 4), fade);
+          float broad = fbm(vXZ / 12000.0 + 3.7, 4);
           float hs = vH / max(uSnowM, 1.0);              // 1 at the snowline
           float jitter = (broad - 0.5) * 0.35 + (fine - 0.5) * 0.12;
           vec3 valley = mix(vec3(0.13, 0.12, 0.075), vec3(0.24, 0.18, 0.11), uArid);
@@ -295,7 +319,7 @@ export function createWorld({ segments = 512, near = 0.12 } = {}) {
 
   // ---- cloud deck: scattered cumulus at cloudM, parallax against the ground ----
   const clouds = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.2e6, 1.2e6, 240, 240).rotateX(-Math.PI / 2),
+    new THREE.PlaneGeometry(1.2e6, 1.2e6, 120, 120).rotateX(-Math.PI / 2),
     new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, uniforms: U,
       // alpha-neutral for the post pass: clouds dim the gold mask under them and never add to it
@@ -322,8 +346,8 @@ export function createWorld({ segments = 512, near = 0.12 } = {}) {
         void main(){
           #include <logdepthbuf_fragment>
           vec2 q = vXZ / 4500.0;
-          float field = fbm(q * 0.18 + 4.0, 3);
-          float puff = fbm(q + vec2(fbm(q * 0.5, 2)) * 1.5, 5);
+          float field = fbm(q * 0.18 + 4.0, 4);
+          float puff = fbm(q + vec2(fbm(q * 0.5, 3)) * 1.5, 6);
           float a = smoothstep(0.86 - uCover * 0.4, 1.0 - uCover * 0.35, puff + (field - 0.5) * 0.7);
           float fog = 1.0 - exp(-vDist / (uHazeDist * 1.1));
           vec3 c = mix(vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff), mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono), fog);
