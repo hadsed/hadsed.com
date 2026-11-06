@@ -4,10 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {%- set pageTitle %}{% if title %}{{ title }} · Had Seddiqi{% else %}Had Seddiqi{% endif %}{% endset %}
-  {%- set pageDescription = description or "Applying AI to hard science and engineering problems." %}
+  {%- set pageDescription = description or summary or "Applying AI to hard science and engineering problems." %}
   <title>{{ pageTitle }}</title>
   <meta name="description" content="{{ pageDescription }}">
+  {%- if noindex %}
+  <meta name="robots" content="noindex">
+  {%- else %}
   <link rel="canonical" href="https://hadsed.com{{ page.url }}">
+  {%- endif %}
+  {#- A top-level visit hands over to /lab/home/, which shows this page over the live sky with Fly.
+      Inside that frame (or for crawlers, link previews and browsers without WebGL) the page stays as is. #}
+  <script>(function () {
+    try {
+      if (window.top !== window || /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|lighthouse/i.test(navigator.userAgent)) return;
+      var c = document.createElement('canvas');
+      if (!(c.getContext('webgl2') || c.getContext('webgl'))) return;
+      location.replace('/lab/home/?p=' + encodeURIComponent(location.pathname + location.search) + location.hash);
+    } catch (e) {}
+  })();</script>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Had Seddiqi">
   <meta property="og:title" content="{{ pageTitle }}">
@@ -24,6 +38,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:wght@300&display=swap">
   <link rel="stylesheet" href="/css/site.css">
+  {%- if page.url == "/" %}
+  {%- set about = collections.about[0].data %}
+  <script type="application/ld+json">
+  {{ {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": about.name,
+    "url": "https://hadsed.com/",
+    "image": "https://hadsed.com/assets/avatar.jpg",
+    "description": pageDescription,
+    "sameAs": about.links | profileUrls
+  } | dump | safe }}
+  </script>
+  {%- endif %}
+  {#- Framed by the home's 3D backdrop: let it dress the page before first paint (no flicker on navigation). -#}
+  <script>try { if (window.frameElement && frameElement.id === 'site' && parent.__siteHook) parent.__siteHook(document); } catch (e) {}</script>
 </head>
 <body>
 <div class="page">

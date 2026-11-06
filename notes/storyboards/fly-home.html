@@ -83,8 +83,8 @@ const SITE_CSS = `
   /* phones: centered on the menu row, without making the row taller */
   @media (max-width: 640px) { .menu ul { align-items: center; } .menu .fly-item { margin: -.4em 0 -.4em auto; } }
 `;
-function decorateSite() {
-  const doc = siteDoc(); if (!doc || !doc.head) return;
+function decorateSite(doc = siteDoc()) {
+  if (!doc || !doc.head) return;
   if (!doc.getElementById('fly-css')) {
     const st = doc.createElement('style'); st.id = 'fly-css'; st.textContent = SITE_CSS; doc.head.appendChild(st);
   }
@@ -96,7 +96,13 @@ function decorateSite() {
   }
   for (const a of doc.querySelectorAll('a[href="#fly"]')) a.onclick = (e) => { e.preventDefault(); enter(); };
   // Keep the address bar in step with the page shown inside, so a reload lands on the same page.
-  try { const p = doc.location.pathname; if (p && !p.startsWith('/lab/')) history.replaceState(null, '', `?p=${encodeURIComponent(p)}`); } catch {}
+  // The address bar shows the page's own URL, so it can be copied and shared; loading that URL
+  // top-level comes straight back here (base.njk), so a reload lands on the same page.
+  try {
+    const l = doc.location, p = l.pathname;
+    if (p && !p.startsWith('/lab/')) history.replaceState(null, '', p + l.search + l.hash);
+    if (doc.title) document.title = doc.title;
+  } catch {}
 }
 
 // The site sits on a see-through navy wash over the sky, lighter in the middle where the jet flies
@@ -104,8 +110,8 @@ function decorateSite() {
 // wide screens only). Had's picks from the jig.
 const WASH = { center: 0.44, edge: 0.68, w: 46, h: 40, x: 50, y: 52, jx: 0, jy: 0.1 };
 const washCss = () => `html, body { background: radial-gradient(ellipse ${WASH.w}% ${WASH.h}% at ${WASH.x}% ${WASH.y}%, rgba(28, 36, 51, ${WASH.center}), rgba(28, 36, 51, ${WASH.edge}) 100%) fixed !important; }`;
-function styleSite() {
-  const doc = siteDoc(); if (!doc || !doc.head) return;
+function styleSite(doc = siteDoc()) {
+  if (!doc || !doc.head) return;
   let tag = doc.getElementById('backdrop-wash');
   if (!tag) { tag = doc.createElement('style'); tag.id = 'backdrop-wash'; doc.head.appendChild(tag); }
   tag.textContent = washCss();
@@ -116,14 +122,24 @@ function styleSky() {
   f.renderer.rig.frame = innerWidth >= innerHeight ? { x: WASH.jx, y: WASH.jy } : { x: 0, y: 0 };
 }
 addEventListener('resize', styleSky);
+// Each site page calls this from the end of its <head> when it's framed here (src/_includes/base.njk),
+// so the wash and the Fly item go in before the page first paints. Waiting for 'load' let every
+// navigation paint the site's solid navy first and then swap to the see-through wash: a flicker.
+window.__siteHook = (doc) => {
+  styleSite(doc); decorateSite(doc);
+  // The menu hasn't been parsed yet: add Fly the moment it is, before it can paint without it.
+  const mo = new MutationObserver(() => { if (doc.querySelector('.menu ul')) { mo.disconnect(); decorateSite(doc); } });
+  mo.observe(doc, { childList: true, subtree: true });
+  doc.addEventListener('DOMContentLoaded', () => { mo.disconnect(); decorateSite(doc); }, { once: true });
+};
 site.addEventListener('load', () => {
-  styleSite(); decorateSite();
+  styleSite(); decorateSite();   // pages without the hook (and a safety net)
   try { wireGestures(site.contentWindow); } catch (err) { console.warn('gestures', err); }
   try { site.contentWindow.addEventListener('keydown', onKey); } catch {}
 });
 {
   const p = new URLSearchParams(location.search).get('p');
-  site.src = p && p.startsWith('/') && !p.startsWith('//') ? p : '/';
+  site.src = (p && p.startsWith('/') && !p.startsWith('//') ? p : '/') + location.hash;
 }
 // The sky loads behind the site and fades up when it has settled next to a live jet (or found none).
 skyFrame.src = '../flight/?attract';

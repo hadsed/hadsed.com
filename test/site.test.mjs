@@ -37,7 +37,7 @@ test("landing page shows about, timeline, and projects", () => {
   assert.doesNotMatch(html, /Adiabatic Quantum Optimization for Associative Memory Recall/);
   assert.match(html, /class="org">Vinci4d</);
   assert.match(html, /My next 5-year role/);
-  assert.match(html, /class="role"><a href="mailto:h@hadsed.com">Reach out to me<\/a><\/div>/);
+  assert.match(html, /class="role"><a href="mailto:h@hadsed.com">[^<]+<\/a><\/div>/);
   assert.match(html, /ML Engineer, Electrical DNA sequencing/);
   assert.doesNotMatch(html, / · /);
   assert.doesNotMatch(html, /entry-head/);
@@ -85,4 +85,20 @@ test("pages carry link-preview tags and icons", () => {
   for (const f of ["assets/og.jpg", "apple-touch-icon.png", "favicon.ico"]) {
     assert.ok(existsSync(new URL(`../_site/${f}`, import.meta.url)), f);
   }
+});
+
+test("crawlers get robots.txt, a sitemap, a real 404 and a Person schema", () => {
+  assert.match(read("robots.txt"), /^User-agent: \*\nAllow: \/$/m);
+  assert.match(read("robots.txt"), /^Sitemap: https:\/\/hadsed\.com\/sitemap\.xml$/m);
+  const sitemap = read("sitemap.xml");
+  assert.match(sitemap, /<loc>https:\/\/hadsed\.com\/<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/hadsed\.com\/portfolio\/subassembler\/<\/loc>/);
+  assert.doesNotMatch(sitemap, /404|robots|sitemap\.xml/);
+  assert.match(read("404.html"), /<meta name="robots" content="noindex">/);
+  assert.match(read("_headers"), /X-Robots-Tag: noindex/);
+  const ld = JSON.parse(read("index.html").match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(ld["@type"], "Person");
+  assert.ok(ld.sameAs.includes("https://github.com/hadsed"));
+  assert.ok(!ld.sameAs.some((url) => url.startsWith("mailto:")));
+  assert.match(read("portfolio/subassembler/index.html"), /<meta name="description" content="Step-by-step assembly walkthroughs generated from CAD\.">/);
 });

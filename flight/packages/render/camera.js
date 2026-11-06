@@ -54,7 +54,8 @@ export function createCameraRig(camera, {
   // at Mach 2.7, more on boost), which left the jet a speck 200 m ahead.
   const camOff = new THREE.Vector3(), lookOff = new THREE.Vector3(), camUp = new THREE.Vector3(0, 1, 0);
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
-  let ready = false, bk = 0, fw = 0;
+  let ready = false, bk = 0, fw = 0, shakeT = 0;
+  const side = new THREE.Vector3();
   const focusPt = new THREE.Vector3();
   // The orbit follows the jet's heading slowly, so autopilot turns don't whip it around.
   let heading = null;
@@ -78,12 +79,24 @@ export function createCameraRig(camera, {
     camUp.lerp(up, ready ? 1 - Math.exp(-dt * 3) : 1).normalize();
     camPos.copy(jetPos).add(camOff);
     camLook.copy(jetPos).add(lookOff);
+    // On the burner the airframe buzzes: a small, fast, uneven shake.
+    if (bk > 0.01) {
+      shakeT += dt;
+      const k = 0.18 * bk;
+      camPos.addScaledVector(up, k * (Math.sin(shakeT * 37) * 0.6 + Math.sin(shakeT * 59 + 1.3) * 0.4));
+      camPos.addScaledVector(side.crossVectors(fwd, up), k * 0.7 * Math.sin(shakeT * 43 + 2.1));
+    }
     // Following: swing the eye toward the leader so it stays on screen, framing
     // both jets, and pull back a little so both fit.
     fw += ((rig.focus ? 1 : 0) - fw) * (1 - Math.exp(-dt * 1.5));
     if (rig.focus) focusPt.copy(rig.focus);
     if (fw > 0.001) {
-      camLook.lerp(focusPt, 0.5 * fw);
+      // Only lean toward the leader while it is ahead of us. If we overshoot (a
+      // boost past the slot), looking back at it would spin the camera off our
+      // own jet; hold the chase view until it comes back in front.
+      const ahead = v.copy(focusPt).sub(jetPos).dot(fwd);
+      const k = THREE.MathUtils.smoothstep(ahead, 20, 200);
+      camLook.lerp(focusPt, 0.5 * fw * k);
       camPos.addScaledVector(camOff, 0.35 * fw);
     }
 

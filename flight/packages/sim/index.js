@@ -32,7 +32,8 @@ export function copyJet(dst, src) {
 export const cloneJet = (j) => copyJet({ pos: [0, 0, 0], q: [0, 0, 0, 1] }, j);
 
 const NO_INPUT = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
-const tq = [0, 0, 0, 1], fwd = [0, 0, 0], right = [0, 0, 0];
+const tq = [0, 0, 0, 1], fwd = [0, 0, 0], right = [0, 0, 0], upv = [0, 0, 0];
+const BAND = 3000;   // m above the floor / below the ceiling where the jet starts to round out
 
 // Advance one jet by dt seconds. intent axes are in [-1, 1]:
 // pitch +1 nose up, roll +1 roll right, yaw +1 nose right, throttle +1 more power.
@@ -50,11 +51,17 @@ export function step(jet, intent = NO_INPUT, dt = STEP) {
   let rollRate = rIn * RATE.roll;
   if (Math.abs(rIn) < 0.1) rollRate -= bank * RATE.level;
   let pitchRate = pIn * RATE.pitch;
-  if (Math.abs(pIn) < 0.1) pitchRate -= nose * RATE.nose;
+  if (Math.abs(pIn) < 0.1) pitchRate -= nose * RATE.nose * (up1(q) >= 0 ? 1 : -1);
 
+  // Floor and ceiling: the closer you get, the shallower the dive (or climb) the
+  // jet allows, so it rounds out and skims the limit instead of grinding along
+  // it nose-down. "Raise the nose" is +pitch upright and -pitch inverted.
   const alt = jet.pos[1];
-  if (alt > LIMITS.maxAlt - 2000 && fwd[1] > 0) pitchRate -= fwd[1] * 2 * ((alt - LIMITS.maxAlt + 2000) / 2000);
-  if (alt < LIMITS.minAlt + 2000 && fwd[1] < 0) pitchRate -= fwd[1] * 2 * ((LIMITS.minAlt + 2000 - alt) / 2000);
+  upOf(q, upv);
+  const pull = upv[1] >= 0 ? 1 : -1;
+  const floorRoom = clamp((alt - LIMITS.minAlt) / BAND, 0, 9), ceilRoom = clamp((LIMITS.maxAlt - alt) / BAND, 0, 9);   // past 1: no limit
+  if (nose < -floorRoom * 1.4) pitchRate = pull * Math.max(pull * pitchRate, (-floorRoom * 1.4 - nose) * 4);
+  if (nose > ceilRoom * 1.4) pitchRate = pull * Math.min(pull * pitchRate, (ceilRoom * 1.4 - nose) * 4);
 
   // Local rotations: pitch about +X, roll about -Z, yaw about -Y.
   mulAxis(q, 1, 0, 0, pitchRate * dt);
@@ -102,6 +109,7 @@ export function lerpJet(out, a, b, t) {
 export function forwardOf(q, out) { return rotate(q, 0, 0, -1, out); }
 export function rightOf(q, out) { return rotate(q, 1, 0, 0, out); }
 export function upOf(q, out) { return rotate(q, 0, 1, 0, out); }
+const up1 = (q) => 1 - 2 * (q[0] * q[0] + q[2] * q[2]);   // world-y of the jet's up vector
 
 export function rotate(q, vx, vy, vz, out) {
   const [x, y, z, w] = q;

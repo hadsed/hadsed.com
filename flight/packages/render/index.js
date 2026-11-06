@@ -10,6 +10,7 @@ import { createContrails } from './contrails.js';
 import { createCameraRig } from './camera.js';
 import { outlineMaterial } from './outline.js';
 import { createBoost } from './boost.js';
+import { createWind } from './wind.js';
 import { FLAG } from '../net/protocol.js';
 
 const MAX_GHOSTS = 64;
@@ -93,7 +94,8 @@ export function createRenderer({ canvas, manifest, labels }) {
   scene.add(dots);
 
   const trails = createContrails({ scene, gold, sky, max: MAX_GHOSTS + 1 });
-  const boost = createBoost({ scene, geo, gold, max: MAX_GHOSTS + 1 });
+  const boost = createBoost({ scene, geo, max: MAX_GHOSTS + 1 });
+  const wind = createWind({ scene });
 
   // ---- camera: backdrop orbit and chase cam, one continuous move between them (camera.js) ----
   const rig = createCameraRig(camera);
@@ -137,6 +139,8 @@ export function createRenderer({ canvas, manifest, labels }) {
       rig.update(me.position, tmpQ, dt, camera.aspect);
       // Gold outlines are for flying; the calm site backdrop shows plain black jets.
       meLine.visible = ghostLines.visible = rig.blend > 0.5;
+      // Air streaming past: only in the chase view, not the calm backdrop.
+      wind.update(dt, me.position, tmpQ, self.speed, rig.boosting ? 1 : 0, Math.min(1, Math.max(0, rig.blend * 2 - 1)));
       const camPos = camera.position;
 
       // The ground grid follows the camera (world.frame): its core moves in whole heightmap texels, so
@@ -156,7 +160,7 @@ export function createRenderer({ canvas, manifest, labels }) {
       trails.begin(time);
       trails.feed('self', self, tmpQ);
       boost.begin(time, dt, camera, canvas.height);
-      boost.feed('self', self, tmpQ, (self.flags & FLAG.BOOST) !== 0);
+      boost.feed('self', self, tmpQ, (self.flags & FLAG.BOOST) !== 0, self.throttle ?? 0.6);
       for (const r of remotes) {
         if (!r.view || !r.visible || n >= MAX_GHOSTS) continue;
         viewQuat(r.view, time, tmpQ);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createJet, step, forwardOf, rightOf, cloneJet, LIMITS, STEP } from '../flight/packages/sim/index.js';
+import { createJet, step, forwardOf, rightOf, upOf, cloneJet, LIMITS, STEP } from '../flight/packages/sim/index.js';
 import { encodeState, decodeState, encodeSnapshot, decodeSnapshot, ENTRY_BYTES } from '../flight/packages/net/protocol.js';
 import { createRemotes } from '../flight/packages/net/interp.js';
 import { createControls, scripted, keyboard, tilt } from '../flight/packages/controls/index.js';
@@ -246,4 +246,51 @@ test('assist: a correction the other way takes effect at once', () => {
   for (let i = 0; i < 48; i++) step(j, a.update(it, j, 0.6, 0));
   for (let i = 0; i < 30; i++) step(j, a.update(it, j, -0.6, 0));
   assert.ok(rightOf(j.q, [0, 0, 0])[1] > 0.1, 'banked left within half a second');
+});
+
+test('follow: holding boost in formation rejoins the slot instead of overshooting the leader', () => {
+  const lead = createJet({ x: 0, z: 0, heading: 0, speed: 850, throttle: 0.75 });
+  const me = createJet({ x: -50, z: 1200, y: 25912, heading: 0, speed: 850 });   // a little behind the slot
+  const intent = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+  const F = [0, 0, 0];
+  let maxAhead = -Infinity, d = Infinity;
+  for (let i = 0; i < 60 * 30; i++) {
+    d = escort(intent, me, lead, -1, true);   // boost held the whole time
+    step(me, intent); step(lead);
+    forwardOf(lead.q, F);
+    const ahead = (me.pos[0] - lead.pos[0]) * F[0] + (me.pos[2] - lead.pos[2]) * F[2];
+    maxAhead = Math.max(maxAhead, ahead);
+  }
+  assert.ok(maxAhead < 0, `never passed the leader (got ${Math.round(maxAhead)} m ahead)`);
+  assert.ok(d < 400, `holding the slot (off by ${Math.round(d)} m)`);
+});
+
+test('assist: stick held full back pulls a whole loop; let go and it comes out upright and level', () => {
+  const j = createJet({ y: 20000, heading: 0, speed: 900 });
+  const a = createAssist();
+  const it = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+  const up = [0, 0, 0];
+  let minUp = 1, minAlt = Infinity, maxAlt = 0;
+  for (let i = 0; i < 60 * 7; i++) {
+    step(j, a.update(it, j, 0, 1));
+    upOf(j.q, up); minUp = Math.min(minUp, up[1]);
+    minAlt = Math.min(minAlt, j.pos[1]); maxAlt = Math.max(maxAlt, j.pos[1]);
+  }
+  assert.ok(minUp < -0.9, `went over the top inverted (up.y reached ${minUp.toFixed(2)})`);
+  assert.ok(maxAlt - 20000 > 1000, 'climbed through the loop');
+  for (let i = 0; i < 60 * 8; i++) step(j, a.update(it, j, 0, 0));
+  upOf(j.q, up);
+  assert.ok(up[1] > 0.95, `upright after letting go (up.y ${up[1].toFixed(2)})`);
+  assert.ok(Math.abs(fwd(j)[1]) < 0.08, 'nose level after letting go');
+});
+
+test('assist: stick held full forward dives steeper than 60 degrees; the floor rounds it out', () => {
+  const j = createJet({ y: 20000, heading: 0, speed: 900 });
+  const a = createAssist();
+  const it = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+  let steepest = 0, low = Infinity;
+  for (let i = 0; i < 60 * 30; i++) { step(j, a.update(it, j, 0, -1)); steepest = Math.min(steepest, fwd(j)[1]); low = Math.min(low, j.pos[1]); }
+  assert.ok(Math.asin(-steepest) > Math.PI / 3, `dove at ${Math.round(Math.asin(-steepest) * 57.3)} degrees`);
+  assert.ok(low >= LIMITS.minAlt, 'never below the floor');
+  assert.ok(Math.abs(fwd(j)[1]) < 0.12, `skimming the floor, not grinding nose-down (fwd.y ${fwd(j)[1].toFixed(2)})`);
 });

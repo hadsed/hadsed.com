@@ -27,6 +27,14 @@
   #following { margin-top: 14px; }
   #unfollow { pointer-events: auto; font: inherit; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; margin-left: 10px; padding: 3px 8px; opacity: 0.75; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #labels span.on { opacity: 1; }
+  /* Hangs below the top-left items without widening them: on narrow phones a 60vw-wide #tl ran
+     under the count at top right. */
+  #log { position: absolute; left: 0; top: 100%; width: min(60vw, 360px); margin-top: 14px; font-size: 10px; line-height: 1.7; }
+  .logline { opacity: 0; transform: translateY(-4px); transition: opacity .35s ease, transform .35s ease; color: var(--dim); }
+  .logline::before { content: '› '; color: var(--gold); }
+  .logline.on { opacity: 1; transform: none; }
+  .logline.held { color: var(--gold); }
+  #labels span.hover { opacity: 1; border: 1px solid var(--gold); border-radius: 3px; padding: 2px 6px; background: rgba(10, 12, 18, 0.55); }
   #reticle { position: fixed; left: -11px; top: -11px; width: 20px; height: 20px; border: 1.5px solid var(--gold); border-radius: 50%; pointer-events: none; display: none; opacity: 0.85; }
   #reticle::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px; background: var(--gold); border-radius: 50%; }
   #boost { position: fixed; right: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 44px); font: inherit; letter-spacing: inherit; text-transform: uppercase; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; padding: 10px 14px; opacity: 0.6; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -49,7 +57,7 @@
 <div id="labels"></div>
 <div id="stick"></div>
 <!-- Top left is only who you are. #status stays for tests and the no-WebGL notice. -->
-<div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div id="following" hidden><span id="followText"></span><button id="unfollow" title="Stop following (X)">stop following</button></div><div class="dim" id="status" hidden>loading</div></div>
+<div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div id="following" hidden><span id="followText"></span><button id="unfollow" title="Stop following (X)">stop following</button></div><div class="dim" id="status" hidden>loading</div><div id="log" aria-live="polite"></div></div>
 <div class="hud" id="tr"><div id="aloft"></div></div>
 <div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
 <!-- Model credit lives in the page source, not on screen; main.js fills it from the jet asset. -->

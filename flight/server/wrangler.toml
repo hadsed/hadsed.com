@@ -16,3 +16,17 @@ class_name = "FlightRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["FlightRoom"]
+
+# Production room server for hadsed.com, deployed from main only (wrangler deploy --env production).
+# Its own Worker and rooms, so pushes to preview branches never redeploy what production flies on.
+[env.production]
+name = "hadsed-flight-prod"
+
+[env.production.vars]
+FLIGHT_ENABLED = "1"
+MAX_INSTANCES = "20"
+ROOM_CAPACITY = "200"
+
+[[env.production.durable_objects.bindings]]
+name = "ROOMS"
+class_name = "FlightRoom"
