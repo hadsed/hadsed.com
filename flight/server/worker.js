@@ -53,17 +53,32 @@ export class FlightRoom extends DurableObject {
     // Newer compatibility dates deliver binary frames as Blob; room.js wants ArrayBuffer.
     server.binaryType = 'arraybuffer';
     server.accept();
-    const seat = this.room.join({
+    const conn = {
       send: (d) => { try { server.send(d); } catch {} },
       close: (code, why) => { try { server.close(code, why); } catch {} },
       ip: req.headers.get('CF-Connecting-IP') || '',
-    });
+    };
+    // ?watch=1: the site backdrop looking at the sky before anyone presses Fly.
+    const watching = new URL(req.url).searchParams.get('watch') === '1';
+    let seat = watching ? this.room.watch(conn) : this.room.join(conn);
     if (!seat) {
       server.close(4001, 'full');
       return new Response('full', { status: 503 });
     }
     server.addEventListener('message', (e) => {
-      if (typeof e.data !== 'string') this.room.receive(seat.id, e.data);
+      if (typeof e.data !== 'string') { this.room.receive(seat.id, e.data); return; }
+      // Pressed Fly: the watcher becomes a seat on the same socket. A full room
+      // closes it, and the client dials again as a normal player.
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.t === 'join' && typeof seat.id === 'string') {
+        const s = this.room.upgrade(seat.id);
+        if (s) seat = s; else conn.close(4001, 'full');
+      }
+      // Back to the site: keep watching on the same socket.
+      if (m.t === 'watch' && typeof seat.id === 'number') {
+        const w = this.room.downgrade(seat.id);
+        if (w) seat = w;
+      }
     });
     const gone = () => { this.room.leave(seat.id); this.idle(); };
     server.addEventListener('close', gone);
@@ -72,7 +87,7 @@ export class FlightRoom extends DurableObject {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  // Tick only while someone is flying; an empty room does no work.
+  // Tick only while someone is flying or watching; an empty room does no work.
   start() {
     if (this.timer) return;
     let last = Date.now();
@@ -85,6 +100,6 @@ export class FlightRoom extends DurableObject {
   }
 
   idle() {
-    if (this.room.humans === 0 && this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this.room.present === 0 && this.timer) { clearInterval(this.timer); this.timer = null; }
   }
 }
