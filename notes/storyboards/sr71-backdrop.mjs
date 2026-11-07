@@ -4,8 +4,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
-import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS, DAY_LOOK, NIGHT_LOOK } from './world/index.js';
-const STORE = 'sr71-backdrop-v6';   // v6: night flight (stars, afterglow, city lights)
+import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
+import { Pane } from './vendor/tweakpane.min.js';
+const STORE = 'sr71-backdrop-v9';   // v9: stars, Tweakpane panel, no night experiment
 
 // ---------- settings ----------
 const PRESETS = {
@@ -29,9 +30,8 @@ const STYLES = {
 };
 // Defaults = the look Had landed on 2026-11-05 (iPad), with altitude at the SR-71's ~85k ft ceiling.
 // The look itself (tone, scene, ground) lives in the shared world module, so the flight lab matches.
-const TIMES = { night: NIGHT_LOOK, day: DAY_LOOK };
 const DEFAULTS = {
-  preset: 'site', ...WORLD_DEFAULTS, ...NIGHT_LOOK, style: 'navycolor', time: 'night',
+  preset: 'site', ...WORLD_DEFAULTS, style: 'navycolor',
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -178,9 +178,6 @@ function apply() {
   world.setLook(S);
   post.setLook(S);
   sunLight.position.copy(sunDir).multiplyScalar(100);
-  // at night the jet is a dark shape against the stars: a little moonlight and sky, no sun
-  const night = +S.night || 0;
-  sunLight.intensity = 3.2 * (1 - night); hemi.intensity = 2.0 * (1 - 0.82 * night); bounce.intensity = 0.6 * (1 - 0.7 * night);
   const altitude = S.altitudeFt * 0.3048;
   const reg = REGIONS[S.region];
   if (reg) origin.set((S.offsetX ?? reg.peakKm[0]) * 1000, altitude, (S.offsetZ ?? reg.peakKm[1]) * 1000);
@@ -308,7 +305,19 @@ frame.addEventListener('load', () => {
 // ---------- panel ----------
 const panel = document.getElementById('panel');
 const SPEC = [
-  ['Tone', [
+  ['Stars', true, [
+    ['stars', 'range', { label: 'Amount', min: 0, max: 3, step: 0.01 }],
+    ['starDensity', 'range', { label: 'Density', min: 0, max: 2, step: 0.01 }],
+    ['starBright', 'range', { label: 'Brightness', min: 0, max: 3, step: 0.01 }],
+    ['starSize', 'range', { label: 'Size', min: 0.4, max: 3, step: 0.01 }],
+    ['starScale', 'range', { label: 'Pattern scale', min: 0.3, max: 2.5, step: 0.01 }],
+    ['starSeed', 'range', { label: 'Reshuffle', min: 0, max: 50, step: 1 }],
+    ['starFade', 'range', { label: 'Horizon fade (°)', min: 0.5, max: 30, step: 0.5 }],
+    ['starColor', 'color', { label: 'Color' }],
+    ['starVar', 'range', { label: 'Color variety', min: 0, max: 1, step: 0.01 }],
+    ['starDark', 'range', { label: 'Dark sky needed', min: 0.01, max: 0.6, step: 0.005 }],
+  ]],
+  ['Tone', false, [
     ['preset', 'select', { options: [['site', 'Site navy + gold'], ['slate', 'Slate'], ['ash', 'Ash'], ['dusk', 'Dusk'], ['custom', 'Custom']] }],
     ['shadow', 'color', { label: 'Shadow' }],
     ['mid', 'color', { label: 'Mid (site navy)' }],
@@ -324,29 +333,19 @@ const SPEC = [
     ['vignette', 'range', { label: 'Vignette', min: 0, max: 1.2, step: 0.01 }],
     ['grain', 'range', { label: 'Grain', min: 0, max: 0.08, step: 0.001 }],
   ]],
-  ['Night', [
-    ['time', 'select', { label: 'Time of day', options: [['night', 'Night flight'], ['day', 'Day']] }],
-    ['night', 'range', { label: 'Night', min: 0, max: 1, step: 0.01 }],
-    ['stars', 'range', { label: 'Stars', min: 0, max: 3, step: 0.01 }],
-    ['milky', 'range', { label: 'Milky Way', min: 0, max: 2, step: 0.01 }],
-    ['afterglow', 'range', { label: 'Afterglow at the horizon', min: 0, max: 3, step: 0.01 }],
-    ['city', 'range', { label: 'City lights', min: 0, max: 3, step: 0.01 }],
-    ['moonAz', 'range', { label: 'Moon direction (°)', min: 0, max: 360, step: 1 }],
-    ['moonEl', 'range', { label: 'Moon height (°)', min: 0, max: 80, step: 1 }],
-  ]],
-  ['Scene', [
+  ['Scene', false, [
     ['region', 'select', { label: 'Region', options: [['sierra', 'Sierra Nevada'], ['alps', 'Alps, Valais'], ['himalaya', 'Himalaya, Everest'], ['grandcanyon', 'Grand Canyon'], ['denali', 'Alaska Range, Denali']] }],
     ['altitudeFt', 'range', { label: 'Altitude (ft)', min: 20000, max: 85000, step: 500 }],
     ['exag', 'range', { label: 'Vertical exaggeration', min: 1, max: 5, step: 0.05 }],
     ['offsetX', 'range', { label: 'Jet position E–W (km)', min: -140, max: 140, step: 0.5 }],
     ['offsetZ', 'range', { label: 'Jet position N–S (km)', min: -140, max: 140, step: 0.5 }],
     ['sunAz', 'range', { label: 'Sun direction (°)', min: 0, max: 360, step: 1 }],
-    ['sunEl', 'range', { label: 'Sun height (°)', min: -18, max: 70, step: 0.5 }],
+    ['sunEl', 'range', { label: 'Sun height (°)', min: -4, max: 70, step: 0.5 }],
     ['haze', 'range', { label: 'Visibility (km)', min: 40, max: 600, step: 5 }],
     ['clouds', 'range', { label: 'Cloud cover', min: 0, max: 1, step: 0.01 }],
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
   ]],
-  ['Ground', [
+  ['Ground', false, [
     ['style', 'select', { label: 'Style', options: [['navycolor', 'Navy, with ground color'], ['navygrid', 'Navy grid (monotone)'], ['natural', 'Natural ground + grid'], ['grid', 'Terrain grid'], ['gridcontour', 'Grid + contours'], ['contour', 'Contours'], ['shaded', 'Shaded relief'], ['shadedgrid', 'Shaded + grid'], ['topo', 'Topo sheet (dark ink)'], ['topoglow', 'Topo, glowing lines']] }],
     ['color', 'range', { label: 'Natural color (forest, rock, snow)', min: 0, max: 1, step: 0.01 }],
     ['texture', 'range', { label: 'Ground texture', min: 0, max: 1, step: 0.01 }],
@@ -362,11 +361,11 @@ const SPEC = [
     ['slope', 'range', { label: 'Darken steep slopes', min: 0, max: 1, step: 0.01 }],
     ['lineGold', 'range', { label: 'Lines in highlight color', min: 0, max: 1, step: 0.01 }],
   ]],
-  ['Camera', [
+  ['Camera', false, [
     ['drift', 'check', { label: 'Slow drift' }],
     ['driftSpeed', 'range', { label: 'Drift speed', min: 0.02, max: 1.5, step: 0.01 }],
   ]],
-  ['Gestures on the site', [
+  ['Gestures on the site', false, [
     ['scrollPan', 'check', { label: '1. Page position pans' }],
     ['scrollDeg', 'range', { label: 'Orbit per screen (°)', min: 0, max: 45, step: 0.5 }],
     ['scrollTilt', 'range', { label: 'Tilt per screen (°)', min: 0, max: 5, step: 0.1 }],
@@ -377,7 +376,7 @@ const SPEC = [
     ['overscroll', 'check', { label: '4. Overscroll pans (rubber-band)' }],
     ['gestureLog', 'check', { label: 'Show event log (debug)' }],
   ]],
-  ['Website', [
+  ['Website', false, [
     ['site', 'check', { label: 'Show site on top' }],
     ['sitePath', 'select', { label: 'Page', options: [['/', 'About'], ['/portfolio/', 'Portfolio'], ['/experience/', 'Experience'], ['/blog/', 'Blog']] }],
     ['siteOpacity', 'range', { label: 'Site opacity', min: 0, max: 1, step: 0.01 }],
@@ -385,54 +384,48 @@ const SPEC = [
     ['siteClick', 'check', { label: 'Clicks go to site' }],
   ]],
 ];
-const inputs = {};
+// The panel edits P, a copy of S shaped for the controls; changes are copied back into S.
+const P = {};
+const OPEN = 'sr71-backdrop-folders';
+let openFolders = {};
+try { openFolders = JSON.parse(localStorage.getItem(OPEN) || '{}'); } catch {}
+let pane = null, syncing = false;
+function toP() {
+  for (const [, , rows] of SPEC) for (const [key] of rows) {
+    let v = S[key];
+    if ((key === 'offsetX' || key === 'offsetZ') && v == null) v = REGIONS[S.region]?.peakKm[key === 'offsetX' ? 0 : 1] ?? 0;
+    P[key] = v;
+  }
+}
 function build() {
-  const body = panel.querySelector('.panel-body');
-  for (const [title, rows] of SPEC) {
-    const fs = document.createElement('fieldset');
-    fs.innerHTML = `<legend>${title}</legend>`;
+  toP();
+  pane = new Pane({ container: panel.querySelector('.panel-body') });
+  for (const [title, expanded, rows] of SPEC) {
+    const f = pane.addFolder({ title, expanded: openFolders[title] ?? expanded });
+    f.on('fold', (e) => { openFolders[title] = e.expanded; try { localStorage.setItem(OPEN, JSON.stringify(openFolders)); } catch {} });
     for (const [key, type, o] of rows) {
-      const row = document.createElement('label');
-      row.className = 'row ' + type;
-      const name = document.createElement('span'); name.textContent = o.label || ({ preset: 'Palette' })[key] || key;
-      let input;
-      if (type === 'select') {
-        input = document.createElement('select');
-        for (const [v, t] of o.options) input.add(new Option(t, v));
-      } else {
-        input = document.createElement('input');
-        input.type = type === 'check' ? 'checkbox' : type;
-        if (type === 'range') Object.assign(input, { min: o.min, max: o.max, step: o.step });
-      }
-      const out = document.createElement('output');
-      row.append(name, input);
-      if (type === 'range') row.append(out);
-      input.addEventListener('input', () => {
-        const v = type === 'check' ? input.checked : type === 'range' ? +input.value : input.value;
+      const opts = { label: o.label || ({ preset: 'Palette' })[key] || key };
+      if (type === 'range') Object.assign(opts, { min: o.min, max: o.max, step: o.step });
+      if (type === 'select') opts.options = Object.fromEntries(o.options.map(([v, t]) => [t, v]));
+      if (type === 'color') opts.view = 'color';
+      f.addBinding(P, key, opts).on('change', (e) => {
+        if (syncing) return;
+        const v = e.value;
         S[key] = v;
         if (key === 'preset' && PRESETS[v]) Object.assign(S, PRESETS[v]);
         if (key === 'style' && STYLES[v]) Object.assign(S, STYLES[v]);
-        if (key === 'time' && TIMES[v]) Object.assign(S, TIMES[v]);
         if (key === 'region') { S.offsetX = null; S.offsetZ = null; }
-        if (['shadow', 'mid', 'light', 'highlight'].includes(key)) S.preset = 'custom';
+        if (['shadow', 'mid', 'light', 'highlight'].includes(key) && S.preset !== 'custom') S.preset = 'custom';
         sync(); apply();
       });
-      inputs[key] = { input, out, type };
-      fs.append(row);
     }
-    body.append(fs);
   }
 }
 function sync() {
-  for (const [key, { input, out, type }] of Object.entries(inputs)) {
-    let val = S[key];
-    if ((key === 'offsetX' || key === 'offsetZ') && val == null) val = REGIONS[S.region]?.peakKm[key === 'offsetX' ? 0 : 1] ?? 0;
-    if (type === 'check') input.checked = !!val;
-    else input.value = val;
-    if (out) out.textContent = Number(val).toLocaleString(undefined, { maximumFractionDigits: 3 });
-  }
-  const custom = inputs.preset.input.querySelector('option[value="custom"]');
-  custom.hidden = S.preset !== 'custom';
+  if (!pane) return;
+  toP();
+  syncing = true;
+  try { pane.refresh(); } finally { syncing = false; }
 }
 build(); sync();
 

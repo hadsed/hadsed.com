@@ -33,13 +33,10 @@ export const WORLD_DEFAULTS = {
   grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   color: 1, texture: 1,
-  // 2026-11-06 night flight (Had's refs: a night sky full of fine stars over a thin orange afterglow at the
-  // horizon, dark ground with city lights). Off by default while it's tuned in the lab: NIGHT_LOOK turns it on.
-  night: 0, stars: 1, afterglow: 1, milky: 0.45, city: 1, moonAz: 200, moonEl: 32,
+  // Stars over the dark upper sky (2026-11-07: Had's pick, the quiet set). stars 0 turns them off.
+  stars: 1, starDensity: 0.2, starBright: 0.8, starSize: 1, starScale: 1, starSeed: 0, starFade: 6, starColor: '#f2eee6', starVar: 0.3, starDark: 0.16,
 };
-// The daytime look, for presets: the sun up at 18 degrees, no stars.
-export const DAY_LOOK = { night: 0, sunEl: 18, sunAz: 41, exposure: 1.12 };
-export const NIGHT_LOOK = { night: 1, sunEl: -5, sunAz: 245, stars: 1, afterglow: 1, milky: 0.45, city: 1, exposure: 2.2 };
+const STAR_KEYS = ['stars', 'starDensity', 'starBright', 'starSize', 'starScale', 'starSeed', 'starFade', 'starVar', 'starDark'];
 
 const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
 
@@ -93,55 +90,39 @@ vec4 finishSky(vec3 c){
   return vec4(mix(naturalInv(toned) / uExposure, grey, uMono), 0.0);
 }`;
 
-// The night sky's own light, worked out per pixel from the view direction d (el: radians above the
-// visible horizon; base: the sky color behind). Stars are points on a few hashed 3D grids, drawn as
-// a soft dot about a pixel and a half across whatever the lens, so they stay crisp at any field of view
-// and don't shimmer as the camera drifts. A faint Milky Way band, and the afterglow: a thin orange
-// seam right on the horizon, strongest toward the sun, with a cool grey-blue glow just above it.
+// Stars, worked out per pixel from the view direction d (el: radians above the visible horizon; base:
+// the sky color behind). Each star is a point on a few hashed 3D grids, drawn as a soft dot about a pixel
+// and a half across whatever the lens, so stars stay crisp at any field of view and don't shimmer as the
+// camera drifts. They live in the dark: they fade out toward the bright band at the horizon.
 export const STARS = /* glsl */`
-uniform float uStars, uAfterglow, uMilky;
+uniform float uStars, uStarDensity, uStarBright, uStarSize, uStarScale, uStarSeed, uStarFade, uStarVar, uStarDark;
+uniform vec3 uStarColor;
 vec3 shash3(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
 float starLayer(vec3 d, float n, float keep, float pix, out vec3 tint){
-  vec3 g = d * n, id = floor(g), r = shash3(id);
+  n *= uStarScale; keep *= uStarDensity;
+  vec3 g = d * n, id = floor(g), r = shash3(id + uStarSeed * 13.7);
   tint = vec3(0.0);
   // a grid finer than a few pixels would read as noise: fade the layer out as its cells shrink on screen
   float fit = 1.0 - smoothstep(0.12, 0.3, pix * n);
   if (r.x > keep || fit <= 0.0) return 0.0;
-  vec3 s = normalize(id + 0.2 + 0.6 * shash3(id + 17.0)) ;
+  vec3 s = normalize(id + 0.2 + 0.6 * shash3(id + 17.0 + uStarSeed * 13.7));
   float a = length(d - s);                              // radians, near enough at these sizes
-  float sig = pix * 0.75;
+  float sig = pix * 0.75 * uStarSize;
   float b = pow(r.y, 5.0) * 1.6 + 0.08;                 // most faint, a few bright
-  tint = mix(vec3(0.70, 0.80, 1.0), vec3(1.0, 0.86, 0.70), r.z);
-  return b * fit * exp(-a * a / (2.0 * sig * sig));
+  tint = uStarColor * mix(vec3(1.0), mix(vec3(0.70, 0.80, 1.0), vec3(1.0, 0.82, 0.62), r.z), uStarVar);
+  return uStarBright * b * fit * exp(-a * a / (2.0 * sig * sig));
 }
-vec3 nightSky(vec3 d, float el, vec3 base){
-  vec3 e = vec3(0.0);
+vec3 starSky(vec3 d, float el, vec3 base){
   float pix = max(length(fwidth(d)), 2e-5);
-  // stars live in the dark: none in the bright band at the horizon, and they thin out where the sky is lit
-  float dark = 1.0 - smoothstep(0.004, 0.03, dot(base, vec3(0.2126, 0.7152, 0.0722)));
-  float up = smoothstep(0.012, 0.09, el);
-  if (uStars > 0.0 && up > 0.0) {
-    // the Milky Way: a soft band on a tilted great circle, more stars inside it
-    vec3 ax = normalize(vec3(0.42, 0.55, -0.72));
-    float band = exp(-pow(dot(d, ax), 2.0) / 0.035);
-    float lane = vnoise(vec2(dot(d, vec3(0.8, 0.1, 0.6)), dot(d, vec3(-0.2, 0.9, 0.3))) * 9.0) * 0.6
-               + vnoise(vec2(dot(d, vec3(0.3, -0.7, 0.6)), dot(d, vec3(0.9, 0.2, -0.4))) * 23.0) * 0.4;
-    e += vec3(0.020, 0.022, 0.030) * band * smoothstep(0.25, 0.85, lane) * uMilky;
-    vec3 t; float s;
-    s = starLayer(d, 70.0, 0.55, pix, t);   e += t * s * 3.2;
-    s = starLayer(d, 160.0, 0.6 + 0.35 * band * uMilky, pix, t); e += t * s * 1.6;
-    s = starLayer(d, 330.0, 0.5 + 0.45 * band * uMilky, pix, t); e += t * s * 0.8;
-    e *= uStars * up * dark;
-  }
-  if (uAfterglow > 0.0) {
-    vec2 h = normalize(d.xz + 1e-6), sh = normalize(uSun.xz + 1e-6);
-    float toward = smoothstep(-0.6, 1.0, dot(h, sh));
-    float x = max(el, 0.0);
-    float seam = exp(-x / 0.008) * smoothstep(-0.02, 0.0, el);
-    e += vec3(1.0, 0.5, 0.16) * seam * (0.2 + 1.8 * toward) * 0.8 * uAfterglow;
-    e += vec3(0.10, 0.12, 0.15) * exp(-x / 0.045) * smoothstep(-0.01, 0.0, el) * (0.5 + 0.8 * toward) * uAfterglow;
-  }
-  return e;
+  float dark = 1.0 - smoothstep(uStarDark * 0.12, uStarDark, dot(base, vec3(0.2126, 0.7152, 0.0722)));
+  float fade = radians(max(uStarFade, 0.05));
+  float up = smoothstep(fade * 0.15, fade, el) * dark;
+  if (up <= 0.0) return vec3(0.0);
+  vec3 e = vec3(0.0), t; float s;
+  s = starLayer(d, 70.0, 0.55, pix, t);  e += t * s * 3.2;
+  s = starLayer(d, 160.0, 0.6, pix, t);  e += t * s * 1.6;
+  s = starLayer(d, 330.0, 0.5, pix, t);  e += t * s * 0.8;
+  return e * uStars * up;
 }`;
 
 const LINES = /* glsl */`
@@ -251,7 +232,7 @@ function buildHeightMips(tex) {
 }
 
 // lite: a CPU rasterizer (SwiftShader, llvmpipe) runs every branch of a shader whatever the uniforms say,
-// so the night sky, city lights and per-pixel relief are compiled out there.
+// so the stars and per-pixel relief are compiled out there.
 export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = false } = {}) {
   const defines = lite ? { WORLD_LITE: '' } : {};
   const sunDir = new THREE.Vector3(0, 1, 0);
@@ -263,7 +244,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uLight: { value: col(WORLD_DEFAULTS.light) }, uHigh: { value: col(WORLD_DEFAULTS.highlight) },
     uMidPoint: { value: 0.56 }, uHlStart: { value: 0.61 }, uHlAmount: { value: 0.85 },
     uMono: { value: 1 }, uExposure: { value: 1.12 }, uContrast: { value: 1.13 }, uDirect: { value: 0 }, uChroma: { value: 0.6 },
-    uNight: { value: 0 }, uStars: { value: 1 }, uAfterglow: { value: 1 }, uMilky: { value: 0.45 }, uMoon: { value: new THREE.Vector3(0, 1, 0) },
+    ...Object.fromEntries(STAR_KEYS.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: +WORLD_DEFAULTS[k] }])),
+    uStarColor: { value: col(WORLD_DEFAULTS.starColor) },
   };
 
   // ---- sky: thin bright air at the horizon, near-space navy overhead, a sun and the limb ----
@@ -275,26 +257,26 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     new THREE.ShaderMaterial({ defines,
       side: THREE.DoubleSide, depthWrite: false, depthTest: false, uniforms: U,
       vertexShader: /* glsl */`
-        uniform vec3 uSun, uHaze; uniform float uDip, uSkyK, uNight;
+        uniform vec3 uSun, uHaze; uniform float uDip, uSkyK;
         varying vec3 vDir; varying vec4 vSky; varying vec3 vBase;
         ${TONE}
         void main(){
           vec3 d = normalize(position); vDir = d;
           float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;       // angle above the true horizon
-          vec3 zenith = mix(vec3(0.010, 0.020, 0.055), vec3(0.0025, 0.0035, 0.008), uNight);   // near-space dark blue; at night near black
-          vec3 haze = mix(uHaze, vec3(0.020, 0.026, 0.040), uNight);
+          vec3 zenith = vec3(0.010, 0.020, 0.055);   // near-space dark blue
+          vec3 haze = uHaze;
           // high up most of the air is below you: a thin bright band at the horizon, navy by ~20 degrees up.
           // Lower down (uSkyK smaller) the bright band widens.
           vec3 c = mix(haze, zenith, 1.0 - exp(-max(el, 0.0) * uSkyK));
-          c += vec3(0.30) * (1.0 - 0.85 * uNight) * exp(-abs(el) * 70.0);   // bright limb on the horizon
-          c += vec3(0.35) * (1.0 - uNight) * pow(max(dot(d, uSun), 0.0), 12.0); // glow around the sun
+          c += vec3(0.30) * exp(-abs(el) * 70.0);   // bright limb on the horizon
+          c += vec3(0.35) * pow(max(dot(d, uSun), 0.0), 12.0); // glow around the sun
           c = mix(c, haze * 0.9, smoothstep(0.0, -0.03, el));
           vBase = c;
           vSky = finishSky(c);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */`
-        uniform float uNight, uDip; uniform vec3 uSun;
+        uniform float uDip; uniform vec3 uSun;
         varying vec3 vDir; varying vec4 vSky; varying vec3 vBase;
         ${NOISE}
         ${TONE}
@@ -303,17 +285,16 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         #endif
         void main(){
           vec3 d = normalize(vDir);
-          float disk = pow(max(dot(d, uSun), 0.0), 2500.0) * (1.0 - uNight);
-          // Night: light of its own (stars, the afterglow seam), added on top of the toned sky. Through the
-          // monotone it turns to the palette's light and gold; in natural color it keeps its orange.
+          float disk = pow(max(dot(d, uSun), 0.0), 2500.0);
+          // Stars: light of their own, added on top of the toned sky.
           vec3 e = vec3(0.0);
           #ifndef WORLD_LITE
-          if (uNight > 0.0) e = nightSky(d, asin(clamp(d.y, -1.0, 1.0)) + uDip, vBase) * uNight;
+          if (uStars > 0.0) e = starSky(d, asin(clamp(d.y, -1.0, 1.0)) + uDip, vBase);
           #endif
           if (uDirect > 0.5) {
             vec3 sky = vSky.rgb;
             #ifndef WORLD_LITE
-            if (uNight > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(vBase + e, 0.0) - display(vBase, 0.0), 0.0), vec3(1.0 / 2.2));
+            if (uStars > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(vBase + e, 0.0) - display(vBase, 0.0), 0.0), vec3(1.0 / 2.2));
             #endif
             // the disk is far past white: in the post pass the tone turns it to highlight; direct, draw that
             gl_FragColor = vec4(mix(sky, pow(uHigh, vec3(1.0 / 2.2)), min(disk * 3.0, 1.0)), 1.0);
@@ -332,7 +313,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uGrid: { value: 1 }, uGridSize: { value: 250 }, uContour: { value: 0 }, uContourStep: { value: 175 },
     uShade: { value: 0.35 }, uLineBright: { value: 0.6 }, uLineGold: { value: 0 },
     uTint: { value: 0 }, uTintContrast: { value: 1 }, uTintPivot: { value: 0.5 }, uSlope: { value: 0 },
-    uColor: { value: 1 }, uTexture: { value: 1 }, uCity: { value: 1 },
+    uColor: { value: 1 }, uTexture: { value: 1 },
     uFiltered: { value: 0 }, uMaxLod: { value: 0 }, uPixelRelief: { value: 1 },
     uSlide: { value: new THREE.Vector2() }, uCell: { value: cell }, uLodBias: { value: 0.5 },
   };
@@ -401,8 +382,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       fragmentShader: /* glsl */`
         #include <logdepthbuf_pars_fragment>
         uniform vec3 uSun, uHaze; uniform float uHazeDist, uMaxH, uGrid, uGridSize, uContour, uContourStep, uShade, uLineBright, uLineGold;
-        uniform float uTint, uTintContrast, uTintPivot, uSlope, uColor, uTexture, uSnowM, uArid, uNight, uCity;
-        uniform vec3 uMoon, uCam, uOrigin; uniform float uAfterglow;
+        uniform float uTint, uTintContrast, uTintPivot, uSlope, uColor, uTexture, uSnowM, uArid;
+        uniform vec3 uCam, uOrigin;
         varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
         uniform sampler2D uHeight; uniform float uWidth, uTexel, uFiltered, uMaxLod, uExag, uPixelRelief;
         float H;   // height here: per vertex, or per pixel from the filtered heightmap
@@ -432,41 +413,10 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           c = mix(c, vec3(0.34, 0.36, 0.40), snow);
           c = mix(c, vec3(0.012, 0.025, 0.045), smoothstep(3.0, 0.5, H));   // sea and lakes at sea level
           c *= mix(1.0, (0.72 + 0.56 * fine) * (0.82 + 0.36 * broad), uTexture);
-          vec3 skyFill = vec3(0.30, 0.36, 0.48) * (1.0 - 0.85 * uNight);
-          vec3 key = mix(vec3(1.0, 0.95, 0.86), vec3(0.62, 0.72, 1.0), uNight);   // sun, or a cool moon
+          vec3 skyFill = vec3(0.30, 0.36, 0.48);
+          vec3 key = vec3(1.0, 0.95, 0.86);
           return c * (skyFill * (0.35 + 0.35 * n.y) + key * 2.2 * lit);
         }
-        #ifndef WORLD_LITE
-        // Night: warm city lights on low, flat ground. Up close each light is a dot about a pixel across;
-        // once the dots get smaller than a pixel they fade into the glow they average to, so distant towns
-        // read as soft patches and nothing sparkles as the camera drifts.
-        vec3 cityLights(vec3 n){
-          float low = smoothstep(1600.0, 500.0, H) * smoothstep(2.5, 6.0, H) * smoothstep(0.94, 0.985, n.y);
-          if (low <= 0.0) return vec3(0.0);
-          float pm = max(length(fwidth(vXZ)), 1.0);                     // meters per pixel here
-          float town = fbm(vXZ / 22000.0 + 9.1, 3);
-          float urban = smoothstep(0.5, 0.68, town);
-          float density = 0.03 + 0.7 * urban;
-          const float CELL = 160.0;
-          float l = urban * 0.012;
-          // two scales: street lights up close, and brighter clusters (town centers, junctions) that
-          // still read as points from far away
-          for (int k = 0; k < 2; k++) {
-            float cell = k == 0 ? CELL : CELL * 6.0, size = k == 0 ? 9.0 : 30.0, gain = k == 0 ? 1.0 : 2.2;
-            float dens = k == 0 ? density : 0.02 + 0.55 * urban;
-            vec2 id = floor(vXZ / cell) + float(k) * 91.7;
-            float r = whash(id), r2 = whash(id + 7.31), r3 = whash(id + 3.17);
-            float sig = max(pm * 0.6, size);
-            vec2 pt = (floor(vXZ / cell) + 0.15 + 0.7 * vec2(r2, r3)) * cell;
-            float dist = length(vXZ - pt);
-            float dots = step(r, dens) * exp(-dist * dist / (2.0 * sig * sig)) * (0.35 + 1.3 * r3) * min(1.0, size * size / (sig * sig) * 2.5);
-            float avg = dens * 0.95 * 6.2832 * size * size / (cell * cell);   // what the dots average to
-            float far = smoothstep(0.7 * cell, 1.6 * cell, pm);
-            l += mix(dots, avg * 2.5, far) * gain;
-          }
-          return vec3(1.0, 0.60, 0.28) * l * low * 3.0;
-        }
-        #endif
         void main(){
           #include <logdepthbuf_fragment>
           vec3 n = normalize(vN);
@@ -487,7 +437,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           float grid = max(lines2(vXZ / uGridSize) * 0.55, lines2(vXZ / (uGridSize * 5.0)));
           float contour = max(lines1(H / uContourStep) * 0.55, lines1(H / (uContourStep * 5.0)));
           float ink = clamp(grid * uGrid + contour * uContour, 0.0, 1.0);
-          float lit = mix(clamp(dot(n, uSun), 0.0, 1.0), clamp(dot(n, uMoon), 0.0, 1.0) * 0.16, uNight);
+          float lit = clamp(dot(n, uSun), 0.0, 1.0);
           float rise = clamp(H / uMaxH, 0.0, 1.0);
           // the drafted look: dark sheet, optional relief and height tint
           vec3 shaded = vec3(0.10, 0.11, 0.12) * (0.25 + 1.6 * lit) * (0.7 + 0.6 * rise);
@@ -499,22 +449,10 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           if (uColor > 0.0) c = mix(c, ground(n, lit), uColor);
           c *= 1.0 - uSlope * smoothstep(0.25, 0.8, 1.0 - n.y);   // steep faces darken, like hachures
           // lines are ink of a set brightness: low values give dark ink, high values glow
-          c = mix(c, vec3(uLineBright) * (0.75 + 0.5 * rise) * (1.0 - 0.72 * uNight), ink * (1.0 - 0.45 * uColor * (1.0 - uMono)));
+          c = mix(c, vec3(uLineBright) * (0.75 + 0.5 * rise), ink * (1.0 - 0.45 * uColor * (1.0 - uMono)));
           float fog = 1.0 - exp(-vDist / uHazeDist);
           vec3 haze = mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono);
-          vec3 nightHaze = vec3(0.020, 0.026, 0.040);
-          #ifndef WORLD_LITE
-          if (uNight > 0.0) {   // the far ground near the horizon catches the afterglow, warmest toward the sun
-            vec2 look = normalize(vXZ - uCam.xz - uOrigin.xz + 1e-3);
-            float toward = smoothstep(-0.6, 1.0, dot(look, normalize(uSun.xz + 1e-6)));
-            nightHaze += vec3(0.30, 0.11, 0.035) * pow(fog, 40.0) * toward * uAfterglow;
-          }
-          #endif
-          haze = mix(haze, nightHaze, uNight);
           c = mix(c, haze * mix(1.0, 0.8, uColor), fog * fog * 0.9 + fog * 0.1);
-          #ifndef WORLD_LITE
-          if (uNight > 0.0 && uCity > 0.0) c += cityLights(n) * uCity * uNight * (1.0 - 0.7 * fog);
-          #endif
           gl_FragColor = finish(c, ink * uLineGold * (1.0 - fog));   // gold mask: lines the tone may turn gold
         }`,
     }),
@@ -545,7 +483,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         }`,
       fragmentShader: /* glsl */`
         #include <logdepthbuf_pars_fragment>
-        uniform vec3 uHaze; uniform float uHazeDist, uCover, uNight; varying vec2 vXZ; varying float vDist;
+        uniform vec3 uHaze; uniform float uHazeDist, uCover; varying vec2 vXZ; varying float vDist;
         ${NOISE}
         ${TONE}
         void main(){
@@ -555,8 +493,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           float puff = fbm(q + vec2(fbm(q * 0.5, 3)) * 1.5, 6);
           float a = smoothstep(0.86 - uCover * 0.4, 1.0 - uCover * 0.35, puff + (field - 0.5) * 0.7);
           float fog = 1.0 - exp(-vDist / (uHazeDist * 1.1));
-          vec3 top = mix(vec3(0.80, 0.82, 0.85), vec3(0.075, 0.095, 0.14), uNight) * (0.7 + 0.4 * puff);   // sunlit, or moonlit
-          vec3 haze = mix(mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono), vec3(0.020, 0.026, 0.040), uNight);
+          vec3 top = vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff);
+          vec3 haze = mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono);
           vec3 c = mix(top, haze, fog);
           gl_FragColor = vec4(finish(c, 0.0).rgb, a * 0.9 * (1.0 - fog * 0.6) * step(0.001, uCover));
         }`,
@@ -584,10 +522,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       TU.uExag.value = +look.exag;
       const az = THREE.MathUtils.degToRad(look.sunAz), el = THREE.MathUtils.degToRad(look.sunEl);
       sunDir.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize();
-      const maz = THREE.MathUtils.degToRad(look.moonAz ?? 200), mel = THREE.MathUtils.degToRad(look.moonEl ?? 32);
-      U.uMoon.value.set(Math.sin(maz) * Math.cos(mel), Math.sin(mel), Math.cos(maz) * Math.cos(mel)).normalize();
-      for (const k of ['night', 'stars', 'afterglow', 'milky']) U[uName(k)].value = +(look[k] ?? 0);
-      TU.uCity.value = +(look.city ?? 0);
+      for (const k of STAR_KEYS) U[uName(k)].value = +(look[k] ?? 0);
+      if (look.starColor) U.uStarColor.value.copy(col(look.starColor));
       U.uHazeDist.value = look.haze * 1000;
       U.uCover.value = +look.clouds;
       if (look.cloudM) cloudM = +look.cloudM;
