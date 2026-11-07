@@ -521,7 +521,9 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     const el = Math.asin(sunDir.y), past = Math.max(0, -dip + 0.004 - el);
     const g = new THREE.Vector3().copy(sunDir); g.y = 0; g.normalize().multiplyScalar(Math.cos(-dip + 0.004)); g.y = Math.sin(-dip + 0.004);
     sunTransmittance(alt, U.uSunG.value, past > 0 ? g : sunDir);
-    U.uSunG.value.multiplyScalar(Math.max(0, 1 - past / 0.06));
+    // and only near the horizon: a high sun at altitude sits in a near-black sky (U-2 and balloon photos)
+    const above = el + dip, high = Math.min(Math.max((above - 0.05) / 0.12, 0), 1);
+    U.uSunG.value.multiplyScalar(Math.max(0, 1 - past / 0.06) * (1 - high * high * (3 - 2 * high)));
     const prev = renderer.getRenderTarget();
     renderer.setRenderTarget(lutRT); renderer.render(lutScene, lutCam); renderer.setRenderTarget(prev);
   }
