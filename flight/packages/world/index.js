@@ -38,17 +38,29 @@ export const WORLD_DEFAULTS = {
   stars: 1.17, starDensity: 0.22, starBright: 1.11, starSize: 0.6, starScale: 1.26, starSeed: 0, starFade: 12, starFall: 2.5, starGlow: 0.5,
   starColor: '#f2eee6', starVar: 0.3, starDark: 0.395,
 };
-// Sky candidates (lab): 0 the current sky, 1 its tone ramp with a rounded corner, 2 a layered art-directed
-// gradient (colors as picked, sRGB), 3 physical single scattering.
+// Sky candidates (lab): 0 the current sky, 1 banded (painted bands matched to photos from altitude, keyed
+// to the sun's height), 3 physical single scattering. Both 1 and 3 also light and haze the ground to match.
 Object.assign(WORLD_DEFAULTS, {
-  skyMode: 0, skySoft: 0.12,
-  layTop: '#0e1420', layMid: '#27303f', layBottom: '#cdb98d', layMidEl: 2.5, layTopEl: 22,
-  layHaloColor: '#f3dca4', layHaloH: 0.5, layHalo: 0.5, laySunColor: '#ffe9b8', laySun: 0.25, laySunSize: 0.25,
-  physExp: 0.4, physColor: 0.7, physMie: 1, physOzone: 1, physSun: 20, physG: 0.76, physMulti: 1, physGlow: 2,
+  skyMode: 0, skySoft: 0.12, skyTrue: 1,
+  physExp: 0.4, physMie: 1, physOzone: 0.4, physSun: 20, physG: 0.76, physMulti: 1, physGlow: 2,
 });
-const SKY_NUM = ['skyMode', 'skySoft', 'layMidEl', 'layTopEl', 'layHaloH', 'layHalo', 'laySun', 'laySunSize', 'physExp', 'physColor', 'physMie', 'physOzone', 'physSun', 'physG', 'physMulti', 'physGlow'];
-const SKY_COL = ['layTop', 'layMid', 'layBottom', 'layHaloColor', 'laySunColor'];
-const srgb = (hex) => { const c = new THREE.Color(hex).convertLinearToSRGB(); return new THREE.Vector3(c.r, c.g, c.b); };   // as picked
+const SKY_NUM = ['skyMode', 'skySoft', 'skyTrue', 'physExp', 'physMie', 'physOzone', 'physSun', 'physG', 'physMulti', 'physGlow'];
+
+// The banded sky's keyframes, by the sun's height above the visible horizon (degrees; from 85,000 ft the
+// visible horizon is 5.2 degrees down). Colors are what photos from 60,000 to 100,000 ft show (sRGB), see
+// notes/storyboards: Z overhead, L the deep blue strip low down, B the bright band on the horizon, H the
+// haze over the far ground; the s versions are toward the sun, R the thin warm sliver right on the
+// horizon under it. Heights (degrees): Lh of the blue strip, Bh of the band, Rh of the sliver.
+export const SKY_BANDS = [
+  [-16, { Z: '#000000', L: '#011228', B: '#183a58', H: '#020509', Zs: '#000000', Ls: '#011228', Bs: '#183a58', R: '#000000', Hs: '#020509', sun: '#000000', glow: 0, Lh: 3, Bh: 0.6, Rh: 0.2, W: 2 }],
+  [-8, { Z: '#000000', L: '#011634', B: '#1c4262', H: '#03080e', Zs: '#000105', Ls: '#021c40', Bs: '#28537a', R: '#3a1206', Hs: '#060c14', sun: '#000000', glow: 0, Lh: 3.5, Bh: 0.6, Rh: 0.3, W: 2 }],
+  [-2.5, { Z: '#000106', L: '#021a36', B: '#2f5f84', H: '#08121c', Zs: '#000a1c', Ls: '#02508e', Bs: '#a8c4cc', R: '#c2481a', Hs: '#1e2a36', sun: '#000000', glow: 0, Lh: 4, Bh: 0.7, Rh: 0.3, W: 2 }],
+  [0.3, { Z: '#000814', L: '#06386a', B: '#5a90b8', H: '#0e2236', Zs: '#003858', Ls: '#12a0e0', Bs: '#f4f0d8', R: '#ff7a2a', Hs: '#1c3a58', sun: '#ffc87a', glow: 0.8, Lh: 7, Bh: 0.9, Rh: 0.25, W: 2 }],
+  [4, { Z: '#000205', L: '#0a4a8c', B: '#a0c8e0', H: '#7896ae', Zs: '#000a18', Ls: '#0a64a8', Bs: '#e8eee4', R: '#6a3a1c', Hs: '#a2b0b8', sun: '#fff0d8', glow: 0.15, Lh: 5, Bh: 0.8, Rh: 0.2, W: 2.5 }],
+  [12, { Z: '#000002', L: '#0b4f9a', B: '#b8d8ec', H: '#a0bfd4', Zs: '#000002', Ls: '#0b4f9a', Bs: '#b8d8ec', R: '#000000', Hs: '#a0bfd4', sun: '#ffffff', glow: 0, Lh: 5, Bh: 0.9, Rh: 0.2, W: 3 }],
+];
+const BAND_COLS = ['Z', 'L', 'B', 'H', 'Zs', 'Ls', 'Bs', 'R', 'Hs', 'sun'];
+const BAND_NUMS = ['glow', 'Lh', 'Bh', 'Rh', 'W'];
 const STAR_KEYS = ['stars', 'starDensity', 'starBright', 'starSize', 'starScale', 'starSeed', 'starFade', 'starFall', 'starGlow', 'starVar', 'starDark'];
 
 const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
@@ -171,7 +183,8 @@ vec3 skyPhysical(vec3 d){
     // multiple scattering, roughly: light already scattered around the sky, strongest where the sun is
     // just up or just down at this point, isotropic
     float sunUp = dot(normalize(p), uSun);
-    ms += view * (BR * h3.x + BM * h3.y) * smoothstep(-0.25, 0.25, sunUp) * vec3(0.9, 0.8, 1.0);
+    // (a little stronger around the terminator, where photos at altitude show a blue twilight above the band)
+    ms += view * (BR * h3.x + BM * h3.y) * smoothstep(-0.25, 0.25, sunUp) * (1.0 + 1.5 * (1.0 - smoothstep(0.0, 0.25, sunUp))) * vec3(0.9, 0.8, 1.0);
     if (raySphere(p, uSun, RE).x > 0.0) continue;   // in the earth's shadow
     float ls = raySphere(p, uSun, RA).y / float(M);
     vec3 odl = vec3(0.0);
@@ -180,6 +193,15 @@ vec3 skyPhysical(vec3 d){
     sumR += att * h3.x; sumM += att * h3.y;
   }
   return uPhysSun * (sumR * BR * pr + sumM * BM * pm + ms * uPhysMulti * 0.08);
+}`;
+
+// Three wavelengths of Rayleigh light shown as RGB come out violet; photos from altitude are cyan-blue.
+// A fixed camera-like grade matches them: less red and a little more green where the light is blue,
+// warm light (the sunset band, the sun) left alone.
+const GRADE = /* glsl */`
+vec3 physGrade(vec3 c){
+  float k = clamp(2.0 * (c.b - c.r) / max(c.b, 1e-6), 0.0, 1.0);
+  return c * mix(vec3(1.0), vec3(0.45, 1.3, 1.0), k);
 }`;
 
 // The sky's own color for a view direction (linear, before the tone): navy overhead, a thin bright band
@@ -198,12 +220,10 @@ vec3 skyBase(vec3 d){
   return mix(c, uHaze * 0.9, smoothstep(0.0, -0.03, el));
 }
 #ifndef WORLD_LITE
-// ---- three candidate skies for the lab (uSkyMode 1-3), compared against the one above (0) ----
-uniform float uSkyMode, uSkySoft;
-uniform vec3 uLayTop, uLayMid, uLayBottom, uLayHaloColor, uLaySunColor;
-uniform float uLayMidEl, uLayTopEl, uLayHaloH, uLayHalo, uLaySun, uLaySunSize;
-uniform float uPhysExp, uPhysColor;
-// 1. the same tone ramp with its corner at the mid point rounded off (width uSkySoft)
+// ---- candidate skies for the lab (uSkyMode 1 and 3), compared against the one above (0) ----
+uniform float uSkyMode, uSkySoft, uSkyTrue;
+uniform float uPhysExp;
+// the tone ramp with its corner at the mid point rounded off (width uSkySoft): the navy end of both
 vec3 rampSoft(vec3 c){
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   l = l / (1.0 + l);
@@ -213,22 +233,29 @@ vec3 rampSoft(vec3 c){
   vec3 hi = mix(uMid, uLight, clamp((l - uMidPoint) / (1.0 - uMidPoint), 0.0, 1.0));
   float k = smoothstep(uMidPoint - uSkySoft, uMidPoint + uSkySoft, l);
   vec3 r = mix(lo, hi, k);
-  // a softer start to the gold too
   float hl = smoothstep(uHlStart - uSkySoft, min(uHlStart + 0.18 + uSkySoft, 1.0), l) * uHlAmount;
   return mix(r, uHigh, hl);
 }
-vec3 toLin(vec3 c){ return pow(c, vec3(2.2)); }
-// 2. Firewatch-style: an art-directed gradient (bottom, middle, top colors), a horizon halo and a sun halo,
-// blended smoothly (smoothstep in linear light), shown as picked
-vec3 skyLayered(vec3 d, float el){
-  float e = max(el, 0.0);
-  float a = smoothstep(0.0, radians(uLayMidEl), e), b = smoothstep(radians(uLayMidEl) * 0.5, radians(uLayTopEl), e);
-  vec3 c = mix(mix(toLin(uLayBottom), toLin(uLayMid), a), toLin(uLayTop), b);
-  c += toLin(uLayHaloColor) * uLayHalo * exp(-e / radians(max(uLayHaloH, 0.02)));
-  float sd = max(dot(d, uSun), 0.0);
-  c += toLin(uLaySunColor) * uLaySun * pow(sd, 1.0 / max(uLaySunSize * uLaySunSize, 1e-4));
-  c = mix(c, toLin(uLayBottom) * 0.6, smoothstep(0.0, -0.03, el));   // below the horizon: haze over the ground
-  return c;
+// 1. banded: overhead, a deep blue strip, a bright band on the horizon and haze below it, painted as
+// smooth exponential bands (display colors, keyframed on the CPU by the sun's height). Toward the sun the
+// bands take their own colors, with a thin warm sliver right on the horizon at sunset.
+uniform vec3 uBZ, uBL, uBB, uBH, uBZs, uBLs, uBBs, uBR, uBHs, uBSun;
+uniform float uBGlow, uBLh, uBBh, uBRh, uBW;
+float sunSide(vec3 d){
+  vec2 sh = normalize(uSun.xz + 1e-6);
+  return pow(0.5 + 0.5 * dot(normalize(d.xz + 1e-6), sh), uBW);
+}
+vec3 skyBanded(vec3 d, float el){
+  float e = max(el, 0.0), w = sunSide(d);
+  float l = exp(-e / uBLh), b = exp(-e / uBBh);
+  vec3 away = mix(mix(uBZ, uBL, l), uBB, b);
+  vec3 toward = mix(mix(uBZs, uBLs, l), uBBs, b) + uBR * exp(-e / uBRh);
+  vec3 c = mix(away, toward, w);
+  // the glow around a low sun hugs the horizon: wider sideways than up
+  vec3 q = normalize(vec3(d.x, d.y * 3.0, d.z)), s = normalize(vec3(uSun.x, uSun.y * 3.0, uSun.z));
+  float mu = max(dot(q, s), 0.0);
+  c += uBSun * uBGlow * (0.12 * pow(mu, 30.0) + 0.5 * pow(mu, 300.0));
+  return mix(c, mix(uBH, uBHs, w), smoothstep(0.0, -0.004, el));   // below the horizon: haze over the ground
 }
 // 3. physical: looked up in the sky-view table (see PHYS), so per pixel it costs one texture read.
 // The table spans azimuth from the sun (0 to 180 degrees, mirrored) and elevation, squeezed toward the
@@ -252,14 +279,21 @@ vec3 naturalHue(vec3 c){
   col = mix(col, vec3(1.0), smoothstep(0.8, 1.0, t) * 0.5);
   return pow(col, vec3(0.85 * 2.2));
 }
-vec3 physTone(vec3 c){ return mix(rampSoft(c), naturalHue(c), uPhysColor); }
-uniform vec3 uSunT, uSunG; uniform float uPhysGlow;
+vec3 physTone(vec3 c){ return mix(rampSoft(c), naturalHue(c), uSkyTrue); }
+uniform vec3 uSunT, uSunG, uNightL, uNightB; uniform float uPhysGlow;
+${GRADE}
 vec3 sunTone(){ return physTone(uSunT * 30.0 * uPhysExp * uExposure); }   // the disk, colored by the air it crosses
 vec3 skyToned(vec3 d, out vec3 base){
   float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;
-  if (uSkyMode < 1.5) { base = skyBase(d); return rampSoft(base * uExposure); }
-  if (uSkyMode < 2.5) { vec3 t = skyLayered(d, el); base = naturalInv(t) / uExposure; return t; }
-  base = skyPhysLut(d) * uPhysExp;
+  if (uSkyMode < 2.5) {
+    vec3 t = skyBanded(d, el); base = naturalInv(t) / uExposure;
+    return mix(rampSoft(naturalInv(t)), t, uSkyTrue);
+  }
+  base = physGrade(skyPhysLut(d)) * uPhysExp;
+  // the night limb (airglow and starlight in the long path along the horizon), which single scattering
+  // of sunlight can't give: faded in once the sun is well down
+  float e = max(el, 0.0);
+  base += uNightL * exp(-e / 0.05) + uNightB * exp(-e / 0.011);
   // Glow around the sun: haze lit by the sun's reddened light. From 85,000 ft there is little haze in the
   // line of sight, so this is a deliberate touch, spread a little wider sideways than up and down.
   vec3 q = normalize(vec3(d.x, d.y * 2.5, d.z)), s = normalize(vec3(uSun.x, uSun.y * 2.5, uSun.z));
@@ -268,6 +302,28 @@ vec3 skyToned(vec3 d, out vec3 base){
   return physTone(base * uExposure);
 }
 #endif`;
+
+
+// The haze color over the ground and clouds for a view direction: the current sky's constant, the banded
+// sky's haze (away from and toward the sun), or the physical sky just under the visible horizon.
+const FOG = /* glsl */`
+uniform float uFogSky, uDip, uBW, uPhysExp; uniform vec3 uFogA, uFogS; uniform sampler2D uSkyLut;
+${GRADE}
+vec3 fogColor(vec3 d, vec3 sun, vec3 haze){
+  if (uFogSky < 0.5) return haze;
+  vec2 sh = normalize(sun.xz + 1e-6), dh = normalize(d.xz + 1e-6);
+  if (uFogSky < 1.5) return mix(uFogA, uFogS, pow(0.5 + 0.5 * dot(dh, sh), uBW));
+  #ifdef WORLD_LITE
+  return haze;
+  #else
+  float lon = acos(clamp(dot(dh, sh), -1.0, 1.0));
+  // the air between you and the ground, as the physical sky sees it looking that way (at least a third
+  // of a degree under the visible horizon, where the table's below-horizon rows start)
+  float el = min(asin(clamp(d.y, -1.0, 1.0)), -uDip - 0.006);
+  float l = -sqrt((-uDip - el) / (1.5708 - uDip));
+  return physGrade(texture2D(uSkyLut, vec2(lon / 3.14159, 0.5 + 0.5 * l)).rgb) * uPhysExp;
+  #endif
+}`;
 
 const LINES = /* glsl */`
 // anti-aliased lines that fade out before they get denser than a couple of pixels
@@ -392,7 +448,12 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uStarColor: { value: col(WORLD_DEFAULTS.starColor) },
     uSkyLut: { value: null }, uAlt: { value: 0 }, uSunT: { value: new THREE.Vector3(1, 1, 1) }, uSunG: { value: new THREE.Vector3(1, 1, 1) },
     ...Object.fromEntries(SKY_NUM.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: +WORLD_DEFAULTS[k] }])),
-    ...Object.fromEntries(SKY_COL.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: srgb(WORLD_DEFAULTS[k]) }])),
+    ...Object.fromEntries(BAND_COLS.map((k) => ['uB' + k[0].toUpperCase() + k.slice(1), { value: new THREE.Vector3() }])),
+    ...Object.fromEntries(BAND_NUMS.map((k) => ['uB' + k[0].toUpperCase() + k.slice(1), { value: 1 }])),
+    // light and haze for the ground and clouds: constants for the current sky, set from the sky in modes 1 and 3
+    uKey: { value: new THREE.Vector3(1.0, 0.95, 0.86) }, uFill: { value: new THREE.Vector3(0.30, 0.36, 0.48) }, uCloudLit: { value: new THREE.Vector3(1, 1, 1) },
+    uNightL: { value: new THREE.Vector3() }, uNightB: { value: new THREE.Vector3() },
+    uFogSky: { value: 0 }, uFogA: { value: new THREE.Vector3() }, uFogS: { value: new THREE.Vector3() },
   };
 
   // ---- sky: thin bright air at the horizon, near-space navy overhead, a sun and the limb ----
@@ -436,8 +497,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           #ifndef WORLD_LITE
           disk *= smoothstep(-0.002, 0.002, asin(clamp(d.y, -1.0, 1.0)) + uDip);   // set behind the earth
           vec3 sunCol = uHigh;
-          if (uSkyMode > 2.5) {   // a real-sized disk (a little over the true 0.27° radius), so the glow around it reads
-            sunCol = sunTone();
+          if (toned) {   // a real-sized disk (a little over the true 0.27° radius), so the glow around it reads
+            sunCol = uSkyMode > 2.5 ? sunTone() : mix(rampSoft(naturalInv(min(uBSun, 0.999))), uBSun, uSkyTrue);
             disk = smoothstep(cos(0.0085), cos(0.0065), dot(d, uSun)) * smoothstep(-0.002, 0.002, asin(clamp(d.y, -1.0, 1.0)) + uDip);
           }
           #else
@@ -549,7 +610,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         uniform vec3 uCam, uOrigin; uniform float uEarthR, uWidth, uTexel, uExag, uEncoded, uFiltered, uMaxLod, uCell, uLodBias; uniform vec2 uShift, uSlide;
         uniform sampler2D uHeight; uniform int uSize;
         attribute float aSpace;
-        varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
+        varying vec2 vXZ; varying float vDist, vH; varying vec3 vN, vView;
         // exact texels, mirrored past the edges, decoded, then interpolated
         float texH(ivec2 p){
           int n = uSize; p = ivec2(mod(vec2(p), float(2 * n)));
@@ -597,7 +658,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           vec3 w = vec3(xz.x, h * uExag - uOrigin.y, xz.y);
           vec2 rel = xz - uCam.xz;
           w.y -= dot(rel, rel) / (2.0 * uEarthR);
-          vXZ = wxz; vH = h; vDist = distance(w, uCam);
+          vXZ = wxz; vH = h; vDist = distance(w, uCam); vView = w - uCam;
           gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
           #include <logdepthbuf_vertex>
         }`,
@@ -605,13 +666,14 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         #include <logdepthbuf_pars_fragment>
         uniform vec3 uSun, uHaze; uniform float uHazeDist, uMaxH, uGrid, uGridSize, uContour, uContourStep, uShade, uLineBright, uLineGold;
         uniform float uTint, uTintContrast, uTintPivot, uSlope, uColor, uTexture, uSnowM, uArid;
-        uniform vec3 uCam, uOrigin;
-        varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
+        uniform vec3 uCam, uOrigin, uKey, uFill;
+        varying vec2 vXZ; varying float vDist, vH; varying vec3 vN, vView;
         uniform sampler2D uHeight; uniform float uWidth, uTexel, uFiltered, uMaxLod, uExag, uPixelRelief;
         float H;   // height here: per vertex, or per pixel from the filtered heightmap
         ${NOISE}
         ${TONE}
         ${LINES}
+        ${FOG}
         // What the ground is made of, lit by the sun: valley floor, forest, alpine, rock on steep faces,
         // snow above the snowline, water at sea level. Texture at two scales fades out with distance.
         vec3 ground(vec3 n, float lit){
@@ -635,9 +697,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           c = mix(c, vec3(0.34, 0.36, 0.40), snow);
           c = mix(c, vec3(0.012, 0.025, 0.045), smoothstep(3.0, 0.5, H));   // sea and lakes at sea level
           c *= mix(1.0, (0.72 + 0.56 * fine) * (0.82 + 0.36 * broad), uTexture);
-          vec3 skyFill = vec3(0.30, 0.36, 0.48);
-          vec3 key = vec3(1.0, 0.95, 0.86);
-          return c * (skyFill * (0.35 + 0.35 * n.y) + key * 2.2 * lit);
+          return c * (uFill * (0.35 + 0.35 * n.y) + uKey * 2.2 * lit);
         }
         void main(){
           #include <logdepthbuf_fragment>
@@ -673,8 +733,9 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           // lines are ink of a set brightness: low values give dark ink, high values glow
           c = mix(c, vec3(uLineBright) * (0.75 + 0.5 * rise), ink * (1.0 - 0.45 * uColor * (1.0 - uMono)));
           float fog = 1.0 - exp(-vDist / uHazeDist);
-          vec3 haze = mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono);
-          c = mix(c, haze * mix(1.0, 0.8, uColor), fog * fog * 0.9 + fog * 0.1);
+          vec3 hz = fogColor(normalize(vView), uSun, uHaze * mix(1.0, 0.8, uColor));
+          vec3 haze = mix(hz, vec3(dot(hz, vec3(0.2126, 0.7152, 0.0722))), uMono);
+          c = mix(c, haze, fog * fog * 0.9 + fog * 0.1);
           gl_FragColor = finish(c, ink * uLineGold * (1.0 - fog));   // gold mask: lines the tone may turn gold
         }`,
     }),
@@ -694,20 +755,21 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         #include <common>
         #include <logdepthbuf_pars_vertex>
         uniform vec3 uCam, uOrigin; uniform float uEarthR;
-        varying vec2 vXZ; varying float vDist;
+        varying vec2 vXZ; varying float vDist; varying vec3 vView;
         void main(){
           vec4 w = modelMatrix * vec4(position, 1.0);
           vec2 rel = w.xz - uCam.xz;
           w.y -= dot(rel, rel) / (2.0 * uEarthR);
-          vXZ = w.xz + uOrigin.xz; vDist = distance(w.xyz, uCam);
+          vXZ = w.xz + uOrigin.xz; vDist = distance(w.xyz, uCam); vView = w.xyz - uCam;
           gl_Position = projectionMatrix * viewMatrix * w;
           #include <logdepthbuf_vertex>
         }`,
       fragmentShader: /* glsl */`
         #include <logdepthbuf_pars_fragment>
-        uniform vec3 uHaze; uniform float uHazeDist, uCover; varying vec2 vXZ; varying float vDist;
+        uniform vec3 uHaze, uSun, uCloudLit; uniform float uHazeDist, uCover; varying vec2 vXZ; varying float vDist; varying vec3 vView;
         ${NOISE}
         ${TONE}
+        ${FOG}
         void main(){
           #include <logdepthbuf_fragment>
           vec2 q = vXZ / 4500.0;
@@ -715,8 +777,9 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           float puff = fbm(q + vec2(fbm(q * 0.5, 3)) * 1.5, 6);
           float a = smoothstep(0.86 - uCover * 0.4, 1.0 - uCover * 0.35, puff + (field - 0.5) * 0.7);
           float fog = 1.0 - exp(-vDist / (uHazeDist * 1.1));
-          vec3 top = vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff);
-          vec3 haze = mix(uHaze, vec3(dot(uHaze, vec3(0.2126, 0.7152, 0.0722))), uMono);
+          vec3 top = vec3(0.80, 0.82, 0.85) * (0.7 + 0.4 * puff) * uCloudLit;
+          vec3 hz = fogColor(normalize(vView), uSun, uHaze);
+          vec3 haze = mix(hz, vec3(dot(hz, vec3(0.2126, 0.7152, 0.0722))), uMono);
           vec3 c = mix(top, haze, fog);
           gl_FragColor = vec4(finish(c, 0.0).rgb, a * 0.9 * (1.0 - fog * 0.6) * step(0.001, uCover));
         }`,
@@ -724,6 +787,64 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
   );
   clouds.frustumCulled = false;
   let cloudM = 7000;
+
+  // Light for the ground and clouds in sky modes 1 and 3: the sun's color after the air it crosses down to
+  // the ground, gone once it sets for the ground (the ground sees the sun set before you do, from altitude),
+  // and the sky's fill fading through twilight to nearly nothing on a moonless night. Mode 1 also sets its
+  // bands from the keyframes.
+  const tmpT = new THREE.Vector3(), tmpD = new THREE.Vector3(), cA = new THREE.Vector3(), cB = new THREE.Vector3();
+  const KEY0 = new THREE.Vector3(1.0, 0.95, 0.86), FILL0 = new THREE.Vector3(0.30, 0.36, 0.48);
+  const BANDS = SKY_BANDS.map(([a, k]) => [a, Object.fromEntries(Object.entries(k).map(([n, v]) => [n, typeof v === 'string' ? col(v) : v]))]);
+  const ninv = (y) => { const t = Math.pow(Math.min(Math.max(y, 0), 0.999), 1 / (0.85 * 2.2)) / 1.55; return t / (1 - t); };
+  let lightKey = '';
+  function skyLight(mode, alt) {
+    const dip = Math.acos(EARTH_R / (EARTH_R + alt));
+    const k = [mode, sunDir.x, sunDir.y, sunDir.z, Math.round(alt / 100), U.uExposure.value, U.uPhysMie.value, U.uPhysOzone.value].map((v) => +(+v).toFixed(4)).join();
+    if (k === lightKey) return;
+    lightKey = k;
+    U.uFogSky.value = mode === 1 ? 1 : mode === 3 ? 2 : 0;
+    if (mode !== 1 && mode !== 3) {
+      U.uKey.value.copy(KEY0); U.uFill.value.copy(FILL0); U.uCloudLit.value.set(1, 1, 1);
+      return;
+    }
+    const el = Math.asin(sunDir.y), deg = THREE.MathUtils.radToDeg;
+    // the key: sunlight at 2 km, reddened by the air on the way, cut as the sun sets for the ground
+    tmpD.copy(sunDir); if (tmpD.y < 0.01) { tmpD.y = 0.01; tmpD.normalize(); }
+    sunTransmittance(2000, tmpT, tmpD);
+    tmpT.divideScalar(Math.max(tmpT.x, tmpT.y, tmpT.z, 1e-6));
+    const up = THREE.MathUtils.smoothstep(deg(el), -0.6, 2.5);
+    U.uKey.value.set(1.0, 0.95, 0.86).multiply(tmpT).multiplyScalar(up);
+    const fill = 0.012 + 0.988 * THREE.MathUtils.smoothstep(deg(el), -9, 6);
+    // twilight fill is the blue of the sky overhead
+    U.uFill.value.copy(FILL0).lerp(cA.set(0.12, 0.24, 0.62), 1 - THREE.MathUtils.smoothstep(deg(el), -3, 8)).multiplyScalar(fill);
+    U.uCloudLit.value.copy(U.uKey.value).multiplyScalar(0.8).addScaledVector(FILL0, fill * 0.6);
+    const e = U.uExposure.value;
+    const lin = (hex, out) => { const c = col(hex); return out.set(ninv(c.x), ninv(c.y), ninv(c.z)).divideScalar(e); };
+    if (mode === 3) {
+      // the eye (and a camera) adapt: through sunset the exposure opens up several stops, so the twilight
+      // sky reads bright blue as in photos, not near black
+      U.uPhysExp.value = +look.physExp * (1 + 1.5 * (1 - THREE.MathUtils.smoothstep(deg(el + dip), -2, 8)));
+      const night = 1 - THREE.MathUtils.smoothstep(deg(el + dip), -10, -4);
+      lin('#011228', U.uNightL.value).multiplyScalar(night);
+      lin('#183a58', U.uNightB.value).multiplyScalar(night);
+      return;
+    }
+    // keyframes by the sun's height above the visible horizon
+    const a = deg(el + dip);
+    let i = 0; while (i < BANDS.length - 2 && a > BANDS[i + 1][0]) i++;
+    const [a0, k0] = BANDS[i], [a1, k1] = BANDS[i + 1];
+    const t = THREE.MathUtils.smoothstep(a, a0, a1);
+    for (const n of BAND_COLS) U['uB' + n[0].toUpperCase() + n.slice(1)].value.lerpVectors(k0[n], k1[n], t);
+    for (const n of BAND_NUMS) {
+      let v = k0[n] + (k1[n] - k0[n]) * t;
+      if (n.endsWith('h')) v = THREE.MathUtils.degToRad(v);
+      U['uB' + n[0].toUpperCase() + n.slice(1)].value = v;
+    }
+    // the ground's haze in scene light, from the band colors
+    cA.copy(U.uBH.value); cB.copy(U.uBHs.value);
+    U.uFogA.value.set(ninv(cA.x), ninv(cA.y), ninv(cA.z)).divideScalar(e);
+    U.uFogS.value.set(ninv(cB.x), ninv(cB.y), ninv(cB.z)).divideScalar(e);
+  }
 
   const look = { ...WORLD_DEFAULTS };
   const TERRAIN_KEYS = ['grid', 'gridSize', 'contour', 'contourStep', 'shade', 'lineBright', 'lineGold', 'tint', 'tintContrast', 'tintPivot', 'slope', 'color', 'texture'];
@@ -737,6 +858,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     /** Any subset of WORLD_DEFAULTS' look keys: palette, tone, sun, haze, clouds, ground style. */
     setLook(o) {
       Object.assign(look, o);
+      lightKey = '';
       for (const k of ['shadow', 'mid', 'light']) U[uName(k)].value.copy(col(look[k]));
       U.uHigh.value.copy(col(look.highlight));
       for (const k of TONE_KEYS) U[uName(k)].value = +look[k];
@@ -747,7 +869,6 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       for (const k of STAR_KEYS) U[uName(k)].value = +(look[k] ?? 0);
       if (look.starColor) U.uStarColor.value.copy(col(look.starColor));
       for (const k of SKY_NUM) if (look[k] != null) U[uName(k)].value = +look[k];
-      for (const k of SKY_COL) if (look[k]) U[uName(k)].value.copy(srgb(look[k]));
       U.uHazeDist.value = look.haze * 1000;
       U.uCover.value = +look.clouds;
       if (look.cloudM) cloudM = +look.cloudM;
@@ -806,7 +927,9 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       const alt = Math.max(camera.position.y + U.uOrigin.value.y, 1);
       U.uDip.value = Math.acos(EARTH_R / (EARTH_R + alt));
       U.uSkyK.value = 2.5 + 6.5 * Math.min(alt / 26000, 1);
-      if (renderer && !lite && U.uSkyMode.value === 3) updateSkyLut(renderer, alt);
+      const mode = lite ? 0 : U.uSkyMode.value;
+      if (renderer && mode === 3) updateSkyLut(renderer, alt);
+      skyLight(mode, alt);
       clouds.position.y = cloudM - U.uOrigin.value.y;
       clouds.position.x = camera.position.x; clouds.position.z = camera.position.z;
       clouds.visible = alt > cloudM + 1000 && look.clouds > 0;
