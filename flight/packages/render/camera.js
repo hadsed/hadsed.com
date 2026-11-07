@@ -36,6 +36,8 @@ export function createCameraRig(camera, {
   glide = 2.8,             // seconds for a full orbit -> chase move
 } = {}) {
   const rig = {
+    // Chase lenses, vertical degrees; live-tunable.
+    lens: { chase: chaseLens, portraitChase: portraitChaseLens },
     blend: 1, target: 1,                    // chase by default; the backdrop sets both to 0
     boosting: false,                        // set each frame; eases the boost pull-back in and out
     focus: null,                            // a Vector3 to keep in frame too (the jet you follow), or null
@@ -132,7 +134,7 @@ export function createCameraRig(camera, {
     // Lens: the backdrop widens in portrait so the jet fits, the chase cam too.
     const portrait = aspect < 1;
     const oFov = portrait ? orbitLens * Math.min(1.8, 1 / aspect) : orbitLens;
-    const cFov = (portrait ? portraitChaseLens : chaseLens) + CHASE.boostLens * bk;
+    const cFov = (portrait ? rig.lens.portraitChase : rig.lens.chase) + CHASE.boostLens * bk;
     const fov = oFov + (cFov - oFov) * k;
     const fx = rig.frame.x * (1 - k), fy = rig.frame.y * (1 - k);
     if (fx || fy) camera.setViewOffset(1000 * aspect, 1000, -fx * 1000 * aspect, -fy * 1000, 1000 * aspect, 1000);

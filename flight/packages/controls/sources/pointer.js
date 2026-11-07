@@ -2,7 +2,9 @@
 // press point, divided by `radius` pixels, becomes the axis value.
 // pointerStick({ element, x: 'roll', y: 'pitch', radius: 80, invertX: false, invertY: false })
 // ignore(e): return true for presses the stick should leave alone (buttons, links).
-export function pointerStick({ element, x, y, radius = 80, invertX = false, invertY = false, deadzone = 0.06, ignore = null } = {}) {
+export function pointerStick({ element, x, y, radius = 80, invertX = false, invertY = false, deadzone = 0.06, curve = 1.5, ignore = null } = {}) {
+  // Live-tunable: change these on the returned source's .tune.
+  const tune = { radius, invertX, invertY, deadzone, curve };
   let origin = null, cur = null, pointerId = null;
   const onDown = (e) => {
     if (pointerId !== null || e.button > 0 || ignore?.(e)) return;
@@ -13,11 +15,12 @@ export function pointerStick({ element, x, y, radius = 80, invertX = false, inve
   const onMove = (e) => { if (e.pointerId === pointerId) cur = { x: e.clientX, y: e.clientY }; };
   const onUp = (e) => { if (e.pointerId === pointerId) { pointerId = null; origin = cur = null; } };
   const shape = (v) => {
-    const a = Math.min(1, Math.abs(v));
-    return a < deadzone ? 0 : Math.sign(v) * ((a - deadzone) / (1 - deadzone)) ** 1.5;
+    const a = Math.min(1, Math.abs(v)), dz = tune.deadzone;
+    return a < dz ? 0 : Math.sign(v) * ((a - dz) / (1 - dz)) ** tune.curve;
   };
   return {
     id: 'pointer',
+    tune,
     attach() {
       element.addEventListener('pointerdown', onDown);
       element.addEventListener('pointermove', onMove);
@@ -36,10 +39,10 @@ export function pointerStick({ element, x, y, radius = 80, invertX = false, inve
     },
     poll(sink) {
       if (!origin) return;
-      if (x) sink.axis(x, shape(((cur.x - origin.x) / radius) * (invertX ? -1 : 1)));
-      if (y) sink.axis(y, shape(((cur.y - origin.y) / radius) * (invertY ? -1 : 1)));
+      if (x) sink.axis(x, shape(((cur.x - origin.x) / tune.radius) * (tune.invertX ? -1 : 1)));
+      if (y) sink.axis(y, shape(((cur.y - origin.y) / tune.radius) * (tune.invertY ? -1 : 1)));
     },
     // Where the stick is, for drawing an on-screen indicator.
-    get state() { return origin ? { origin, cur, radius } : null; },
+    get state() { return origin ? { origin, cur, radius: tune.radius } : null; },
   };
 }

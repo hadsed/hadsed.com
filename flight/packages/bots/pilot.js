@@ -13,6 +13,9 @@ const f = [0, 0, 0], r = [0, 0, 0];
 // Fly to a slot off the leader's wing and hold it: 180 m out, 60 m back, 20 m up.
 // Used by bots (escorting people) and by players (click a jet to follow it).
 export const SLOT = { out: 50, back: 150, up: 12 };
+// ahead: how far past the slot the escort aims, so it converges instead of circling.
+// gain: how hard it banks toward it. catchUp: past this distance it boosts on its own.
+export const ESCORT = { ahead: 1500, gain: 1.2, catchUp: 3000 };
 
 // dash: the player is holding boost. It burns only while the slot is ahead and
 // cuts out as you arrive, so a boost while following rejoins the V instead of
@@ -28,8 +31,8 @@ export function escort(intent, jet, lead, side = 1, dash = false) {
   const sy = lp[1] + SLOT.up;
   const sz = lp[2] + r[2] * SLOT.out * side - f[2] * SLOT.back;
   // Aim at a point ahead of the slot so we converge instead of circling it.
-  const ahead = 1500;
-  steer(intent, jet, sx + f[0] * ahead, sy + f[1] * ahead, sz + f[2] * ahead, 1.2);
+  const ahead = ESCORT.ahead;
+  steer(intent, jet, sx + f[0] * ahead, sy + f[1] * ahead, sz + f[2] * ahead, ESCORT.gain);
   const dx = sx - jet.pos[0], dz = sz - jet.pos[2];
   forwardOf(jet.q, f);
   const along = dx * f[0] + dz * f[2];                  // + means slot is ahead of us
@@ -37,7 +40,7 @@ export function escort(intent, jet, lead, side = 1, dash = false) {
   intent.throttle = clamp((wantSpeed - jet.speed) / 40, -1, 1);
   intent.yaw = 0;
   const d = Math.hypot(dx, sy - jet.pos[1], dz);
-  intent.boost = (d > 3000 || (dash && d > 120)) && along > 60;   // dash to catch up; never to fall back
+  intent.boost = (d > ESCORT.catchUp || (dash && d > 120)) && along > 60;   // dash to catch up; never to fall back
   return d;           // distance to the slot
 }
 

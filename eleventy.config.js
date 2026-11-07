@@ -59,6 +59,27 @@ export default function (eleventyConfig) {
     });
   }
 
+  // Branch previews (SITE_URL set) carry the game mechanics jig at /lab/game/: the flight
+  // game alone (no site, no look jigs) with a Tweakpane panel over its feel. The page is the
+  // flight lab's own index.html with a <base> at /lab/flight/, so it can never drift from the
+  // game, and previews point it at the staging room server. Production builds never include it.
+  if (process.env.SITE_URL || process.env.LAB) {
+    eleventyConfig.addPassthroughCopy({ "notes/lab/game": "lab/game" });
+    eleventyConfig.on("eleventy.after", async ({ dir }) => {
+      const { readFile, writeFile, mkdir } = await import("node:fs/promises");
+      const swap = (html, from, to) => {
+        if (!html.includes(from)) throw new Error(`/lab/game/: flight/index.html no longer has ${from}`);
+        return html.replace(from, to);
+      };
+      let html = await readFile("flight/index.html", "utf8");
+      html = swap(html, "<head>", '<head>\n<base href="/lab/flight/">');
+      html = swap(html, "<title>Flight lab</title>", '<title>Game mechanics jig</title>\n<link rel="stylesheet" href="/lab/game/jig.css">');
+      html = swap(html, '<script type="module" src="main.js"></script>', '<script type="module" src="/lab/game/jig.js"></script>');
+      await mkdir(`${dir.output}/lab/game`, { recursive: true });
+      await writeFile(`${dir.output}/lab/game/index.html`, html);
+    });
+  }
+
   // Branch previews (SITE_URL set) carry the SR-71 model shootout at /lab/sr71-models/.
   // Production builds never include it.
   if (process.env.SITE_URL || process.env.LAB) {

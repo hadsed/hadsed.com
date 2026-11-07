@@ -44,19 +44,20 @@ const tilter = tilt({ x: 'aimX', y: 'aimY', range: 35 });
 const onControl = (e) => !!e.target.closest?.('button, a, input, select');
 const stick = pointerStick({ element: document.body, x: 'aimX', y: 'aimY', invertX: true, radius: Math.min(innerWidth, innerHeight) * 0.17, ignore: onControl });
 const buttons = scripted('buttons');   // on-screen BOOST
+const keys = keyboard({
+  axes: {
+    aimX: [['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']],
+    aimY: [['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']],   // like a stick: forward dives, back climbs
+    throttle: ['KeyF', 'KeyR'],
+  },
+  actions: { boost: ['Space', 'ShiftLeft', 'ShiftRight'], waggle: 'KeyE' },
+  attack: 5, release: 8,
+});
 const controls = createControls({
   axes: ['aimX', 'aimY', 'throttle'],
   actions: ['boost', 'waggle'],
   sources: [
-    keyboard({
-      axes: {
-        aimX: [['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']],
-        aimY: [['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']],   // like a stick: forward dives, back climbs
-        throttle: ['KeyF', 'KeyR'],
-      },
-      actions: { boost: ['Space', 'ShiftLeft', 'ShiftRight'], waggle: 'KeyE' },
-      attack: 5, release: 8,
-    }),
+    keys,
     stick,
     // Right stick aims, left stick forward/back is throttle, A boosts, B waves.
     gamepad({ axes: { aimX: 2, aimY: 3, throttle: 1 }, invert: { throttle: true }, buttons: { boost: 0, waggle: 1 } }),
@@ -66,7 +67,7 @@ const controls = createControls({
 });
 const assist = createAssist();
 const aimIntent = { pitch: 0, roll: 0, yaw: 0, throttle: 0, boost: false };
-window.__flight = { controls, assist };
+window.__flight = { controls, assist, keys, stick };
 // A long press on a phone would open the select / save-image menu; flying needs the whole screen.
 addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('selectstart', (e) => e.preventDefault());   // hook for voice/gesture experiments in the console
