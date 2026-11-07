@@ -4,9 +4,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
-import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS, DAY_LOOK, NIGHT_LOOK } from './world/index.js';
+import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
 import { Pane } from './vendor/tweakpane.min.js';
-const STORE = 'sr71-backdrop-v8';   // v8: quiet stars as their own layer, Tweakpane panel
+const STORE = 'sr71-backdrop-v9';   // v9: stars, Tweakpane panel, no night experiment
 
 // ---------- settings ----------
 const PRESETS = {
@@ -30,9 +30,8 @@ const STYLES = {
 };
 // Defaults = the look Had landed on 2026-11-05 (iPad), with altitude at the SR-71's ~85k ft ceiling.
 // The look itself (tone, scene, ground) lives in the shared world module, so the flight lab matches.
-const TIMES = { night: NIGHT_LOOK, day: DAY_LOOK };
 const DEFAULTS = {
-  preset: 'site', ...WORLD_DEFAULTS, ...DAY_LOOK, stars: 1, style: 'navycolor', time: 'day',
+  preset: 'site', ...WORLD_DEFAULTS, style: 'navycolor',
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -179,9 +178,6 @@ function apply() {
   world.setLook(S);
   post.setLook(S);
   sunLight.position.copy(sunDir).multiplyScalar(100);
-  // at night the jet is a dark shape against the stars: a little moonlight and sky, no sun
-  const night = +S.night || 0;
-  sunLight.intensity = 3.2 * (1 - night); hemi.intensity = 2.0 * (1 - 0.82 * night); bounce.intensity = 0.6 * (1 - 0.7 * night);
   const altitude = S.altitudeFt * 0.3048;
   const reg = REGIONS[S.region];
   if (reg) origin.set((S.offsetX ?? reg.peakKm[0]) * 1000, altitude, (S.offsetZ ?? reg.peakKm[1]) * 1000);
@@ -319,15 +315,7 @@ const SPEC = [
     ['starFade', 'range', { label: 'Horizon fade (°)', min: 0.5, max: 30, step: 0.5 }],
     ['starColor', 'color', { label: 'Color' }],
     ['starVar', 'range', { label: 'Color variety', min: 0, max: 1, step: 0.01 }],
-    ['milky', 'range', { label: 'Milky Way', min: 0, max: 2, step: 0.01 }],
-  ]],
-  ['Time of day', false, [
-    ['time', 'select', { label: 'Preset', options: [['day', 'Day'], ['night', 'Night (experimental)']] }],
-    ['sunAz', 'range', { label: 'Sun direction (°)', min: 0, max: 360, step: 1 }],
-    ['sunEl', 'range', { label: 'Sun height (°)', min: -18, max: 70, step: 0.5 }],
-    ['night', 'range', { label: 'Night', min: 0, max: 1, step: 0.01 }],
-    ['moonAz', 'range', { label: 'Moon direction (°)', min: 0, max: 360, step: 1 }],
-    ['moonEl', 'range', { label: 'Moon height (°)', min: 0, max: 80, step: 1 }],
+    ['starDark', 'range', { label: 'Dark sky needed', min: 0.01, max: 0.6, step: 0.005 }],
   ]],
   ['Tone', false, [
     ['preset', 'select', { options: [['site', 'Site navy + gold'], ['slate', 'Slate'], ['ash', 'Ash'], ['dusk', 'Dusk'], ['custom', 'Custom']] }],
@@ -351,6 +339,8 @@ const SPEC = [
     ['exag', 'range', { label: 'Vertical exaggeration', min: 1, max: 5, step: 0.05 }],
     ['offsetX', 'range', { label: 'Jet position E–W (km)', min: -140, max: 140, step: 0.5 }],
     ['offsetZ', 'range', { label: 'Jet position N–S (km)', min: -140, max: 140, step: 0.5 }],
+    ['sunAz', 'range', { label: 'Sun direction (°)', min: 0, max: 360, step: 1 }],
+    ['sunEl', 'range', { label: 'Sun height (°)', min: -4, max: 70, step: 0.5 }],
     ['haze', 'range', { label: 'Visibility (km)', min: 40, max: 600, step: 5 }],
     ['clouds', 'range', { label: 'Cloud cover', min: 0, max: 1, step: 0.01 }],
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
@@ -424,7 +414,6 @@ function build() {
         S[key] = v;
         if (key === 'preset' && PRESETS[v]) Object.assign(S, PRESETS[v]);
         if (key === 'style' && STYLES[v]) Object.assign(S, STYLES[v]);
-        if (key === 'time' && TIMES[v]) Object.assign(S, TIMES[v]);
         if (key === 'region') { S.offsetX = null; S.offsetZ = null; }
         if (['shadow', 'mid', 'light', 'highlight'].includes(key) && S.preset !== 'custom') S.preset = 'custom';
         sync(); apply();

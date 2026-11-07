@@ -52,9 +52,6 @@ export function createRenderer({ canvas, manifest, labels }) {
   scene.add(world.sky, world.terrain);
   if (!software) scene.add(world.clouds);
   sun.position.copy(world.sunDir);
-  // Night flight: the jets go dark against the stars, with a little moon and sky light left.
-  const night = +world.look.night || 0;
-  sun.intensity = 2.4 * (1 - 0.9 * night); hemi.intensity = 1.2 * (1 - 0.6 * night);
   const shift = new THREE.Vector2();
   const groundO = new THREE.Vector3();
 
