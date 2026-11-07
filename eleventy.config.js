@@ -86,6 +86,16 @@ export default function (eleventyConfig) {
     value instanceof Date ? String(value.getUTCFullYear()) : String(value).slice(0, 4)
   );
   eleventyConfig.addFilter("roleSlug", roleSlug);
+  // Front matter text with inline Markdown links, e.g. a role subtitle of
+  // "Interested in working together? [Let's chat](mailto:h@hadsed.com)".
+  // Everything else is escaped; only web, mailto, and site-relative URLs link.
+  const escapeHtml = (text) =>
+    text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  eleventyConfig.addFilter("inlineLinks", (text = "") =>
+    escapeHtml(String(text)).replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (whole, label, url) =>
+      /^(https?:|mailto:|\/|#)/.test(url) ? `<a href="${url}">${label}</a>` : whole
+    )
+  );
   // Profile links (GitHub, LinkedIn, Scholar) for the Person schema's sameAs.
   eleventyConfig.addFilter("profileUrls", (links = []) =>
     links.map((link) => link.url).filter((url) => url.startsWith("http"))
