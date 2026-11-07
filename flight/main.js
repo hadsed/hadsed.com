@@ -20,8 +20,10 @@ const params = new URLSearchParams(location.search);
 // ?attract: the site backdrop. The jet flies itself, the HUD is hidden, and the
 // socket only watches (no seat, so the aloft count stays honest) until fly().
 let attract = params.has('attract');
-// Boost speed cue, while Had picks one: ?speed=dust (default) | vapor | lens.
+// Boost speed cue: dust streaming past plus the lens's darkened edges (Had's
+// pick). ?speed=dust | vapor | lens shows one cue alone, for comparison.
 const speedStyle = ['dust', 'vapor', 'lens'].includes(params.get('speed')) ? params.get('speed') : 'dust';
+const edgeDark = !params.has('speed') || speedStyle === 'lens';
 let vignette = 0;
 if (attract) document.body.classList.add('attract');
 
@@ -225,7 +227,7 @@ function frame(nowMs) {
   const others = net.state.status === 'online' ? roster.size : 0;
   $('aloft').textContent = `${others} other${others === 1 ? '' : 's'} in flight`;
   if (!attract) statusLog();
-  if (speedStyle === 'lens') {
+  if (edgeDark) {
     vignette += ((!attract && jet.flags & FLAG.BOOST ? 1 : 0) - vignette) * (1 - Math.exp(-dt * 2.5));
     $('vignette').style.opacity = vignette.toFixed(3);
   }
