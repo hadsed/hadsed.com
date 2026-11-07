@@ -145,7 +145,7 @@ const panel = document.createElement('aside');
 panel.id = 'jig';
 panel.innerHTML = `
   <div class="jig-head"><strong>Game mechanics</strong><button id="jig-toggle" type="button" aria-expanded="true">Hide</button></div>
-  <div class="jig-body"><p class="jig-hint">Changes apply live to your jet only; bots and other players fly on the server's numbers. Gold labels differ from the defaults; ↺ resets one, each folder has its own reset. H hides this panel. Settings stay in this browser.</p></div>
+  <div class="jig-body"><p class="jig-hint">Changes apply live to your jet only; bots and other players fly on the server's numbers. Gold labels differ from the defaults; ↺ resets one, max sets one to the top of its range, each folder has its own reset. H hides this panel. Settings stay in this browser.</p></div>
   <div class="jig-foot">
     <button id="jig-copy" type="button">Copy link</button>
     <button id="jig-reset" type="button">Reset all</button>
@@ -178,6 +178,19 @@ for (const [title, expanded, rows] of SPEC) {
     undo.title = `Reset to ${DEFAULTS[k]}`;
     undo.addEventListener('click', (e) => { e.stopPropagation(); reset([r]); });
     b.element.querySelector('.tp-lblv_l')?.appendChild(undo);
+    // Per-control max: jump this one setting to the top of its slider.
+    if (typeof S[k] === 'number') {
+      const max = document.createElement('button');
+      max.type = 'button'; max.className = 'jig-max'; max.textContent = 'max';
+      max.title = `Set to ${r[4]}`;
+      max.addEventListener('click', (e) => {
+        e.stopPropagation();
+        S[k] = r[4]; write(r, S[k]);
+        syncing = true; try { pane.refresh(); } finally { syncing = false; }
+        save(); mark();
+      });
+      b.element.querySelector('.tp-lblv_l')?.appendChild(max);
+    }
   }
   // Per-folder reset.
   const live = rows.filter((r) => S[id(r)] !== undefined);
