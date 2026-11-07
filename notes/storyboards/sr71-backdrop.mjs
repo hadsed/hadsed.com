@@ -221,7 +221,7 @@ function render() {
   viewCam.updateProjectionMatrix();
   viewCam.up.set(0, 1, 0); viewCam.lookAt(controls.target);
   farCam.position.copy(viewCam.position); farCam.quaternion.copy(viewCam.quaternion);
-  world.frame(farCam, origin);
+  world.frame(farCam, origin, null, renderer);
   post.render(() => {
     renderer.clear();
     renderer.render(farScene, farCam);
@@ -325,7 +325,10 @@ const SPEC = [
     ['physColor', 'range', { label: 'Navy tone ↔ true color', min: 0, max: 1, step: 0.01, show: m(3) }],
     ['physMie', 'range', { label: 'Haze (Mie)', min: 0, max: 10, step: 0.05, show: m(3) }],
     ['physOzone', 'range', { label: 'Ozone (blue hour)', min: 0, max: 4, step: 0.05, show: m(3) }],
-    ['sunEl', 'range', { label: 'Sun height (°)', min: -4, max: 70, step: 0.5 }],
+    ['physG', 'range', { label: 'Haze glow tightness', min: 0, max: 0.95, step: 0.01, show: m(3) }],
+    ['physMulti', 'range', { label: 'Twilight glow', min: 0, max: 3, step: 0.05, show: m(3) }],
+    ['physGlow', 'range', { label: 'Sun glow', min: 0, max: 4, step: 0.05, show: m(3) }],
+    ['sunEl', 'range', { label: 'Sun height (°). From 85,000 ft it sets near −5', min: -20, max: 70, step: 0.5 }],
   ]],
   ['Stars', true, [
     ['stars', 'range', { label: 'Amount', min: 0, max: 3, step: 0.01 }],

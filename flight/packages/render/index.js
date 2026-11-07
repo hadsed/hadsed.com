@@ -149,7 +149,7 @@ export function createRenderer({ canvas, manifest, labels }) {
       const ox = go ? go[0] : 0, oz = go ? go[2] : 0;
       shift.set(camPos.x, camPos.z);
       groundO.set(ox, 0, oz);
-      world.frame(camera, go ? groundO : null, shift);
+      world.frame(camera, go ? groundO : null, shift, renderer);
       world.uniforms.uMono.value = 1 - Math.min(Math.max(rig.blend, 0), 1);
 
       // Ghosts
