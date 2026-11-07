@@ -36,12 +36,12 @@ export const WORLD_DEFAULTS = {
   color: 1, texture: 1,
   // 2026-11-06 night flight (Had's refs: a night sky full of fine stars over a thin orange afterglow at the
   // horizon, dark ground with city lights). Off by default while it's tuned in the lab: NIGHT_LOOK turns it on.
-  night: 0, stars: 1, afterglow: 1, milky: 0.45, city: 1, moonAz: 200, moonEl: 32,
+  night: 0, stars: 0, afterglow: 1, milky: 0, city: 1, moonAz: 200, moonEl: 32,
 };
 // The night's finer controls (the lab's Stars, Horizon, City lights and Night colors groups).
 // Angles in degrees, distances in meters, colors as sRGB hex.
 export const NIGHT_DEFAULTS = {
-  starDensity: 0.35, starSize: 1, starBright: 1, starScale: 1, starSeed: 0, starFade: 6, starColor: '#f2eee6', starVar: 0.3,
+  starDensity: 0.2, starSize: 1, starBright: 0.8, starScale: 1, starSeed: 0, starFade: 6, starColor: '#f2eee6', starVar: 0.3,
   seamColor: '#ffb45a', seamWidth: 0.26, seamBright: 1, seamAround: 0.1, glowColor: '#4a5566', glowHeight: 2.6, glowBright: 1, groundGlow: 1,
   nightZenith: '#080c16', nightHorizon: '#282d38', nightGround: '#282d38', moonLight: 0.16,
   cityDensity: 1, cityTown: 22, cityCover: 0.4, cityColor: '#ffb35c', cityGlow: 1, cityDot: 9, cityBright: 1, cityMaxAlt: 2200,
@@ -57,7 +57,7 @@ const nightUniforms = (num, cols) => Object.fromEntries([
 ]);
 // The daytime look, for presets: the sun up at 18 degrees, no stars.
 export const DAY_LOOK = { night: 0, sunEl: 18, sunAz: 41, exposure: 1.12 };
-export const NIGHT_LOOK = { night: 1, sunEl: -5, sunAz: 245, stars: 1, afterglow: 1, milky: 0.45, city: 1, exposure: 2.2 };
+export const NIGHT_LOOK = { night: 1, sunEl: -5, sunAz: 245, stars: 1, afterglow: 1, milky: 0, city: 1, exposure: 2.2 };
 
 
 export const NOISE = /* glsl */`
@@ -136,11 +136,11 @@ float starLayer(vec3 d, float n, float keep, float pix, out vec3 tint){
   tint = uStarColor * mix(vec3(1.0), mix(vec3(0.70, 0.80, 1.0), vec3(1.0, 0.82, 0.62), r.z), uStarVar);
   return uStarBright * b * fit * exp(-a * a / (2.0 * sig * sig));
 }
-vec3 nightSky(vec3 d, float el, vec3 base){
+vec3 nightSky(vec3 d, float el, vec3 base, float night){
   vec3 e = vec3(0.0);
   float pix = max(length(fwidth(d)), 2e-5);
   // stars live in the dark: none in the bright band at the horizon, and they thin out where the sky is lit
-  float dark = 1.0 - smoothstep(0.004, 0.03, dot(base, vec3(0.2126, 0.7152, 0.0722)));
+  float dark = 1.0 - smoothstep(0.02, 0.16, dot(base, vec3(0.2126, 0.7152, 0.0722)));
   float fade = radians(max(uStarFade, 0.05));
   float up = smoothstep(fade * 0.15, fade, el);
   if (uStars > 0.0 && up > 0.0) {
@@ -156,14 +156,15 @@ vec3 nightSky(vec3 d, float el, vec3 base){
     s = starLayer(d, 330.0, 0.5 + 0.45 * band * uMilky, pix, t); e += t * s * 0.8;
     e *= uStars * up * dark;
   }
-  if (uAfterglow > 0.0) {
+  // stars are their own layer: they show wherever the sky is dark enough, night or not
+  if (uAfterglow > 0.0 && night > 0.0) {
     vec2 h = normalize(d.xz + 1e-6), sh = normalize(uSun.xz + 1e-6);
     float toward = smoothstep(-0.6, 1.0, dot(h, sh));
     float x = max(el, 0.0);
     float w = radians(max(uSeamWidth, 0.01)), gh = radians(max(uGlowHeight, 0.05));
     float seam = exp(-x / w) * smoothstep(-2.7 * w, 0.0, el);
-    e += uSeamColor * seam * mix(0.2 + 1.8 * toward, 1.0, uSeamAround) * 1.1 * uSeamBright * uAfterglow;
-    e += uGlowColor * 0.5 * exp(-x / gh) * smoothstep(-0.01, 0.0, el) * mix(0.5 + 0.8 * toward, 1.0, uSeamAround) * uGlowBright * uAfterglow;
+    e += uSeamColor * seam * mix(0.2 + 1.8 * toward, 1.0, uSeamAround) * 1.1 * uSeamBright * uAfterglow * night;
+    e += uGlowColor * 0.5 * exp(-x / gh) * smoothstep(-0.01, 0.0, el) * mix(0.5 + 0.8 * toward, 1.0, uSeamAround) * uGlowBright * uAfterglow * night;
   }
   return e;
 }`;
@@ -287,7 +288,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uLight: { value: col(WORLD_DEFAULTS.light) }, uHigh: { value: col(WORLD_DEFAULTS.highlight) },
     uMidPoint: { value: 0.56 }, uHlStart: { value: 0.61 }, uHlAmount: { value: 0.85 },
     uMono: { value: 1 }, uExposure: { value: 1.12 }, uContrast: { value: 1.13 }, uDirect: { value: 0 }, uChroma: { value: 0.6 },
-    uNight: { value: 0 }, uStars: { value: 1 }, uAfterglow: { value: 1 }, uMilky: { value: 0.45 }, uMoon: { value: new THREE.Vector3(0, 1, 0) },
+    uNight: { value: 0 }, uStars: { value: 0 }, uAfterglow: { value: 1 }, uMilky: { value: 0 }, uMoon: { value: new THREE.Vector3(0, 1, 0) },
     ...nightUniforms(NIGHT_U, NIGHT_UC),
   };
 
@@ -333,12 +334,12 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           // monotone it turns to the palette's light and gold; in natural color it keeps its orange.
           vec3 e = vec3(0.0);
           #ifndef WORLD_LITE
-          if (uNight > 0.0) e = nightSky(d, asin(clamp(d.y, -1.0, 1.0)) + uDip, vBase) * uNight;
+          if (uNight > 0.0 || uStars > 0.0) e = nightSky(d, asin(clamp(d.y, -1.0, 1.0)) + uDip, vBase, uNight);
           #endif
           if (uDirect > 0.5) {
             vec3 sky = vSky.rgb;
             #ifndef WORLD_LITE
-            if (uNight > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(vBase + e, 0.0) - display(vBase, 0.0), 0.0), vec3(1.0 / 2.2));
+            if (uNight > 0.0 || uStars > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(vBase + e, 0.0) - display(vBase, 0.0), 0.0), vec3(1.0 / 2.2));
             #endif
             // the disk is far past white: in the post pass the tone turns it to highlight; direct, draw that
             gl_FragColor = vec4(mix(sky, pow(uHigh, vec3(1.0 / 2.2)), min(disk * 3.0, 1.0)), 1.0);
