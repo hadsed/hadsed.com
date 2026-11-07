@@ -53,7 +53,8 @@ export function headingOf(q) {
 export function createAssist({ maxTurn = 0.75, maxPitch = 0.85, gain = 1.1 } = {}) {
   // Live-tunable (the mechanics jig edits it): turn/pitch curves are the soft-center
   // exponents, loopIn/loopOut the stick travel that starts and ends a loop or dive.
-  const tune = { maxTurn, maxPitch, gain, turnCurve: 1.3, pitchCurve: 1.05, dive: DIVE, loopIn: 0.92, loopOut: 0.8 };
+  // reverseY flips up/down for every input at once.
+  const tune = { maxTurn, maxPitch, gain, turnCurve: 1.3, pitchCurve: 1.05, dive: DIVE, loopIn: 0.92, loopOut: 0.8, reverseY: false };
   const aim = { yaw: null, pitch: 0 };
   const dir = [0, 0, 0];
   const api = {
@@ -67,6 +68,7 @@ export function createAssist({ maxTurn = 0.75, maxPitch = 0.85, gain = 1.1 } = {
       // hold it. Let go and the assist rolls you upright and levels out on
       // whatever heading you have.
       const { maxTurn, maxPitch, gain } = tune;
+      if (tune.reverseY) ay = -ay;
       if (api.loop === 0 && Math.abs(ay) > tune.loopIn) api.loop = Math.sign(ay);
       else if (api.loop !== 0 && (Math.abs(ay) < tune.loopOut || Math.sign(ay) !== api.loop)) api.loop = 0;
       if (api.loop > 0) {

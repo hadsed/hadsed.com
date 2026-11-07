@@ -11,6 +11,8 @@ import { SLOT, ESCORT } from '../flight/packages/bots/pilot.js';
 import { CHASE } from '../flight/packages/render/camera.js';
 import { Pane } from './tweakpane.min.js';
 
+// Where the jig starts out different from the live game (Had, 2026-11-07: reticle held to a small radius).
+const JIG_DEFAULTS = { 'reticle.radius': 70 };
 const STORE = 'game-jig-v1', OPEN = 'game-jig-folders';
 const FT = 3.281, DEG = 180 / Math.PI, NM = 1 / 1852;
 
@@ -20,7 +22,7 @@ const stickSize = { frac: 0.17 };   // drag radius as a share of the screen's sh
 const T = {
   rate: () => RATE, limits: () => LIMITS, feel: () => FEEL, slot: () => SLOT, escort: () => ESCORT, chase: () => CHASE,
   stickSize: () => stickSize,
-  assist: () => F?.assist.tune, stick: () => F?.stick.tune, keys: () => F?.keys.tune, lens: () => F?.renderer.rig.lens,
+  assist: () => F?.assist.tune, stick: () => F?.stick.tune, keys: () => F?.keys.tune, lens: () => F?.renderer.rig.lens, reticle: () => F?.reticle,
 };
 
 // [folder, open, rows]; row = [target, key, label, min, max, step, scale?]. scale converts the
@@ -41,6 +43,7 @@ const SPEC = [
     ['chase', 'boostLens', 'Lens opens by (°)', 0, 30, 0.5],
   ]],
   ['Handling', true, [
+    ['assist', 'reverseY', 'Reverse up/down (all inputs)'],
     ['rate', 'roll', 'Roll rate (rad/s)', 0.2, 5, 0.05],
     ['rate', 'pitch', 'Pitch rate (rad/s)', 0.2, 3, 0.05],
     ['rate', 'turn', 'Turn from bank (rad/s)', 0.1, 2, 0.05],
@@ -56,6 +59,7 @@ const SPEC = [
     ['assist', 'loopIn', 'Loop / dive starts past', 0.5, 1, 0.01],
     ['assist', 'loopOut', 'Loop / dive ends below', 0.3, 1, 0.01],
     ['assist', 'dive', 'Full forward dive (°)', 30, 89, 1, DEG],
+    ['reticle', 'radius', 'Reticle radius (px, 0 = free)', 0, 300, 5],
   ]],
   ['Touch and mouse drag', false, [
     ['stickSize', 'frac', 'Drag for full stick (× short side)', 0.05, 0.5, 0.01],
@@ -97,14 +101,14 @@ const round = (v, step) => (typeof v === 'number' ? +(Math.round(v / step) * ste
 
 // Panel values (in panel units) from the game, and back.
 const read = (r) => { const o = T[r[0]](); if (!o) return undefined; const v = o[r[1]]; return typeof v === 'number' && r[6] ? v * r[6] : v; };
-// A value left at its default writes back the game's exact number, not the panel's rounded one.
-const RAW = {};
+// A value left at the game's own setting writes back the game's exact number, not the panel's rounded one.
+const RAW = {}, GAME = {};
 function write(r, v) {
   const o = T[r[0]]();
   if (!o) return;
   const k = id(r);
   if (!(k in RAW)) RAW[k] = o[r[1]];
-  o[r[1]] = v === DEFAULTS[k] ? RAW[k] : typeof v === 'number' && r[6] ? v / r[6] : v;
+  o[r[1]] = v === GAME[k] ? RAW[k] : typeof v === 'number' && r[6] ? v / r[6] : v;
   if (r[0] === 'stickSize' && F) F.stick.tune.radius = stickSize.frac * Math.min(innerWidth, innerHeight);
 }
 
@@ -118,13 +122,14 @@ const S = {}, DEFAULTS = {};
 const applyAll = () => { for (const r of ROWS) if (S[id(r)] !== undefined) write(r, S[id(r)]); };
 
 // Module-level numbers first, so the game's very first tick uses them.
-for (const r of ROWS) { const v = read(r); if (v !== undefined) DEFAULTS[id(r)] = S[id(r)] = round(v, r[5] ?? 1); }
+const setDefault = (r, v) => { const k = id(r); GAME[k] = round(v, r[5] ?? 1); DEFAULTS[k] = k in JIG_DEFAULTS ? JIG_DEFAULTS[k] : GAME[k]; };
+for (const r of ROWS) { const v = read(r); if (v !== undefined) { setDefault(r, v); S[id(r)] = DEFAULTS[id(r)]; } }
 Object.assign(S, pick(tweaks));
 applyAll();
 
 await import('../flight/main.js');
 F = window.__flight;
-for (const r of ROWS) if (!(id(r) in DEFAULTS)) { const v = read(r); DEFAULTS[id(r)] = round(v, r[5] ?? 1); if (!(id(r) in tweaks)) S[id(r)] = DEFAULTS[id(r)]; }
+for (const r of ROWS) if (!(id(r) in DEFAULTS)) { setDefault(r, read(r)); if (!(id(r) in tweaks)) S[id(r)] = DEFAULTS[id(r)]; }
 Object.assign(S, pick(tweaks));
 applyAll();
 addEventListener('resize', () => write(['stickSize', 'frac'], S['stickSize.frac']));

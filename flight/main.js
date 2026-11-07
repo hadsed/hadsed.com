@@ -239,10 +239,35 @@ function frame(nowMs) {
 
   // Reticle: where the jet is headed. Hidden while the autopilot follows someone.
   assist.direction(aimDir);
-  proj.set(view.pos[0] + aimDir[0] * 20000, view.pos[1] + aimDir[1] * 20000, view.pos[2] + aimDir[2] * 20000).project(renderer.camera);
-  const showReticle = !follow && !attract && renderer.rig.blend === 1 && proj.z < 1;
+  const pin = RETICLE.radius > 0 && placeReticle(RETICLE.radius);
+  if (!pin) proj.set(view.pos[0] + aimDir[0] * 20000, view.pos[1] + aimDir[1] * 20000, view.pos[2] + aimDir[2] * 20000).project(renderer.camera);
+  const showReticle = !follow && !attract && renderer.rig.blend === 1 && (pin || proj.z < 1);
   reticle.style.display = showReticle ? 'block' : 'none';
-  if (showReticle) reticle.style.transform = `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
+  if (showReticle) reticle.style.transform = pin ? `translate(${pin[0]}px, ${pin[1]}px)` : `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
+}
+
+// Reticle radius in px (0 = free, drawn where the aim point projects). Set, the reticle stays
+// within that many px of the jet's nose point: its distance out is how far the aim is from the
+// nose as a share of a full-stick turn, so it reads the same whatever the assist's limits, and
+// steep banks or loops pin it to the rim instead of throwing it off screen.
+const RETICLE = { radius: 0 };
+const camQ = new THREE.Quaternion(), aimC = new THREE.Vector3(), noseC = new THREE.Vector3(), pinAt = [0, 0];
+function placeReticle(R) {
+  const cam = renderer.camera;
+  forwardOf(view.q, _f);
+  proj.set(view.pos[0] + _f[0] * 20000, view.pos[1] + _f[1] * 20000, view.pos[2] + _f[2] * 20000).project(cam);
+  if (proj.z > 1) return null;
+  const sx = (proj.x * 0.5 + 0.5) * innerWidth, sy = (-proj.y * 0.5 + 0.5) * innerHeight;
+  // Aim and nose in camera space: the screen direction from one to the other, even when the
+  // aim point is behind the camera.
+  camQ.copy(cam.quaternion).invert();
+  aimC.set(aimDir[0], aimDir[1], aimDir[2]).applyQuaternion(camQ);
+  noseC.set(_f[0], _f[1], _f[2]).applyQuaternion(camQ);
+  const dx = aimC.x - noseC.x, dy = -(aimC.y - noseC.y), len = Math.hypot(dx, dy);
+  const angle = Math.acos(Math.max(-1, Math.min(1, aimC.dot(noseC))));
+  const k = len > 1e-6 ? R * Math.min(1, angle / Math.max(assist.tune.maxTurn, assist.tune.maxPitch)) / len : 0;
+  pinAt[0] = sx + dx * k; pinAt[1] = sy + dy * k;
+  return pinAt;
 }
 requestAnimationFrame(frame);
 
@@ -380,7 +405,7 @@ function followAxes(dash = false) {
 }
 $('unfollow').addEventListener('click', () => stopFollow());
 addEventListener('keydown', (e) => { if (e.code === 'KeyX' && follow) stopFollow(); });
-Object.assign(window.__flight, { startFollow, stopFollow });
+Object.assign(window.__flight, { startFollow, stopFollow, reticle: RETICLE });
 
 // ---- attract <-> flying (the site backdrop's Fly and Back) ----
 // Before the backdrop is shown, drop the jet next to a live one if any are about,
