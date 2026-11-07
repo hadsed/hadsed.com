@@ -6,7 +6,7 @@ import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
 import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
 import { Pane } from './vendor/tweakpane.min.js';
-const STORE = 'sr71-backdrop-v10';   // v10: Had's star tuning as defaults, horizon thinning
+const STORE = 'sr71-backdrop-v11';   // v10: Had's star tuning as defaults, horizon thinning
 
 // ---------- settings ----------
 const PRESETS = {
@@ -304,7 +304,29 @@ frame.addEventListener('load', () => {
 
 // ---------- panel ----------
 const panel = document.getElementById('panel');
+const m = (...modes) => () => modes.includes(+S.skyMode);
 const SPEC = [
+  ['Sky', true, [
+    ['skyMode', 'select', { label: 'Sky model', options: [[0, 'Current'], [1, 'Smooth ramp'], [2, 'Layered (Firewatch-style)'], [3, 'Physical (scattering)']] }],
+    ['skySoft', 'range', { label: 'Softness', min: 0, max: 0.4, step: 0.005, show: m(1) }],
+    ['layTop', 'color', { label: 'Top', show: m(2) }],
+    ['layMid', 'color', { label: 'Middle', show: m(2) }],
+    ['layBottom', 'color', { label: 'Bottom', show: m(2) }],
+    ['layMidEl', 'range', { label: 'Middle at (°)', min: 0.2, max: 20, step: 0.1, show: m(2) }],
+    ['layTopEl', 'range', { label: 'Top at (°)', min: 2, max: 90, step: 0.5, show: m(2) }],
+    ['layHaloColor', 'color', { label: 'Horizon halo', show: m(2) }],
+    ['layHalo', 'range', { label: 'Halo strength', min: 0, max: 2, step: 0.01, show: m(2) }],
+    ['layHaloH', 'range', { label: 'Halo height (°)', min: 0.05, max: 10, step: 0.05, show: m(2) }],
+    ['laySunColor', 'color', { label: 'Sun halo', show: m(2) }],
+    ['laySun', 'range', { label: 'Sun halo strength', min: 0, max: 2, step: 0.01, show: m(2) }],
+    ['laySunSize', 'range', { label: 'Sun halo size', min: 0.02, max: 1, step: 0.01, show: m(2) }],
+    ['physSun', 'range', { label: 'Sun intensity', min: 1, max: 60, step: 0.5, show: m(3) }],
+    ['physExp', 'range', { label: 'Exposure', min: 0.05, max: 5, step: 0.01, show: m(3) }],
+    ['physColor', 'range', { label: 'Navy tone ↔ true color', min: 0, max: 1, step: 0.01, show: m(3) }],
+    ['physMie', 'range', { label: 'Haze (Mie)', min: 0, max: 10, step: 0.05, show: m(3) }],
+    ['physOzone', 'range', { label: 'Ozone (blue hour)', min: 0, max: 4, step: 0.05, show: m(3) }],
+    ['sunEl', 'range', { label: 'Sun height (°)', min: -4, max: 70, step: 0.5 }],
+  ]],
   ['Stars', true, [
     ['stars', 'range', { label: 'Amount', min: 0, max: 3, step: 0.01 }],
     ['starDensity', 'range', { label: 'Density', min: 0, max: 2, step: 0.01 }],
@@ -342,7 +364,6 @@ const SPEC = [
     ['offsetX', 'range', { label: 'Jet position E–W (km)', min: -140, max: 140, step: 0.5 }],
     ['offsetZ', 'range', { label: 'Jet position N–S (km)', min: -140, max: 140, step: 0.5 }],
     ['sunAz', 'range', { label: 'Sun direction (°)', min: 0, max: 360, step: 1 }],
-    ['sunEl', 'range', { label: 'Sun height (°)', min: -4, max: 70, step: 0.5 }],
     ['haze', 'range', { label: 'Visibility (km)', min: 40, max: 600, step: 5 }],
     ['clouds', 'range', { label: 'Cloud cover', min: 0, max: 1, step: 0.01 }],
     ['fov', 'range', { label: 'Lens (vertical °)', min: 12, max: 70, step: 1 }],
@@ -392,6 +413,7 @@ const OPEN = 'sr71-backdrop-folders';
 let openFolders = {};
 try { openFolders = JSON.parse(localStorage.getItem(OPEN) || '{}'); } catch {}
 let pane = null, syncing = false;
+const shows = [];
 function toP() {
   for (const [, , rows] of SPEC) for (const [key] of rows) {
     let v = S[key];
@@ -410,9 +432,11 @@ function build() {
       if (type === 'range') Object.assign(opts, { min: o.min, max: o.max, step: o.step });
       if (type === 'select') opts.options = Object.fromEntries(o.options.map(([v, t]) => [t, v]));
       if (type === 'color') opts.view = 'color';
-      f.addBinding(P, key, opts).on('change', (e) => {
+      const bnd = f.addBinding(P, key, opts);
+      if (o.show) shows.push([bnd, o.show]);
+      bnd.on('change', (e) => {
         if (syncing) return;
-        const v = e.value;
+        const v = key === 'skyMode' ? +e.value : e.value;
         S[key] = v;
         if (key === 'preset' && PRESETS[v]) Object.assign(S, PRESETS[v]);
         if (key === 'style' && STYLES[v]) Object.assign(S, STYLES[v]);
@@ -428,6 +452,7 @@ function sync() {
   toP();
   syncing = true;
   try { pane.refresh(); } finally { syncing = false; }
+  for (const [b, show] of shows) b.hidden = !show();
 }
 build(); sync();
 

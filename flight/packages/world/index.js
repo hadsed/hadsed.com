@@ -38,6 +38,17 @@ export const WORLD_DEFAULTS = {
   stars: 1.17, starDensity: 0.22, starBright: 1.11, starSize: 0.6, starScale: 1.26, starSeed: 0, starFade: 12, starFall: 2.5, starGlow: 0.5,
   starColor: '#f2eee6', starVar: 0.3, starDark: 0.395,
 };
+// Sky candidates (lab): 0 the current sky, 1 its tone ramp with a rounded corner, 2 a layered art-directed
+// gradient (colors as picked, sRGB), 3 physical single scattering.
+Object.assign(WORLD_DEFAULTS, {
+  skyMode: 0, skySoft: 0.12,
+  layTop: '#0e1420', layMid: '#27303f', layBottom: '#cdb98d', layMidEl: 2.5, layTopEl: 22,
+  layHaloColor: '#f3dca4', layHaloH: 0.5, layHalo: 0.5, laySunColor: '#ffe9b8', laySun: 0.25, laySunSize: 0.25,
+  physExp: 0.4, physColor: 0.3, physMie: 1, physOzone: 1, physSun: 20,
+});
+const SKY_NUM = ['skyMode', 'skySoft', 'layMidEl', 'layTopEl', 'layHaloH', 'layHalo', 'laySun', 'laySunSize', 'physExp', 'physColor', 'physMie', 'physOzone', 'physSun'];
+const SKY_COL = ['layTop', 'layMid', 'layBottom', 'layHaloColor', 'laySunColor'];
+const srgb = (hex) => { const c = new THREE.Color(hex).convertLinearToSRGB(); return new THREE.Vector3(c.r, c.g, c.b); };   // as picked
 const STAR_KEYS = ['stars', 'starDensity', 'starBright', 'starSize', 'starScale', 'starSeed', 'starFade', 'starFall', 'starGlow', 'starVar', 'starDark'];
 
 const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
@@ -146,7 +157,86 @@ vec3 skyBase(vec3 d){
   c += vec3(0.30) * exp(-abs(el) * 70.0);   // bright limb on the horizon
   c += vec3(0.35) * pow(max(dot(d, uSun), 0.0), 12.0); // glow around the sun
   return mix(c, uHaze * 0.9, smoothstep(0.0, -0.03, el));
-}`;
+}
+#ifndef WORLD_LITE
+// ---- three candidate skies for the lab (uSkyMode 1-3), compared against the one above (0) ----
+uniform float uSkyMode, uSkySoft;
+uniform vec3 uLayTop, uLayMid, uLayBottom, uLayHaloColor, uLaySunColor;
+uniform float uLayMidEl, uLayTopEl, uLayHaloH, uLayHalo, uLaySun, uLaySunSize;
+uniform float uPhysExp, uPhysColor, uPhysMie, uPhysOzone, uPhysSun;
+uniform vec3 uCam, uOrigin;
+// 1. the same tone ramp with its corner at the mid point rounded off (width uSkySoft)
+vec3 rampSoft(vec3 c){
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  l = l / (1.0 + l);
+  l = pow(clamp(l * 1.55, 0.0, 1.0), 0.85);
+  l = clamp((l - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  vec3 lo = mix(uShadow, uMid, clamp(l / uMidPoint, 0.0, 1.0));
+  vec3 hi = mix(uMid, uLight, clamp((l - uMidPoint) / (1.0 - uMidPoint), 0.0, 1.0));
+  float k = smoothstep(uMidPoint - uSkySoft, uMidPoint + uSkySoft, l);
+  vec3 r = mix(lo, hi, k);
+  // a softer start to the gold too
+  float hl = smoothstep(uHlStart - uSkySoft, min(uHlStart + 0.18 + uSkySoft, 1.0), l) * uHlAmount;
+  return mix(r, uHigh, hl);
+}
+vec3 toLin(vec3 c){ return pow(c, vec3(2.2)); }
+// 2. Firewatch-style: an art-directed gradient (bottom, middle, top colors), a horizon halo and a sun halo,
+// blended smoothly (smoothstep in linear light), shown as picked
+vec3 skyLayered(vec3 d, float el){
+  float e = max(el, 0.0);
+  float a = smoothstep(0.0, radians(uLayMidEl), e), b = smoothstep(radians(uLayMidEl) * 0.5, radians(uLayTopEl), e);
+  vec3 c = mix(mix(toLin(uLayBottom), toLin(uLayMid), a), toLin(uLayTop), b);
+  c += toLin(uLayHaloColor) * uLayHalo * exp(-e / radians(max(uLayHaloH, 0.02)));
+  float sd = max(dot(d, uSun), 0.0);
+  c += toLin(uLaySunColor) * uLaySun * pow(sd, 1.0 / max(uLaySunSize * uLaySunSize, 1e-4));
+  c = mix(c, toLin(uLayBottom) * 0.6, smoothstep(0.0, -0.03, el));   // below the horizon: haze over the ground
+  return c;
+}
+// 3. physical: single scattering through a real atmosphere (Rayleigh, Mie, ozone), ray marched per pixel
+// from the camera's altitude (after Nishita; ozone as in Hillaire 2020)
+vec2 raySphere(vec3 o, vec3 d, float r){ float b = dot(o, d), c = dot(o, o) - r * r, h = b * b - c; if (h < 0.0) return vec2(-1.0); h = sqrt(h); return vec2(-b - h, -b + h); }
+vec3 skyPhysical(vec3 d){
+  const float RE = 6360e3, RA = 6460e3;
+  const vec3 BR = vec3(5.802e-6, 13.558e-6, 33.1e-6), BO = vec3(0.650e-6, 1.881e-6, 0.085e-6);
+  float BM = 3.996e-6 * uPhysMie;
+  float alt = clamp(uCam.y + uOrigin.y, 10.0, 90e3);
+  vec3 o = vec3(0.0, RE + alt, 0.0);
+  vec2 ta = raySphere(o, d, RA), tg = raySphere(o, d, RE);
+  float tmax = ta.y; if (tg.x > 0.0) tmax = tg.x;
+  if (tmax <= 0.0) return vec3(0.0);
+  const int N = 24, M = 6;
+  float dt = tmax / float(N), mu = dot(d, uSun);
+  float pr = 3.0 / (16.0 * 3.14159) * (1.0 + mu * mu);
+  float g = 0.8, pm = 3.0 / (8.0 * 3.14159) * ((1.0 - g * g) * (1.0 + mu * mu)) / ((2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
+  vec3 sumR = vec3(0.0), sumM = vec3(0.0); vec3 od = vec3(0.0);   // optical depth: rayleigh, mie, ozone
+  for (int i = 0; i < N; i++) {
+    vec3 p = o + d * (dt * (float(i) + 0.5));
+    float h = length(p) - RE;
+    float hr = exp(-h / 8000.0) * dt, hm = exp(-h / 1200.0) * dt, ho = max(0.0, 1.0 - abs(h - 25000.0) / 15000.0) * dt;
+    od += vec3(hr, hm, ho);
+    if (raySphere(p, uSun, RE).x > 0.0) continue;   // this point is in the earth's shadow
+    float ls = raySphere(p, uSun, RA).y / float(M);
+    vec3 odl = vec3(0.0);
+    for (int j = 0; j < M; j++) {
+      float hl = length(p + uSun * (ls * (float(j) + 0.5))) - RE;
+      odl += vec3(exp(-hl / 8000.0), exp(-hl / 1200.0), max(0.0, 1.0 - abs(hl - 25000.0) / 15000.0)) * ls;
+    }
+    vec3 tau = BR * (od.x + odl.x) + 1.1 * BM * (od.y + odl.y) + BO * uPhysOzone * (od.z + odl.z);
+    vec3 att = exp(-tau);
+    sumR += att * hr; sumM += att * hm;
+  }
+  return uPhysSun * (sumR * BR * pr + sumM * BM * pm);
+}
+// the chosen sky, toned for display (display-linear), and its linear color for the stars' darkness test
+vec3 skyToned(vec3 d, out vec3 base){
+  float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;
+  if (uSkyMode < 1.5) { base = skyBase(d); return rampSoft(base * uExposure); }
+  if (uSkyMode < 2.5) { vec3 t = skyLayered(d, el); base = naturalInv(t) / uExposure; return t; }
+  base = skyPhysical(d) * uPhysExp;
+  vec3 c = base * uExposure;
+  return mix(ramp(c, 0.0), natural(c), uPhysColor);
+}
+#endif`;
 
 const LINES = /* glsl */`
 // anti-aliased lines that fade out before they get denser than a couple of pixels
@@ -269,6 +359,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uMono: { value: 1 }, uExposure: { value: 1.12 }, uContrast: { value: 1.13 }, uDirect: { value: 0 }, uChroma: { value: 0.6 },
     ...Object.fromEntries(STAR_KEYS.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: +WORLD_DEFAULTS[k] }])),
     uStarColor: { value: col(WORLD_DEFAULTS.starColor) },
+    ...Object.fromEntries(SKY_NUM.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: +WORLD_DEFAULTS[k] }])),
+    ...Object.fromEntries(SKY_COL.map((k) => ['u' + k[0].toUpperCase() + k.slice(1), { value: srgb(WORLD_DEFAULTS[k]) }])),
   };
 
   // ---- sky: thin bright air at the horizon, near-space navy overhead, a sun and the limb ----
@@ -304,7 +396,9 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           #ifdef WORLD_LITE
           vec3 base = vBase; vec4 skyOut = vSky;
           #else
-          vec3 base = skyBase(d); vec4 skyOut = finishSky(base);
+          vec3 base; vec4 skyOut; bool toned = uSkyMode > 0.5;
+          if (toned) skyOut = vec4(skyToned(d, base), -1.0);   // alpha -1: already toned, the post pass keeps it
+          else { base = skyBase(d); skyOut = finishSky(base); }
           #endif
           float disk = pow(max(dot(d, uSun), 0.0), 2500.0);
           // Stars: light of their own, added on top of the toned sky.
@@ -315,6 +409,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           if (uDirect > 0.5) {
             vec3 sky = skyOut.rgb;
             #ifndef WORLD_LITE
+            if (toned) sky = pow(max(sky, 0.0), vec3(1.0 / 2.2));
             if (uStars > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(base + e, 0.0) - display(base, 0.0), 0.0), vec3(1.0 / 2.2));
             // an 8-bit screen can't hold a slow dark gradient: half a step of noise hides the bands
             sky += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
@@ -322,6 +417,14 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
             // the disk is far past white: in the post pass the tone turns it to highlight; direct, draw that
             gl_FragColor = vec4(mix(sky, pow(uHigh, vec3(1.0 / 2.2)), min(disk * 3.0, 1.0)), 1.0);
           } else {
+            #ifndef WORLD_LITE
+            if (toned) {
+              vec3 t = skyOut.rgb;
+              if (uStars > 0.0) t += max(display(base + e, 0.0) - display(base, 0.0), 0.0);
+              gl_FragColor = vec4(mix(t, uHigh, min(disk * 3.0, 1.0)), -1.0);
+              return;
+            }
+            #endif
             gl_FragColor = vec4(skyOut.rgb + e / uExposure + vec3(3.0) * disk, skyOut.a);
           }
         }`,
@@ -547,6 +650,8 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       sunDir.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize();
       for (const k of STAR_KEYS) U[uName(k)].value = +(look[k] ?? 0);
       if (look.starColor) U.uStarColor.value.copy(col(look.starColor));
+      for (const k of SKY_NUM) if (look[k] != null) U[uName(k)].value = +look[k];
+      for (const k of SKY_COL) if (look[k]) U[uName(k)].value.copy(srgb(look[k]));
       U.uHazeDist.value = look.haze * 1000;
       U.uCover.value = +look.clouds;
       if (look.cloudM) cloudM = +look.cloudM;
@@ -633,7 +738,7 @@ export function createPost(renderer, world, { samples = 4, skipWhenOff = true } 
         float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
         void main(){
           vec4 src = texture2D(tColor, vUv);
-          vec3 m = display(src.rgb, src.a);
+          vec3 m = src.a < -0.5 ? src.rgb : display(src.rgb, max(src.a, 0.0));   // alpha -1: a sky that toned itself
           vec2 v = vUv - 0.5; m *= 1.0 - uVignette * dot(v, v) * 1.6;
           m = pow(max(m, 0.0), vec3(1.0 / 2.2));
           m += (h(vUv * uRes) - 0.5) * (uGrain + 1.0 / 255.0);   // grain, and always half a step of dither so dark gradients don't band
