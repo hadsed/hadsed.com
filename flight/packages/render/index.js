@@ -16,10 +16,10 @@ import { FLAG } from '../net/protocol.js';
 const MAX_GHOSTS = 64;
 const REAL_LOOK = { grid: 0, contour: 0, haze: 170 };
 
-// look: 'site' (default: the gold-outlined jets over the site's survey-grid ground)
-// or 'real' (a comparison look: plain matte jets, natural ground with no grid or
-// contours, white contrails, a little more haze).
-export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', look = 'site' }) {
+// look: 'real' (default: plain matte jets, natural ground with no grid or
+// contours, white contrails, a little more haze) or 'site' (the gold-outlined
+// jets over the site's survey-grid ground; ?look=site).
+export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', look = 'real' }) {
   const real = look === 'real';
   const pal = manifest.palette;
   const sky = new THREE.Color(pal.sky), gold = new THREE.Color(pal.gold);

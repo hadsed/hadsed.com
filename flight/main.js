@@ -161,7 +161,7 @@ function labels(camera, list) {
 
 let renderer;
 try {
-  renderer = createRenderer({ canvas, manifest, labels, speedStyle, look: params.get('look') === 'real' ? 'real' : 'site' });
+  renderer = createRenderer({ canvas, manifest, labels, speedStyle, look: params.get('look') === 'site' ? 'site' : 'real' });
 } catch (err) {
   // No WebGL (old device, blocked GPU, lockdown mode): say so instead of a black screen.
   net.close();
