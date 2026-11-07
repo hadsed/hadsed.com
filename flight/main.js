@@ -225,7 +225,8 @@ function frame(nowMs) {
   $('mach').textContent = `mach ${(jet.speed / 295).toFixed(2)}`;
   thr.style.width = `${Math.round(jet.throttle * 100)}%`;
   const others = net.state.status === 'online' ? roster.size : 0;
-  $('aloft').textContent = `${others} other${others === 1 ? '' : 's'} in flight`;
+  // "in flight" drops on narrow phones (index.html), where a long callsign at top left would meet it.
+  $('aloft').innerHTML = `${others} other${others === 1 ? '' : 's'}<span class="wide"> in flight</span>`;
   if (!attract) statusLog();
   if (edgeDark) {
     vignette += ((!attract && jet.flags & FLAG.BOOST ? 1 : 0) - vignette) * (1 - Math.exp(-dt * 2.5));

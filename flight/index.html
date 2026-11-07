@@ -17,6 +17,7 @@
   .hud { position: fixed; pointer-events: none; text-transform: uppercase; }
   #tl { top: max(14px, env(safe-area-inset-top)); left: 16px; }
   #tr { top: max(14px, env(safe-area-inset-top)); right: 16px; text-align: right; }
+  @media (max-width: 400px) { #tr .wide { display: none; } }
   #bl { bottom: max(14px, env(safe-area-inset-bottom)); left: 16px; }
   #help { bottom: max(14px, env(safe-area-inset-bottom)); right: 16px; text-align: right; color: var(--dim); transition: opacity 1s; }
   /* Phones: no keyboard, and the key list would run into the altimeter. */
