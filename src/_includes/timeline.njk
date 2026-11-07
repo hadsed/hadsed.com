@@ -9,7 +9,8 @@
     <span class="dates">{% if startYear == endYear %}{{ startYear }}{% else %}{{ startYear }} – {{ endYear }}{% endif %}</span>
     {%- if item.data.role or item.data.subtitle %}
     <div class="role">{%- if item.data.role %}{{ item.data.role }}{% if item.data.subtitle %}, {% endif %}{% endif -%}
-      {%- if item.data.subtitle and item.data.link %}<a href="{{ item.data.link }}">{{ item.data.subtitle }}</a>{% elif item.data.subtitle %}{{ item.data.subtitle }}{% endif -%}
+      {#- Subtitles can carry inline Markdown links; a bare subtitle with a link field links as a whole -#}
+      {%- if item.data.subtitle and item.data.link and "](" not in item.data.subtitle %}<a href="{{ item.data.link }}">{{ item.data.subtitle }}</a>{% elif item.data.subtitle %}{{ item.data.subtitle | inlineLinks | safe }}{% endif -%}
     </div>
     {%- endif %}
     {%- if detailed and (item.templateContent | trim) %}
