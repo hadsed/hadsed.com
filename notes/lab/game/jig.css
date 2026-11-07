@@ -28,3 +28,6 @@
   #jig { left: 8px; right: 8px; width: auto; max-height: 55vh; }
   #jig.closed { left: auto; }
 }
+/* Per-control reset, only on changed rows. */
+.jig-body .tp-lblv_l .jig-undo { display: none; margin-left: 4px; padding: 0 4px !important; border: 0 !important; background: none !important; color: #e4c56f !important; font-size: 12px; line-height: 1; cursor: pointer; }
+.jig-body .jig-changed .tp-lblv_l .jig-undo { display: inline; }

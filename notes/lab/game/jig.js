@@ -97,6 +97,8 @@ const SPEC = [
 ];
 const ROWS = SPEC.flatMap(([, , rows]) => rows);
 const id = (r) => `${r[0]}.${r[1]}`;
+// Tweakpane snaps values to the step in floating point (1.6 can come back as 1.5999999999999999).
+const same = (a, b) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 1e-9 : a === b);
 const round = (v, step) => (typeof v === 'number' ? +(Math.round(v / step) * step).toFixed(6) : v);
 
 // Panel values (in panel units) from the game, and back.
@@ -108,7 +110,7 @@ function write(r, v) {
   if (!o) return;
   const k = id(r);
   if (!(k in RAW)) RAW[k] = o[r[1]];
-  o[r[1]] = v === GAME[k] ? RAW[k] : typeof v === 'number' && r[6] ? v / r[6] : v;
+  o[r[1]] = same(v, GAME[k]) ? RAW[k] : typeof v === 'number' && r[6] ? v / r[6] : v;
   if (r[0] === 'stickSize' && F) F.stick.tune.radius = stickSize.frac * Math.min(innerWidth, innerHeight);
 }
 
@@ -135,7 +137,7 @@ applyAll();
 addEventListener('resize', () => write(['stickSize', 'frac'], S['stickSize.frac']));
 
 function pick(o) { const out = {}; for (const r of ROWS) if (o && id(r) in o) out[id(r)] = o[id(r)]; return out; }
-function changed() { const out = {}; for (const k in S) if (S[k] !== DEFAULTS[k]) out[k] = S[k]; return out; }
+function changed() { const out = {}; for (const k in S) if (!same(S[k], DEFAULTS[k])) out[k] = S[k]; return out; }
 function save() { try { localStorage.setItem(STORE, JSON.stringify(changed())); } catch {} }
 
 // ---- panel ----
@@ -143,10 +145,10 @@ const panel = document.createElement('aside');
 panel.id = 'jig';
 panel.innerHTML = `
   <div class="jig-head"><strong>Game mechanics</strong><button id="jig-toggle" type="button" aria-expanded="true">Hide</button></div>
-  <div class="jig-body"><p class="jig-hint">Changes apply live to your jet only; bots and other players fly on the server's numbers. Gold labels differ from the game's defaults. H hides this panel. Settings stay in this browser.</p></div>
+  <div class="jig-body"><p class="jig-hint">Changes apply live to your jet only; bots and other players fly on the server's numbers. Gold labels differ from the defaults; ↺ resets one, each folder has its own reset. H hides this panel. Settings stay in this browser.</p></div>
   <div class="jig-foot">
     <button id="jig-copy" type="button">Copy link</button>
-    <button id="jig-reset" type="button">Defaults</button>
+    <button id="jig-reset" type="button">Reset all</button>
     <span id="jig-status" role="status" aria-live="polite"></span>
   </div>`;
 document.body.appendChild(panel);
@@ -170,9 +172,23 @@ for (const [title, expanded, rows] of SPEC) {
     const b = f.addBinding(S, k, opts);
     b.on('change', (e) => { if (syncing) return; write(r, e.value); save(); mark(); });
     bindings.push([k, b]);
+    // Per-control reset: a small ↺ beside the label, shown only while the value differs.
+    const undo = document.createElement('button');
+    undo.type = 'button'; undo.className = 'jig-undo'; undo.textContent = '↺';
+    undo.title = `Reset to ${DEFAULTS[k]}`;
+    undo.addEventListener('click', (e) => { e.stopPropagation(); reset([r]); });
+    b.element.querySelector('.tp-lblv_l')?.appendChild(undo);
   }
+  // Per-folder reset.
+  const live = rows.filter((r) => S[id(r)] !== undefined);
+  f.addButton({ title: `Reset ${title.toLowerCase()}` }).on('click', () => { reset(live); say(`${title} back to defaults`); });
 }
-function mark() { for (const [k, b] of bindings) b.element.classList.toggle('jig-changed', S[k] !== DEFAULTS[k]); }
+function reset(rows) {
+  for (const r of rows) { S[id(r)] = DEFAULTS[id(r)]; write(r, S[id(r)]); }
+  syncing = true; try { pane.refresh(); } finally { syncing = false; }
+  save(); mark();
+}
+function mark() { for (const [k, b] of bindings) b.element.classList.toggle('jig-changed', !same(S[k], DEFAULTS[k])); }
 mark();
 
 const status = panel.querySelector('#jig-status');
@@ -183,9 +199,7 @@ toggle.addEventListener('click', () => {
   toggle.setAttribute('aria-expanded', String(open)); toggle.textContent = open ? 'Hide' : 'Tune';
 });
 panel.querySelector('#jig-reset').addEventListener('click', () => {
-  Object.assign(S, DEFAULTS); applyAll();
-  syncing = true; try { pane.refresh(); } finally { syncing = false; }
-  save(); mark();
+  reset(ROWS.filter((r) => S[id(r)] !== undefined));
   history.replaceState(null, '', location.pathname + location.search);
   say('Back to the game\'s defaults');
 });
