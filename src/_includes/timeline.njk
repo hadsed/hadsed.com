@@ -9,7 +9,10 @@
     <span class="dates">{% if startYear == endYear %}{{ startYear }}{% else %}{{ startYear }} – {{ endYear }}{% endif %}</span>
     {%- if item.data.role or item.data.subtitle %}
     <div class="role">{%- if item.data.role %}{{ item.data.role }}{% if item.data.subtitle %}, {% endif %}{% endif -%}
-      {%- if item.data.subtitle and item.data.link %}<a href="{{ item.data.link }}">{{ item.data.subtitle }}</a>{% elif item.data.subtitle %}{{ item.data.subtitle }}{% endif -%}
+      {#- link_text links just that phrase of the subtitle; without it (or if it's not in the subtitle) the whole subtitle is the link -#}
+      {%- set linkParts = item.data.subtitle.split(item.data.link_text) if (item.data.subtitle and item.data.link and item.data.link_text) else [] -%}
+      {%- if linkParts | length == 2 %}{{ linkParts[0] }}<a href="{{ item.data.link }}">{{ item.data.link_text }}</a>{{ linkParts[1] }}
+      {%- elif item.data.subtitle and item.data.link %}<a href="{{ item.data.link }}">{{ item.data.subtitle }}</a>{% elif item.data.subtitle %}{{ item.data.subtitle }}{% endif -%}
     </div>
     {%- endif %}
     {%- if detailed and (item.templateContent | trim) %}
