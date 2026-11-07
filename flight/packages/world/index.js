@@ -28,15 +28,17 @@ export const EARTH_R = 6371000;
 // color 0 is the original navy terrain grid; mono 0 is full natural color.
 export const WORLD_DEFAULTS = {
   shadow: '#07090e', mid: '#1c2433', light: '#c8cdd5', highlight: '#e4c56f',
-  midPoint: 0.56, hlStart: 0.61, hlAmount: 0.85, mono: 1, chroma: 0.7, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
+  midPoint: 0.56, hlStart: 0.62, hlAmount: 0.68, mono: 1, chroma: 0.7, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
   region: 'sierra', altitudeFt: 85000, exag: 1, offsetX: 79, offsetZ: -69.1, sunAz: 41, sunEl: 18, haze: 130, clouds: 0.54, fov: 23,
   grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   color: 1, texture: 1,
   // Stars over the dark upper sky (2026-11-07: Had's pick, the quiet set). stars 0 turns them off.
-  stars: 1, starDensity: 0.2, starBright: 0.8, starSize: 1, starScale: 1, starSeed: 0, starFade: 6, starColor: '#f2eee6', starVar: 0.3, starDark: 0.16,
+  // 2026-11-07 Had's tuning; starFall/starGlow: fewer stars toward the horizon, a few bright ones still in the glow.
+  stars: 1.17, starDensity: 0.22, starBright: 1.11, starSize: 0.6, starScale: 1.26, starSeed: 0, starFade: 12, starFall: 2.5, starGlow: 0.5,
+  starColor: '#f2eee6', starVar: 0.3, starDark: 0.395,
 };
-const STAR_KEYS = ['stars', 'starDensity', 'starBright', 'starSize', 'starScale', 'starSeed', 'starFade', 'starVar', 'starDark'];
+const STAR_KEYS = ['stars', 'starDensity', 'starBright', 'starSize', 'starScale', 'starSeed', 'starFade', 'starFall', 'starGlow', 'starVar', 'starDark'];
 
 const col = (hex) => { const c = new THREE.Color(hex); return new THREE.Vector3(c.r, c.g, c.b); };  // linear
 
@@ -95,34 +97,55 @@ vec4 finishSky(vec3 c){
 // and a half across whatever the lens, so stars stay crisp at any field of view and don't shimmer as the
 // camera drifts. They live in the dark: they fade out toward the bright band at the horizon.
 export const STARS = /* glsl */`
-uniform float uStars, uStarDensity, uStarBright, uStarSize, uStarScale, uStarSeed, uStarFade, uStarVar, uStarDark;
+uniform float uStars, uStarDensity, uStarBright, uStarSize, uStarScale, uStarSeed, uStarFade, uStarFall, uStarGlow, uStarVar, uStarDark;
 uniform vec3 uStarColor;
 vec3 shash3(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
-float starLayer(vec3 d, float n, float keep, float pix, out vec3 tint){
+// w: how many of the usual stars survive here (0 to 1), thinning toward the horizon. The brightest
+// few (by uStarGlow) survive regardless, so some still shine through the horizon glow.
+float starLayer(vec3 d, float n, float keep, float pix, float w, out vec3 tint){
   n *= uStarScale; keep *= uStarDensity;
   vec3 g = d * n, id = floor(g), r = shash3(id + uStarSeed * 13.7);
   tint = vec3(0.0);
   // a grid finer than a few pixels would read as noise: fade the layer out as its cells shrink on screen
   float fit = 1.0 - smoothstep(0.12, 0.3, pix * n);
-  if (r.x > keep || fit <= 0.0) return 0.0;
+  float bright = smoothstep(0.55, 0.85, r.y) * uStarGlow;
+  float here = max(w, bright);
+  if (r.x > keep * here || fit <= 0.0) return 0.0;
   vec3 s = normalize(id + 0.2 + 0.6 * shash3(id + 17.0 + uStarSeed * 13.7));
   float a = length(d - s);                              // radians, near enough at these sizes
   float sig = pix * 0.75 * uStarSize;
   float b = pow(r.y, 5.0) * 1.6 + 0.08;                 // most faint, a few bright
   tint = uStarColor * mix(vec3(1.0), mix(vec3(0.70, 0.80, 1.0), vec3(1.0, 0.82, 0.62), r.z), uStarVar);
-  return uStarBright * b * fit * exp(-a * a / (2.0 * sig * sig));
+  return uStarBright * b * fit * max(sqrt(w), bright) * exp(-a * a / (2.0 * sig * sig));
 }
 vec3 starSky(vec3 d, float el, vec3 base){
   float pix = max(length(fwidth(d)), 2e-5);
   float dark = 1.0 - smoothstep(uStarDark * 0.12, uStarDark, dot(base, vec3(0.2126, 0.7152, 0.0722)));
+  // the count thins as a power of the height above the horizon: higher starFall, steeper drop
   float fade = radians(max(uStarFade, 0.05));
-  float up = smoothstep(fade * 0.15, fade, el) * dark;
-  if (up <= 0.0) return vec3(0.0);
+  float w = pow(clamp(el / fade, 0.0, 1.0), max(uStarFall, 0.1)) * dark;
+  if (el < -0.002 || (w <= 0.0 && uStarGlow <= 0.0)) return vec3(0.0);
   vec3 e = vec3(0.0), t; float s;
-  s = starLayer(d, 70.0, 0.55, pix, t);  e += t * s * 3.2;
-  s = starLayer(d, 160.0, 0.6, pix, t);  e += t * s * 1.6;
-  s = starLayer(d, 330.0, 0.5, pix, t);  e += t * s * 0.8;
-  return e * uStars * up;
+  s = starLayer(d, 70.0, 0.55, pix, w, t);  e += t * s * 3.2;
+  s = starLayer(d, 160.0, 0.6, pix, w, t);  e += t * s * 1.6;
+  s = starLayer(d, 330.0, 0.5, pix, w, t);  e += t * s * 0.8;
+  return e * uStars;
+}`;
+
+// The sky's own color for a view direction (linear, before the tone): navy overhead, a thin bright band
+// at the horizon, a glow around the sun.
+const SKY = /* glsl */`
+uniform vec3 uSun, uHaze; uniform float uDip, uSkyK;
+${TONE}
+vec3 skyBase(vec3 d){
+  float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;       // angle above the true horizon
+  vec3 zenith = vec3(0.010, 0.020, 0.055);   // near-space dark blue
+  // high up most of the air is below you: a thin bright band at the horizon, navy by ~20 degrees up.
+  // Lower down (uSkyK smaller) the bright band widens.
+  vec3 c = mix(uHaze, zenith, 1.0 - exp(-max(el, 0.0) * uSkyK));
+  c += vec3(0.30) * exp(-abs(el) * 70.0);   // bright limb on the horizon
+  c += vec3(0.35) * pow(max(dot(d, uSun), 0.0), 12.0); // glow around the sun
+  return mix(c, uHaze * 0.9, smoothstep(0.0, -0.03, el));
 }`;
 
 const LINES = /* glsl */`
@@ -249,57 +272,57 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
   };
 
   // ---- sky: thin bright air at the horizon, near-space navy overhead, a sun and the limb ----
-  // The sky is smooth, so it is shaded per vertex on a sphere whose rings crowd in at the horizon
-  // (where the limb is a fraction of a degree thick); only the sun disk is worked out per pixel.
+  // A sphere whose rings crowd in at the horizon (where the limb is a fraction of a degree thick).
   // Drawn first, behind everything, with no depth test, depth write or log-depth.
   const sky = new THREE.Mesh(
     skyGeometry(1.5e6),
     new THREE.ShaderMaterial({ defines,
       side: THREE.DoubleSide, depthWrite: false, depthTest: false, uniforms: U,
       vertexShader: /* glsl */`
-        uniform vec3 uSun, uHaze; uniform float uDip, uSkyK;
         varying vec3 vDir; varying vec4 vSky; varying vec3 vBase;
-        ${TONE}
+        ${SKY}
         void main(){
           vec3 d = normalize(position); vDir = d;
-          float el = asin(clamp(d.y, -1.0, 1.0)) + uDip;       // angle above the true horizon
-          vec3 zenith = vec3(0.010, 0.020, 0.055);   // near-space dark blue
-          vec3 haze = uHaze;
-          // high up most of the air is below you: a thin bright band at the horizon, navy by ~20 degrees up.
-          // Lower down (uSkyK smaller) the bright band widens.
-          vec3 c = mix(haze, zenith, 1.0 - exp(-max(el, 0.0) * uSkyK));
-          c += vec3(0.30) * exp(-abs(el) * 70.0);   // bright limb on the horizon
-          c += vec3(0.35) * pow(max(dot(d, uSun), 0.0), 12.0); // glow around the sun
-          c = mix(c, haze * 0.9, smoothstep(0.0, -0.03, el));
-          vBase = c;
-          vSky = finishSky(c);
+          #ifdef WORLD_LITE
+          vBase = skyBase(d);
+          vSky = finishSky(vBase);
+          #endif
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */`
-        uniform float uDip; uniform vec3 uSun;
         varying vec3 vDir; varying vec4 vSky; varying vec3 vBase;
         ${NOISE}
-        ${TONE}
+        ${SKY}
         #ifndef WORLD_LITE
         ${STARS}
         #endif
         void main(){
           vec3 d = normalize(vDir);
+          // Per pixel on a GPU: the gradient is steep at the horizon and the tone ramp bends it, so
+          // shading per vertex and blending between rings showed as stripes. A CPU rasterizer keeps
+          // the per-vertex sky.
+          #ifdef WORLD_LITE
+          vec3 base = vBase; vec4 skyOut = vSky;
+          #else
+          vec3 base = skyBase(d); vec4 skyOut = finishSky(base);
+          #endif
           float disk = pow(max(dot(d, uSun), 0.0), 2500.0);
           // Stars: light of their own, added on top of the toned sky.
           vec3 e = vec3(0.0);
           #ifndef WORLD_LITE
-          if (uStars > 0.0) e = starSky(d, asin(clamp(d.y, -1.0, 1.0)) + uDip, vBase);
+          if (uStars > 0.0) e = starSky(d, asin(clamp(d.y, -1.0, 1.0)) + uDip, base);
           #endif
           if (uDirect > 0.5) {
-            vec3 sky = vSky.rgb;
+            vec3 sky = skyOut.rgb;
             #ifndef WORLD_LITE
-            if (uStars > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(vBase + e, 0.0) - display(vBase, 0.0), 0.0), vec3(1.0 / 2.2));
+            if (uStars > 0.0) sky = pow(pow(sky, vec3(2.2)) + max(display(base + e, 0.0) - display(base, 0.0), 0.0), vec3(1.0 / 2.2));
+            // an 8-bit screen can't hold a slow dark gradient: half a step of noise hides the bands
+            sky += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
             #endif
             // the disk is far past white: in the post pass the tone turns it to highlight; direct, draw that
             gl_FragColor = vec4(mix(sky, pow(uHigh, vec3(1.0 / 2.2)), min(disk * 3.0, 1.0)), 1.0);
           } else {
-            gl_FragColor = vec4(vSky.rgb + e / uExposure + vec3(3.0) * disk, vSky.a);
+            gl_FragColor = vec4(skyOut.rgb + e / uExposure + vec3(3.0) * disk, skyOut.a);
           }
         }`,
     }),
@@ -613,7 +636,7 @@ export function createPost(renderer, world, { samples = 4, skipWhenOff = true } 
           vec3 m = display(src.rgb, src.a);
           vec2 v = vUv - 0.5; m *= 1.0 - uVignette * dot(v, v) * 1.6;
           m = pow(max(m, 0.0), vec3(1.0 / 2.2));
-          m += (h(vUv * uRes) - 0.5) * uGrain;     // fine grain; also kills gradient banding
+          m += (h(vUv * uRes) - 0.5) * (uGrain + 1.0 / 255.0);   // grain, and always half a step of dither so dark gradients don't band
           gl_FragColor = vec4(m, 1.0);
         }`,
     }),

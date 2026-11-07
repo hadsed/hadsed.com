@@ -6,7 +6,7 @@ import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
 import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
 import { Pane } from './vendor/tweakpane.min.js';
-const STORE = 'sr71-backdrop-v9';   // v9: stars, Tweakpane panel, no night experiment
+const STORE = 'sr71-backdrop-v10';   // v10: Had's star tuning as defaults, horizon thinning
 
 // ---------- settings ----------
 const PRESETS = {
@@ -312,7 +312,9 @@ const SPEC = [
     ['starSize', 'range', { label: 'Size', min: 0.4, max: 3, step: 0.01 }],
     ['starScale', 'range', { label: 'Pattern scale', min: 0.3, max: 2.5, step: 0.01 }],
     ['starSeed', 'range', { label: 'Reshuffle', min: 0, max: 50, step: 1 }],
-    ['starFade', 'range', { label: 'Horizon fade (°)', min: 0.5, max: 30, step: 0.5 }],
+    ['starFade', 'range', { label: 'Thin out below (°)', min: 0.5, max: 40, step: 0.5 }],
+    ['starFall', 'range', { label: 'Thinning steepness', min: 0.2, max: 8, step: 0.05 }],
+    ['starGlow', 'range', { label: 'Bright stars in the glow', min: 0, max: 1, step: 0.01 }],
     ['starColor', 'color', { label: 'Color' }],
     ['starVar', 'range', { label: 'Color variety', min: 0, max: 1, step: 0.01 }],
     ['starDark', 'range', { label: 'Dark sky needed', min: 0.01, max: 0.6, step: 0.005 }],
