@@ -74,6 +74,10 @@ export default function (eleventyConfig) {
       let html = await readFile("flight/index.html", "utf8");
       html = swap(html, "<head>", '<head>\n<base href="/lab/flight/">');
       html = swap(html, "<title>Flight lab</title>", '<title>Game mechanics jig</title>\n<link rel="stylesheet" href="/lab/game/jig.css">');
+      // Absolute, not via <base>: Cloudflare turns the preload into an Early Hints header
+      // resolved against the page's own URL.
+      html = swap(html, '<link rel="modulepreload" href="vendor/three.module.js">', '<link rel="modulepreload" href="/lab/flight/vendor/three.module.js">');
+      html = swap(html, '"three": "./vendor/three.module.js"', '"three": "/lab/flight/vendor/three.module.js"');
       html = swap(html, '<script type="module" src="main.js"></script>', '<script type="module" src="/lab/game/jig.js"></script>');
       await mkdir(`${dir.output}/lab/game`, { recursive: true });
       await writeFile(`${dir.output}/lab/game/index.html`, html);
