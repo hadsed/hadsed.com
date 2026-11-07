@@ -8,6 +8,7 @@ import { createRemotes } from './packages/net/interp.js';
 import { FLAG } from './packages/net/protocol.js';
 import { loadManifest } from './packages/assets/index.js';
 import { createRenderer } from './packages/render/index.js';
+import { CHASE } from './packages/render/camera.js';
 import { escort } from './packages/bots/pilot.js';
 import { createLog } from './packages/hud/log.js';
 import { createAttractPilot, SLOTS } from './attract.js';
@@ -247,26 +248,29 @@ function frame(nowMs) {
 }
 
 // Reticle radius in px (0 = free, drawn where the aim point projects). Set, the reticle stays
-// within that many px of the jet's nose point: its distance out is how far the aim is from the
-// nose as a share of a full-stick turn, so it reads the same whatever the assist's limits, and
-// steep banks or loops pin it to the rim instead of throwing it off screen.
+// inside a circle of that radius fixed on screen, centered where the nose points in level
+// flight. Its distance out is how far the aim is from the nose as a share of a full-stick turn,
+// so it reads the same whatever the assist's limits, and hard pulls, banks and loops pin it to
+// the rim instead of throwing it off screen (the chase cam lags the nose in a hard pull-up).
 const RETICLE = { radius: 0 };
 const camQ = new THREE.Quaternion(), aimC = new THREE.Vector3(), noseC = new THREE.Vector3(), pinAt = [0, 0];
 function placeReticle(R) {
   const cam = renderer.camera;
+  // Level flight: the camera sits CHASE.up above and looks at a point CHASE.look ahead, so the
+  // nose's vanishing point is that far above the middle of the screen.
+  const tilt = Math.atan2(CHASE.up, CHASE.back + CHASE.look);
+  const cx = innerWidth / 2, cy = innerHeight / 2 * (1 - Math.tan(tilt) / Math.tan(cam.fov * Math.PI / 360));
   forwardOf(view.q, _f);
-  proj.set(view.pos[0] + _f[0] * 20000, view.pos[1] + _f[1] * 20000, view.pos[2] + _f[2] * 20000).project(cam);
-  if (proj.z > 1) return null;
-  const sx = (proj.x * 0.5 + 0.5) * innerWidth, sy = (-proj.y * 0.5 + 0.5) * innerHeight;
-  // Aim and nose in camera space: the screen direction from one to the other, even when the
-  // aim point is behind the camera.
   camQ.copy(cam.quaternion).invert();
   aimC.set(aimDir[0], aimDir[1], aimDir[2]).applyQuaternion(camQ);
   noseC.set(_f[0], _f[1], _f[2]).applyQuaternion(camQ);
   const dx = aimC.x - noseC.x, dy = -(aimC.y - noseC.y), len = Math.hypot(dx, dy);
   const angle = Math.acos(Math.max(-1, Math.min(1, aimC.dot(noseC))));
+  // Full back is a loop: the assist hands over raw pitch and its aim sits level, behind the
+  // nose, which would drop the reticle while you pull up. Pin it to the top of the rim instead.
+  if (assist.loop > 0) { pinAt[0] = cx; pinAt[1] = cy - R; return pinAt; }
   const k = len > 1e-6 ? R * Math.min(1, angle / Math.max(assist.tune.maxTurn, assist.tune.maxPitch)) / len : 0;
-  pinAt[0] = sx + dx * k; pinAt[1] = sy + dy * k;
+  pinAt[0] = cx + dx * k; pinAt[1] = cy + dy * k;
   return pinAt;
 }
 requestAnimationFrame(frame);
