@@ -11,6 +11,8 @@ import { createRenderer } from './packages/render/index.js';
 import { CHASE } from './packages/render/camera.js';
 import { escort } from './packages/bots/pilot.js';
 import { createLog } from './packages/hud/log.js';
+import { createDowned } from './packages/hud/downed.js';
+import { CRASH, classifyGround, classifyJets, creditFor, iGetCredit, createStats } from './packages/sim/crash.js';
 import { createAttractPilot, SLOTS } from './attract.js';
 import * as THREE from 'three';
 
@@ -196,14 +198,17 @@ function frame(nowMs) {
   acc += dt;
   while (acc >= STEP) {
     const input = controls.read(STEP);
+    if (down) { downTick(input); acc -= STEP; continue; }   // crashed: the jet lies where it fell
     if (input.pressed.waggle) waggleLeft = 1.2;
     copyJet(prev, jet);
     const it = attract ? attractPilot.think(jet, remoteList, STEP) : flyIntent(input);
     lastIntent = it;
     step(jet, it, STEP);
     if (attract) attractPilot.hold(jet, STEP); else collide();
+    if (down) { acc -= STEP; continue; }
     waggleLeft = Math.max(0, waggleLeft - STEP);
-    jet.flags = (waggleLeft > 0 ? FLAG.WAGGLE : 0) | (it.boost ? FLAG.BOOST : 0);
+    jet.flags = (waggleLeft > 0 ? FLAG.WAGGLE : 0) | (it.boost ? FLAG.BOOST : 0) | hurtFlags();
+    if (!attract) stats.tick(jet.speed, renderer?.ground ? jet.pos[1] - renderer.ground.height(jet.pos[0], jet.pos[2]) : null, STEP);
     if (!attract) rumble(it.boost);
     if (!helpHidden && input.active.size) { helpHidden = true; setTimeout(() => ($('help').style.opacity = 0.25), 6000); }
     acc -= STEP;
@@ -212,20 +217,26 @@ function frame(nowMs) {
   slideGround();
 
   sendAcc += dt;
-  if (sendAcc >= (attract ? 1 : 0.1)) { sendAcc = 0; net.send(jet); }   // watchers only report where they look from
+  // Just before a respawn the jet goes quiet for a moment, so the room server takes the jump
+  // back into the sky as flying, not a teleport (it allows more distance the longer the gap).
+  if (sendAcc >= (attract ? 1 : 0.1)) { sendAcc = 0; if (!down?.quiet) net.send(jet); }   // watchers only report where they look from
 
   remotes.sample(nowMs);
   remoteList.length = 0;
   for (const [id, r] of remotes.remotes) { r.id = id; remoteList.push(r); }
-  if (attract) calmRemotes(dt);
+  if (attract) calmRemotes(dt); else othersDown();
 
   if (attract && !window.__flight.ready && readyAt) placeBackdrop(nowMs);
   const lead = follow && !attract ? remotes.remotes.get(follow.id)?.view : null;
-  renderer.draw({ self: view, remotes: remoteList, time: nowMs / 1000, dt, focus: lead ? lead.pos : null });
+  renderer.draw({ self: view, remotes: remoteList, time: nowMs / 1000, dt, focus: lead ? lead.pos : null,
+    wreckCam: down ? { pos: down.pos, heading: down.heading, t: clock() - down.at } : null });
 
   $('alt').textContent = `alt ${Math.round(jet.pos[1] * 3.281).toLocaleString()} ft`;
   $('mach').textContent = `mach ${(jet.speed / 295).toFixed(2)}`;
   thr.style.width = `${Math.round(jet.throttle * 100)}%`;
+  const hull = $('hull');
+  hull.hidden = !CRASH.on || attract;
+  if (CRASH.on) { hull.textContent = `hull ${Math.max(0, Math.round(hp))}%${wing ? ` · ${wing < 0 ? 'left' : 'right'} wing hit` : ''}${clock() < shieldUntil ? ' · shield' : ''}`; hull.classList.toggle('hurt', hp < CRASH.smokeBelow); }
   const others = net.state.status === 'online' ? roster.size : 0;
   // "in flight" drops on narrow phones (index.html), where a long callsign at top left would meet it.
   $('aloft').innerHTML = `${others} other${others === 1 ? '' : 's'}<span class="wide"> in flight</span>`;
@@ -393,6 +404,8 @@ function flyIntent(input) {
     if (it && !steering) { assist.reset(jet); return it; }
   }
   assist.update(aimIntent, jet, a.aimX, a.aimY, STEP);
+  // A damaged wing drags that side down; the assist fights it, so you feel it tug.
+  if (CRASH.on && wing) aimIntent.roll = Math.max(-1, Math.min(1, aimIntent.roll + wing * CRASH.wingPull));
   aimIntent.throttle = a.throttle;
   aimIntent.boost = input.actions.boost;
   return aimIntent;
@@ -421,7 +434,7 @@ const COLLIDE = { ground: false, jets: false, keep: 0.6, clearance: 6, radius: 1
 window.__flight.collide = COLLIDE;
 const gN = [0, 0, 0], bA = new THREE.Vector3(), bB = new THREE.Vector3(), bQ = new THREE.Quaternion(), jQ = new THREE.Quaternion();
 let bumpLogAt = 0;
-function bounce(nx, ny, nz, what) {
+function bounce(nx, ny, nz, what, logIt = true) {
   forwardOf(jet.q, _f);
   const d = _f[0] * nx + _f[1] * ny + _f[2] * nz;
   if (d >= 0) return;   // already moving away
@@ -433,7 +446,7 @@ function bounce(nx, ny, nz, what) {
   jet.speed = Math.max(LIMITS.minSpeed * 0.8, jet.speed * (1 - (1 - COLLIDE.keep) * -d));
   assist.reset(jet);
   const t = performance.now();
-  if (t - bumpLogAt > 1500) { bumpLogAt = t; log.post('bump', what, 2500); }
+  if (logIt && t - bumpLogAt > 1500) { bumpLogAt = t; log.post('bump', what, 2500); }
 }
 function collide() {
   const g = renderer?.ground;
@@ -443,21 +456,188 @@ function collide() {
     if (jet.pos[1] < floor) {
       jet.pos[1] = floor;
       g.normal(jet.pos[0], jet.pos[2], gN);
+      if (CRASH.on) {
+        forwardOf(jet.q, _f);
+        const angle = Math.asin(Math.max(0, Math.min(1, -(_f[0] * gN[0] + _f[1] * gN[1] + _f[2] * gN[2]))));
+        if (angle > 0 && hit(classifyGround(angle, clock() < shieldUntil), { cause: 'ground', angle })) return;
+      }
       bounce(gN[0], gN[1], gN[2], 'bounced off the ground');
     }
   }
   if (COLLIDE.jets) {
     const R2 = COLLIDE.radius * 2;
     for (const r of remoteList) {
-      if (!r.view || !r.visible) continue;
+      if (!r.view || !r.visible || r.view.flags & FLAG.DOWN) continue;
       const p = r.view.pos, dx = jet.pos[0] - p[0], dy = jet.pos[1] - p[1], dz = jet.pos[2] - p[2], d = Math.hypot(dx, dy, dz);
       if (d >= R2 || d < 1e-3) continue;
       const nx = dx / d, ny = dy / d, nz = dz / d;
+      // Closing speed along the line between the jets: a nudge in formation is a bump,
+      // head-on at Mach 3 is not.
+      forwardOf(jet.q, _f); forwardOf(r.view.q, _g);
+      const closing = -((_f[0] * jet.speed - _g[0] * r.view.speed) * nx + (_f[1] * jet.speed - _g[1] * r.view.speed) * ny + (_f[2] * jet.speed - _g[2] * r.view.speed) * nz);
+      const t = clock();
+      lastBump = { id: r.id, callsign: r.callsign || 'another jet', at: t };
+      bumpedAt.set(r.id, t);
+      if (CRASH.on && hit(classifyJets(Math.max(0, closing), t < shieldUntil), { cause: 'jet', closing, with: lastBump })) return;
       jet.pos[0] = p[0] + nx * R2; jet.pos[1] = p[1] + ny * R2; jet.pos[2] = p[2] + nz * R2;
       bounce(nx, ny, nz, `bumped ${r.callsign || 'another jet'}`);
     }
   }
 }
+
+// ---- crashes (packages/sim/crash.js): damage, going down, the kill card, back in the sky ----
+// Off in the live game (CRASH.on false); the mechanics jig turns it on. Everything here is your
+// own jet. Others learn you crashed from the DOWN flag on your jet, and each client works out
+// for itself whether it was the one that forced you down (the same rule, on its own copy of the sky).
+const _g = [0, 0, 0];
+const clock = () => performance.now() / 1000;
+let hp = 100, wing = 0, down = null, shieldUntil = 0, lastBump = null;
+const bumpedAt = new Map();   // id -> when I last bumped that jet (for credit when they go down)
+let stats = createStats();
+const session = { lives: 0, kills: 0, best: null };
+const card = createDowned($('downed'), { onFly: () => leaveWreck() });
+const flash = $('flash');
+
+function hurtFlags() {
+  if (!CRASH.on) return 0;
+  return (hp < CRASH.smokeBelow ? FLAG.SMOKE : 0) | (hp < CRASH.fireBelow ? FLAG.FIRE : 0);
+}
+
+// Apply a hit's verdict. Returns true if you're down (the caller stops bouncing).
+function hit(v, info) {
+  window.__flight.lastHit = { ...v, ...info, hp };
+  if (v.kind !== 'direct' && hp - v.damage > 0) {
+    hp -= v.damage;
+    if (!v.damage) return false;
+    if (v.kind === 'hard' && !wing && Math.random() < CRASH.wingChance) {
+      // The wing that hit: the low one, by the bank.
+      const r = jet.q, rightY = 2 * (r[0] * r[1] + r[3] * r[2]);   // right wing's world y
+      wing = rightY < 0 ? 1 : -1;
+    }
+    if (v.kind === 'hard') stats.hard = (stats.hard || 0) + 1; else stats.scrapes++;
+    const what = info.cause === 'jet' ? `hit ${info.with.callsign}` : v.kind === 'hard' ? 'hard hit' : 'scraped the ground';
+    log.post('bump', `${what} · hull ${Math.round(hp)}%${v.kind === 'hard' && wing ? ` · ${wing < 0 ? 'left' : 'right'} wing damaged` : ''}`, 3500);
+    bumpLogAt = performance.now();
+    if (navigator.vibrate) navigator.vibrate(v.kind === 'hard' ? [90, 40, 60] : 35);
+    return false;
+  }
+  goDown(info, v);
+  return true;
+}
+
+function goDown(info, v) {
+  const t = clock();
+  forwardOf(jet.q, _f);
+  const others = [];
+  for (const r of remoteList) if (r.view && r.visible && !(r.view.flags & FLAG.DOWN)) others.push({ id: r.id, callsign: r.callsign || 'another jet', pos: r.view.pos });
+  const credit = info.cause === 'jet' ? { ...info.with, how: 'collision', dist: 0 } : creditFor(jet.pos, others, lastBump, t);
+  down = { at: t, pos: [jet.pos[0], jet.pos[1], jet.pos[2]], heading: Math.atan2(-_f[0], -_f[2]), info, credit, speed: jet.speed, outOfHull: v.kind !== 'direct', quiet: false, leaveAt: null };
+  jet.flags = FLAG.DOWN | FLAG.FIRE;   // speed stays on the wire a moment: others' debris flies on with it
+  hp = 0;
+  stopFollow();
+  session.lives++;
+  flash.style.transition = 'none'; flash.style.opacity = '1';
+  requestAnimationFrame(() => { flash.style.transition = 'opacity 1.4s ease-out'; flash.style.opacity = '0'; });
+  if (navigator.vibrate) navigator.vibrate([200, 60, 120, 60, 60]);
+  window.__flight.down = down;
+}
+
+function downTick(input) {
+  const e = clock() - down.at;
+  if (e > 0.3) jet.speed = 0;
+  if (!card.shown && e > 1.1) showCard();
+  if (card.shown) card.tick(CRASH.wreckTime - e);
+  // Space, Enter (the boost key) or the card's button: back in the sky early.
+  if (input.pressed.boost && e > 1.5) leaveWreck();
+  if (!down.leaveAt && e >= CRASH.wreckTime - 1) leaveWreck();
+  if (down.leaveAt && clock() >= down.leaveAt) respawn();
+}
+addEventListener('keydown', (e) => { if (down && (e.code === 'Enter' || e.code === 'NumpadEnter') && clock() - down.at > 1.5) leaveWreck(); });
+
+function leaveWreck() {
+  if (!down || down.leaveAt) return;
+  down.quiet = true;
+  down.leaveAt = clock() + 1;
+}
+
+const clockFmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function showCard() {
+  const { info, credit } = down;
+  const mach = (down.speed / 295).toFixed(2);
+  let kicker, title, detail;
+  if (info.cause === 'jet') {
+    kicker = 'mid-air collision';
+    title = `${credit.callsign} gets the kill`;
+    detail = `${Math.round(info.closing * 1.944).toLocaleString()} kt closing speed · mach ${mach}`;
+  } else {
+    const how = down.outOfHull ? 'one hit too many' : `hit the ground at ${Math.round(info.angle * 180 / Math.PI)}°`;
+    if (credit?.how === 'collision') { kicker = 'forced down'; title = `${credit.callsign} gets the kill`; detail = `${how} after bumping them · mach ${mach}`; }
+    else if (credit) { kicker = 'maneuver kill'; title = `${credit.callsign} gets the kill`; detail = `${how} · ${range(credit.dist)} from them · mach ${mach}`; }
+    else { kicker = 'crashed'; title = 'the mountain wins'; detail = `${how} · mach ${mach} · nobody within ${CRASH.creditKm} km`; }
+  }
+  const b = session.best, s = stats;
+  const lowest = isFinite(s.lowest) ? s.lowest : null;
+  const rows = [
+    ['distance flown', `${(s.distance / 1852).toFixed(1)} nm`, b && s.distance > b.distance],
+    ['time aloft', clockFmt(s.time), b && s.time > b.time],
+    ['top speed', `mach ${(s.topSpeed / 295).toFixed(2)}`, b && s.topSpeed > b.topSpeed],
+    ['lowest pass', lowest == null ? '—' : `${Math.round(lowest * 3.281).toLocaleString()} ft`, b && lowest != null && lowest < b.lowest],
+    ['under 1,000 ft', `${Math.round(s.lowTime)} s`, b && s.lowTime > b.lowTime],
+    ['hits survived', `${s.scrapes + (s.hard || 0)}`, false],
+    ['maneuver kills', `${session.kills} this session`, false],
+    ['crashes', `${session.lives} this session`, false],
+  ];
+  session.best = b ? { distance: Math.max(b.distance, s.distance), time: Math.max(b.time, s.time), topSpeed: Math.max(b.topSpeed, s.topSpeed), lowest: Math.min(b.lowest, lowest ?? Infinity), lowTime: Math.max(b.lowTime, s.lowTime) }
+    : { distance: s.distance, time: s.time, topSpeed: s.topSpeed, lowest: lowest ?? Infinity, lowTime: s.lowTime };
+  card.show({ kicker, title, detail, stats: rows, seconds: CRASH.wreckTime - 1.1 });
+}
+
+// Back on track (MSFS's answer): just behind the wreck, on the same heading, level and clear of
+// the ground for the next few km, with a few seconds' shield.
+function respawn() {
+  const g = renderer?.ground, h = down.heading, fx = -Math.sin(h), fz = -Math.cos(h);
+  const x = down.pos[0] - fx * 1500, z = down.pos[2] - fz * 1500;
+  let top = 0;
+  if (g) for (let k = 0; k <= 8; k++) top = Math.max(top, g.height(x + fx * k * 1000, z + fz * k * 1000));
+  const y = Math.min(LIMITS.maxAlt - 1000, Math.max(LIMITS.minAlt, top + 900, down.pos[1] + 600));
+  jet = createJet({ x, y, z, heading: h, speed: Math.max(LIMITS.minSpeed, 700) });
+  copyJet(prev, jet);
+  assist.reset(jet);
+  renderer.rig.reset();
+  hp = 100; wing = 0; lastBump = null;
+  shieldUntil = clock() + CRASH.shield;
+  stats = createStats();
+  card.hide();
+  down = null;
+  window.__flight.down = null;
+  log.post('respawn', `back in the sky${CRASH.shield ? ` · ${CRASH.shield} s shield` : ''}`, 3500);
+}
+
+// Someone else went down. If I'm who forced them down (I bumped them lately, or I'm the
+// nearest jet within range), I get the maneuver kill.
+const seenDown = new Set();
+function othersDown() {
+  for (const r of remoteList) {
+    if (!r.view) continue;
+    const isDown = (r.view.flags & FLAG.DOWN) !== 0;
+    if (!isDown) { seenDown.delete(r.id); continue; }
+    if (seenDown.has(r.id)) continue;
+    seenDown.add(r.id);
+    if (!CRASH.on || down) continue;
+    const others = remoteList.filter((o) => o !== r && o.view && o.visible && !(o.view.flags & FLAG.DOWN)).map((o) => ({ pos: o.view.pos }));
+    const t = clock();
+    if (!iGetCredit(r.view.pos, jet.pos, others, bumpedAt.get(r.id) ?? null, t)) continue;
+    session.kills++;
+    const d = Math.hypot(r.view.pos[0] - jet.pos[0], r.view.pos[1] - jet.pos[1], r.view.pos[2] - jet.pos[2]);
+    const how = bumpedAt.has(r.id) && t - bumpedAt.get(r.id) <= CRASH.creditWindow ? 'after your bump' : `${range(d)} from you`;
+    log.post('kill', `maneuver kill: ${r.callsign || 'a jet'} went down ${how}`, 7000);
+    if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+  }
+}
+// Test hook (the jig's "Crash here" button): go down on the spot, as if you hit the ground nose first.
+function crashNow() { if (!down && !attract) goDown({ cause: 'ground', angle: Math.PI / 4 }, { kind: 'direct' }); }
+Object.assign(window.__flight, { crash: CRASH, crashNow, session });
+Object.defineProperty(window.__flight, 'hp', { get: () => hp, set: (v) => { hp = v; } });
 
 // ---- attract <-> flying (the site backdrop's Fly and Back) ----
 // Before the backdrop is shown, drop the jet next to a live one if any are about,

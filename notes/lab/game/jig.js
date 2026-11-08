@@ -9,20 +9,21 @@
 import { RATE, LIMITS, FEEL } from '../flight/packages/sim/index.js';
 import { SLOT, ESCORT } from '../flight/packages/bots/pilot.js';
 import { CHASE } from '../flight/packages/render/camera.js';
+import { CRASH } from '../flight/packages/sim/crash.js';
 import { Pane } from './tweakpane.min.js';
 
 // Where the jig starts out different from the live game (Had, 2026-11-07): reticle held to a small
 // radius; no hard deck, so you can fly down among the mountains, which are taller, and bounce off
 // them and off other jets.
-const JIG_DEFAULTS = { 'reticle.radius': 70, 'limits.minAlt': 0, 'collide.ground': true, 'collide.jets': true, 'terrain.exag': 2.5, 'terrain.steadyKm': 90 };
+const JIG_DEFAULTS = { 'reticle.radius': 70, 'limits.minAlt': 0, 'collide.ground': true, 'collide.jets': true, 'terrain.exag': 2.5, 'terrain.steadyKm': 90, 'crash.on': true };
 const STORE = 'game-jig-v1', OPEN = 'game-jig-folders';
-const FT = 3.281, DEG = 180 / Math.PI, NM = 1 / 1852;
+const FT = 3.281, DEG = 180 / Math.PI, NM = 1 / 1852, KT = 1.944;
 
 // Targets that exist only once the game has started.
 let F = null;   // window.__flight
 const stickSize = { frac: 0.17 };   // drag radius as a share of the screen's short side
 const T = {
-  rate: () => RATE, limits: () => LIMITS, feel: () => FEEL, slot: () => SLOT, escort: () => ESCORT, chase: () => CHASE,
+  crash: () => CRASH, rate: () => RATE, limits: () => LIMITS, feel: () => FEEL, slot: () => SLOT, escort: () => ESCORT, chase: () => CHASE,
   stickSize: () => stickSize,
   assist: () => F?.assist.tune, stick: () => F?.stick.tune, keys: () => F?.keys.tune, lens: () => F?.renderer.rig.lens, reticle: () => F?.reticle, collide: () => F?.collide, terrain: () => F?.renderer.terrain,
 };
@@ -90,6 +91,24 @@ const SPEC = [
     ['collide', 'keep', 'Speed kept after a head-on bump', 0.1, 1, 0.05],
     ['collide', 'clearance', 'Ground clearance (m)', 0, 50, 1],
     ['collide', 'radius', 'Jet bump radius (m)', 5, 60, 1],
+  ]],
+  // Crash research sweet spot (2026-11-08): graded hits, lethal direct hits, kill credit card.
+  ['Crashes', true, [
+    ['crash', 'on', 'Crashes (off = bounce only)'],
+    ['crash', 'fatalAbove', 'Direct hit: lethal above (°)', 5, 60, 1, DEG],
+    ['crash', 'scrapeBelow', 'Scrape: shallower than (°)', 1, 30, 0.5, DEG],
+    ['crash', 'scrapeDamage', 'Scrape damage (hull %)', 0, 100, 1],
+    ['crash', 'hardDamage', 'Hard hit damage (hull %)', 0, 100, 1],
+    ['crash', 'wingChance', 'Hard hit damages a wing (chance)', 0, 1, 0.05],
+    ['crash', 'wingPull', 'Damaged wing pulls (× full stick)', 0, 0.6, 0.01],
+    ['crash', 'smokeBelow', 'Smoke trail below hull %', 0, 100, 1],
+    ['crash', 'fireBelow', 'Fire below hull %', 0, 100, 1],
+    ['crash', 'jetFatal', 'Mid-air: lethal above (kt closing)', 50, 3500, 10, KT],
+    ['crash', 'jetDamage', 'Mid-air damage (hull % per 100 m/s)', 0, 100, 1],
+    ['crash', 'wreckTime', 'Wreck cam, then respawn (s)', 2, 20, 0.5],
+    ['crash', 'shield', 'Shield after respawn (s)', 0, 10, 0.5],
+    ['crash', 'creditKm', 'Maneuver kill range (km)', 0, 10, 0.1],
+    ['crash', 'creditWindow', 'A bump keeps credit for (s)', 0, 60, 1],
   ]],
   ['Map limits', false, [
     ['limits', 'minAlt', 'Hard deck (ft, 0 = none)', 0, 60000, 500, FT],
@@ -172,8 +191,9 @@ try { openFolders = JSON.parse(localStorage.getItem(OPEN) || '{}'); } catch {}
 const pane = new Pane({ container: panel.querySelector('.jig-body') });
 const bindings = [];
 let syncing = false;
+const folders = {};
 for (const [title, expanded, rows] of SPEC) {
-  const f = pane.addFolder({ title, expanded: openFolders[title] ?? expanded });
+  const f = folders[title] = pane.addFolder({ title, expanded: openFolders[title] ?? expanded });
   f.on('fold', (e) => { openFolders[title] = e.expanded; try { localStorage.setItem(OPEN, JSON.stringify(openFolders)); } catch {} });
   for (const r of rows) {
     const k = id(r);
@@ -207,6 +227,8 @@ for (const [title, expanded, rows] of SPEC) {
   const live = rows.filter((r) => S[id(r)] !== undefined);
   f.addButton({ title: `Reset ${title.toLowerCase()}` }).on('click', () => { reset(live); say(`${title} back to defaults`); });
 }
+// Try the crash without hunting for a mountain.
+folders.Crashes?.addButton({ title: 'Crash here (test)' }).on('click', () => F.crashNow());
 function reset(rows) {
   for (const r of rows) { S[id(r)] = DEFAULTS[id(r)]; write(r, S[id(r)]); }
   syncing = true; try { pane.refresh(); } finally { syncing = false; }

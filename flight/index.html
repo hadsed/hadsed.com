@@ -23,6 +23,7 @@
   /* Phones: no keyboard, and the key list would run into the altimeter. */
   @media (max-width: 700px) { #help .keys { display: none; } }
   .dim { color: var(--dim); }
+  #hull.hurt { color: #ff9a5a; }
   #credit { text-transform: none; font-size: 9px; letter-spacing: 0; max-width: min(42vw, 260px); margin-top: 6px; opacity: 0.7; }
   /* Its own HUD item, set apart from "you are" above it. */
   #following { margin-top: 14px; }
@@ -53,6 +54,27 @@
   .hud, #labels, #boost, #tilt { transition: opacity .8s ease 2s; }
   body.attract .hud, body.attract #labels, body.attract #reticle, body.attract #boost, body.attract #tilt, body.attract #stick { opacity: 0 !important; pointer-events: none; transition: opacity .4s ease; }
   body.attract canvas { cursor: default; }
+  /* Crashed: the kill-credit card drops from the top, with what you did this flight. */
+  #downed { position: fixed; z-index: 6; left: 50%; top: max(18px, env(safe-area-inset-top)); width: min(calc(100vw - 32px), 600px); box-sizing: border-box;
+    padding: 18px 20px 0; text-transform: uppercase; color: var(--gold); background: rgba(10, 13, 20, 0.88); border: 1px solid rgba(228, 197, 111, 0.45); border-radius: 6px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); overflow: hidden;
+    transform: translate(-50%, calc(-100% - 40px)); transition: transform .55s cubic-bezier(.2, 1.35, .45, 1); }
+  #downed.on { transform: translate(-50%, 0); }
+  .dn-kicker { color: var(--dim); font-size: 10px; }
+  .dn-title { font-size: 19px; letter-spacing: 0.06em; margin: 4px 0 2px; line-height: 1.25; }
+  .dn-detail { color: var(--dim); font-size: 10px; text-transform: none; letter-spacing: 0.04em; }
+  .dn-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 14px; margin: 14px 0 0; }
+  @media (max-width: 560px) { .dn-stats { grid-template-columns: 1fr 1fr; } }
+  .dn-stats dt { color: var(--dim); font-size: 9px; }
+  .dn-stats dd { margin: 2px 0 0; font-size: 14px; }
+  .dn-best { font-size: 8px; margin-left: 6px; padding: 1px 4px; border: 1px solid var(--gold); border-radius: 2px; vertical-align: 2px; }
+  .dn-foot { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 12px; font-size: 10px; color: var(--dim); }
+  .dn-fly { font: inherit; letter-spacing: inherit; text-transform: uppercase; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; padding: 5px 10px; cursor: pointer; }
+  .dn-bar { height: 2px; margin: 0 -20px; background: rgba(228, 197, 111, 0.15); }
+  .dn-bar i { display: block; height: 100%; background: var(--gold); transform-origin: left; }
+  /* The hit: a flash of hot light that fades as the fireball blooms. */
+  #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 55%, rgba(255, 236, 200, 0.95), rgba(255, 140, 60, 0.5) 45%, rgba(40, 10, 0, 0.3)); }
+  body.attract #downed { display: none; }
 </style>
 </head>
 <body>
@@ -63,10 +85,12 @@
 <!-- Top left is only who you are. #status stays for tests and the no-WebGL notice. -->
 <div class="hud" id="tl"><div id="you" hidden><span class="dim">you are </span><span id="callsign"></span></div><div id="following" hidden><span id="followText"></span><button id="unfollow" title="Stop following (X)">stop following</button></div><div class="dim" id="status" hidden>loading</div><div id="log" aria-live="polite"></div></div>
 <div class="hud" id="tr"><div id="aloft"></div></div>
-<div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div></div>
+<div class="hud" id="bl"><div id="alt"></div><div id="mach"></div><div>thr<span id="thr"><i></i></span></div><div id="hull" hidden></div></div>
 <!-- Model credit lives in the page source, not on screen; main.js fills it from the jet asset. -->
 <div id="credit" hidden></div>
 <div id="reticle"></div>
+<div id="flash"></div>
+<div id="downed" hidden aria-live="polite"></div>
 <button id="boost" type="button" hidden>boost</button>
 <button id="tilt" type="button" hidden>tilt</button>
 <!-- Only shown when the browser cannot draw 3D. -->

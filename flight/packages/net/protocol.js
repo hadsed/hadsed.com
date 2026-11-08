@@ -13,7 +13,9 @@ export const JET_BYTES = 23;
 export const SNAP_HEADER = 7;
 export const ENTRY_BYTES = 4 + JET_BYTES;
 
-export const FLAG = { WAGGLE: 1, BOOST: 2 };
+// SMOKE / FIRE: a damaged jet trails them. DOWN: crashed; its position is the wreck until it
+// respawns. Clients that don't know these bits just ignore them.
+export const FLAG = { WAGGLE: 1, BOOST: 2, SMOKE: 4, FIRE: 8, DOWN: 16 };
 
 function writeJet(dv, o, jet) {
   dv.setFloat32(o, jet.pos[0], true);

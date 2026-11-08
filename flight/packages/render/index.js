@@ -12,6 +12,7 @@ import { createCameraRig } from './camera.js';
 import { outlineMaterial } from './outline.js';
 import { createBoost } from './boost.js';
 import { createWind } from './wind.js';
+import { createWreck } from './wreck.js';
 import { FLAG } from '../net/protocol.js';
 
 const MAX_GHOSTS = 64;
@@ -102,6 +103,8 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
   const trails = createContrails({ scene, gold: real ? new THREE.Color(0xe8ecf2) : gold, sky, max: MAX_GHOSTS + 1 });
   const boost = createBoost({ scene, geo, max: MAX_GHOSTS + 1 });
   const wind = createWind({ scene, geo, style: speedStyle });
+  // Smoke, fire, fireball and debris, from each jet's flags (wreck.js). Particles rest on the ground.
+  const wreck = createWreck({ scene, height: (x, z) => (api.ground ? api.ground.height(x, z) : null) });
 
   // ---- camera: backdrop orbit and chase cam, one continuous move between them (camera.js) ----
   const rig = createCameraRig(camera);
@@ -124,9 +127,28 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
   resize();
   addEventListener('resize', resize);
 
+  // Down: a slow circle around the wreck, opening out, high enough to see the smoke column.
+  // A short shake as it hits. Starts from behind the jet, where the chase cam was.
+  const wc = new THREE.Vector3(), wl = new THREE.Vector3();
+  function circleWreck({ pos, heading, t }) {
+    // heading points the way the jet flew, so sin/cos of it is behind the wreck: open air.
+    const a = heading + t * 0.18;
+    const R = 160 + 40 * Math.min(t, 6), H = 70 + 25 * Math.min(t, 6);
+    wc.set(pos[0] + Math.sin(a) * R, pos[1] + H, pos[2] + Math.cos(a) * R);
+    const g = api.ground ? api.ground.height(wc.x, wc.z) + 40 : -Infinity;
+    if (wc.y < g) wc.y = g;
+    const shake = Math.max(0, 0.6 - t) * 6;
+    if (shake > 0) wc.add(wl.set(rnd(shake), rnd(shake), rnd(shake)));
+    camera.position.copy(wc);
+    camera.up.set(0, 1, 0);
+    // Look above the wreck, so it sits low in the frame, under the card that drops from the top.
+    camera.lookAt(wl.set(pos[0], pos[1] + H * 0.55, pos[2]));
+  }
+  const rnd = (s) => (Math.random() * 2 - 1) * s;
+
   let exagSet = null, steadySet = null;
   const api = {
-    renderer, scene, camera, rig, world,
+    renderer, scene, camera, rig, world, wreck,
     async setWorld(w) {
       const t = await loadHeightmap(w, manifest.base);
       world.setHeight(t.tex, { size: w.size, metersPerPixel: w.metersPerPixel, maxM: w.maxM, snowM: w.snowM, arid: w.arid ?? 0.3, encoded: false });
@@ -146,7 +168,9 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       get steadyKm() { return steadySet ?? (api.ground ? world.steadyRadius : world.steadyRadius / world.cellSize * (manifest.worlds?.[0]?.metersPerPixel ?? world.cellSize)) / 1000; },
       set steadyKm(v) { steadySet = v; if (api.ground) world.steadyRadius = v * 1000; },
     },
-    draw({ self, remotes, time, dt, focus = null }) {   // focus: [x, y, z] to keep in frame, or null
+    // wreckCam: { pos: [x, y, z], heading, t } while you're down: the camera circles the wreck
+    // instead of chasing (t: seconds since the crash).
+    draw({ self, remotes, time, dt, focus = null, wreckCam = null }) {   // focus: [x, y, z] to keep in frame, or null
       // Your jet
       viewQuat(self, time, tmpQ);
       me.position.set(self.pos[0], self.pos[1], self.pos[2]);
@@ -158,11 +182,15 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       rig.boosting = (self.flags & FLAG.BOOST) !== 0;
       rig.focus = focus ? focusV.set(focus[0], focus[1], focus[2]) : null;
       rig.update(me.position, tmpQ, dt, camera.aspect);
+      const selfDown = (self.flags & FLAG.DOWN) !== 0;
+      me.visible = !selfDown;
+      if (wreckCam) circleWreck(wreckCam);
       // Gold outlines are for flying; the calm site backdrop shows plain black jets.
       meLine.visible = ghostLines.visible = !real && rig.blend > 0.5;
+      if (selfDown) meLine.visible = false;
       // Air streaming past: only in the chase view, not the calm backdrop.
       wind.setProjection?.(canvas.height, camera.fov);
-      wind.update(dt, me.position, tmpQ, self.speed, rig.boosting ? 1 : 0, Math.min(1, Math.max(0, rig.blend * 2 - 1)));
+      wind.update(dt, me.position, tmpQ, selfDown ? 0 : self.speed, rig.boosting ? 1 : 0, Math.min(1, Math.max(0, rig.blend * 2 - 1)));
       const camPos = camera.position;
 
       // The ground grid follows the camera (world.frame): its core moves in whole heightmap texels, so
@@ -180,12 +208,17 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       // Ghosts
       let n = 0;
       trails.begin(time);
-      trails.feed('self', self, tmpQ);
+      if (!selfDown) trails.feed('self', self, tmpQ);
       boost.begin(time, dt, camera, canvas.height);
-      boost.feed('self', self, tmpQ, (self.flags & FLAG.BOOST) !== 0, self.throttle ?? 0.6);
+      wreck.begin(time, dt, camera, canvas.height);
+      wreck.feed('self', self, tmpQ, self.flags);
+      if (!selfDown) boost.feed('self', self, tmpQ, (self.flags & FLAG.BOOST) !== 0, self.throttle ?? 0.6);
       for (const r of remotes) {
         if (!r.view || !r.visible || n >= MAX_GHOSTS) continue;
         viewQuat(r.view, time, tmpQ);
+        // A downed jet is a wreck on the ground: smoke and fire, no airframe.
+        wreck.feed(r.id, r.view, tmpQ, r.view.flags);
+        if (r.view.flags & FLAG.DOWN) continue;
         v.set(r.view.pos[0], r.view.pos[1], r.view.pos[2]);
         m4.compose(v, tmpQ, s1);
         ghosts.setMatrixAt(n, m4);
@@ -196,6 +229,7 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       }
       trails.end();
       boost.end();
+      wreck.end();
       ghosts.count = ghostLines.count = n;
       ghosts.instanceMatrix.needsUpdate = true;
       dotsGeo.setDrawRange(0, n);
