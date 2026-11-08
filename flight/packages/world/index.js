@@ -28,21 +28,21 @@ export const EARTH_R = 6371000;
 // color 0 is the original navy terrain grid; mono 0 is full natural color.
 export const WORLD_DEFAULTS = {
   shadow: '#07090e', mid: '#1c2433', light: '#c8cdd5', highlight: '#e4c56f',
-  midPoint: 0.56, hlStart: 0.62, hlAmount: 0.68, mono: 1, chroma: 0.7, exposure: 1.12, contrast: 1.13, grain: 0, vignette: 1.2,
+  midPoint: 0.56, hlStart: 0.65, hlAmount: 0.68, mono: 1, chroma: 0.7, exposure: 1.12, contrast: 1.12, grain: 0, vignette: 1.2,
   region: 'sierra', altitudeFt: 85000, exag: 1, offsetX: 79, offsetZ: -69.1, sunAz: 41, sunEl: 18, haze: 130, clouds: 0.54, fov: 23,
   grid: 0.66, gridSize: 250, contour: 0.46, contourStep: 175, shade: 0.39, lineBright: 0.73, lineGold: 0,
   tint: 0, tintContrast: 1, tintPivot: 0.5, slope: 0,
   color: 1, texture: 1,
   // Stars over the dark upper sky (2026-11-07: Had's pick, the quiet set). stars 0 turns them off.
-  // 2026-11-07 Had's tuning; starFall/starGlow: fewer stars toward the horizon, a few bright ones still in the glow.
-  stars: 1.17, starDensity: 0.22, starBright: 1.11, starSize: 0.6, starScale: 1.26, starSeed: 0, starFade: 12, starFall: 2.5, starGlow: 0.5,
-  starColor: '#f2eee6', starVar: 0.3, starDark: 0.395,
+  // 2026-11-08 Had's tuning with the banded sky: fewer, brighter, more colorful stars, thinning gently all the way down.
+  stars: 0.68, starDensity: 0.24, starBright: 1.89, starSize: 0.63, starScale: 1.26, starSeed: 0, starFade: 40, starFall: 0.2, starGlow: 0,
+  starColor: '#f2eee6', starVar: 1, starDark: 0.345,
 };
 // Sky candidates (lab): 0 the current sky, 1 banded (painted bands matched to photos from altitude, keyed
 // to the sun's height), 3 physical single scattering. Both 1 and 3 also light and haze the ground to match.
 Object.assign(WORLD_DEFAULTS, {
   skyMode: 0, skySoft: 0.12, skyTrue: 1,
-  physExp: 0.4, physMie: 1, physOzone: 0.4, physSun: 20, physG: 0.76, physMulti: 1, physGlow: 2,
+  physExp: 0.4, physMie: 1, physOzone: 0.4, physSun: 15, physG: 0.76, physMulti: 1, physGlow: 2,
 });
 const SKY_NUM = ['skyMode', 'skySoft', 'skyTrue', 'physExp', 'physMie', 'physOzone', 'physSun', 'physG', 'physMulti', 'physGlow'];
 

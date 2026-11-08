@@ -6,7 +6,7 @@ import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
 import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
 import { Pane } from './vendor/tweakpane.min.js';
-const STORE = 'sr71-backdrop-v12';   // v12: banded and physical skies with time of day   // v10: Had's star tuning as defaults, horizon thinning
+const STORE = 'sr71-backdrop-v13';   // v13: Had's banded-sky defaults, silver outline on the jet   // v10: Had's star tuning as defaults, horizon thinning
 
 // ---------- settings ----------
 const PRESETS = {
@@ -32,6 +32,9 @@ const STYLES = {
 // The look itself (tone, scene, ground) lives in the shared world module, so the flight lab matches.
 const DEFAULTS = {
   preset: 'site', ...WORLD_DEFAULTS, style: 'navycolor', tod: 'custom',
+  // 2026-11-08 Had's pick: the banded sky with dither, sun just above the horizon
+  skyMode: 1, sunAz: 27, sunEl: 1,
+  rim: 2.5, rimWidth: 5.5,
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -93,8 +96,22 @@ const plane = new THREE.Group(); nearScene.add(plane);
 const skin = new THREE.MeshStandardMaterial({ color: 0x1d2027, roughness: 0.55, metalness: 0.25 });
 const glass = new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.25, metalness: 0.6 });
 const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
+// A thin silver outline so the jet still reads against a dark sky: light on the edges that face away
+// from you (a rim, like moonlight on the skin), kept silver (capped under the gold highlight), faded in as the sun goes down.
+const RIM = { uRim: { value: 0 }, uRimPow: { value: 3 }, uRimColor: { value: new THREE.Color(0xc8d0dc) } };
 for (const m of [skin, glass, nozzleMat]) {   // the jet never takes the line highlight
-  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.a = 0.0;'); };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, RIM);
+    sh.fragmentShader = 'uniform float uRim, uRimPow; uniform vec3 uRimColor;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>
+  float rimF = pow(1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0), uRimPow);
+  gl_FragColor.rgb += uRimColor * min(rimF * uRim, 1.2);   // capped below where the tone turns gold
+  gl_FragColor.a = 0.0;`);
+  };
+}
+// how dark it is: none in daylight, full once the sun is a little below the visible horizon
+function rimAmount() {
+  const dip = THREE.MathUtils.radToDeg(Math.acos(6371000 / (6371000 + S.altitudeFt * 0.3048)));
+  return +S.rim * (1 - THREE.MathUtils.smoothstep(S.sunEl + dip, -2, 8));
 }
 const add = (g, m = skin) => { const o = new THREE.Mesh(g, m); plane.add(o); return o; };
 const body = add(new THREE.SphereGeometry(1, 32, 16)); body.scale.set(1.25, 0.7, 10.5);
@@ -178,6 +195,7 @@ function apply() {
   world.setLook(S);
   post.setLook(S);
   sunLight.position.copy(sunDir).multiplyScalar(100);
+  RIM.uRim.value = rimAmount(); RIM.uRimPow.value = +S.rimWidth;
   const altitude = S.altitudeFt * 0.3048;
   const reg = REGIONS[S.region];
   if (reg) origin.set((S.offsetX ?? reg.peakKm[0]) * 1000, altitude, (S.offsetZ ?? reg.peakKm[1]) * 1000);
@@ -307,7 +325,7 @@ const panel = document.getElementById('panel');
 const m = (...modes) => () => modes.includes(+S.skyMode);
 const SPEC = [
   ['Sky', true, [
-    ['skyMode', 'select', { label: 'Sky model', options: [[0, 'Current'], [1, 'Banded + dither'], [3, 'Physical (scattering)']] }],
+    ['skyMode', 'select', { label: 'Sky model', options: [[0, 'Current'], [1, 'Banded + dither']] }],
     ['tod', 'select', { label: 'Time of day', options: [['day', 'Day'], ['sunset', 'Sunset (sun in view)'], ['night', 'Night'], ['custom', 'Custom (sun height below)']] }],
     ['skyTrue', 'range', { label: 'Navy tone ↔ true color', min: 0, max: 1, step: 0.01, show: m(1, 3) }],
     ['physSun', 'range', { label: 'Sun intensity', min: 1, max: 60, step: 0.5, show: m(3) }],
@@ -375,6 +393,10 @@ const SPEC = [
     ['tintPivot', 'range', { label: 'Height tint pivot', min: 0, max: 1, step: 0.01 }],
     ['slope', 'range', { label: 'Darken steep slopes', min: 0, max: 1, step: 0.01 }],
     ['lineGold', 'range', { label: 'Lines in highlight color', min: 0, max: 1, step: 0.01 }],
+  ]],
+  ['Jet', true, [
+    ['rim', 'range', { label: 'Silver outline in the dark', min: 0, max: 3, step: 0.01 }],
+    ['rimWidth', 'range', { label: 'Outline thinness', min: 1, max: 8, step: 0.1 }],
   ]],
   ['Camera', false, [
     ['drift', 'check', { label: 'Slow drift' }],
