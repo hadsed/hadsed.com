@@ -14,6 +14,8 @@ import { createLog } from './packages/hud/log.js';
 import { createAttractPilot, SLOTS } from './attract.js';
 import * as THREE from 'three';
 
+LIMITS.minAlt = 0;   // this client only: no hard deck, fly among the peaks (server bots keep theirs)
+
 const $ = (id) => document.getElementById(id);
 const base = new URL('./', import.meta.url);
 const log = createLog($('log'));
@@ -252,7 +254,7 @@ function frame(nowMs) {
 // flight. Its distance out is how far the aim is from the nose as a share of a full-stick turn,
 // so it reads the same whatever the assist's limits, and hard pulls, banks and loops pin it to
 // the rim instead of throwing it off screen (the chase cam lags the nose in a hard pull-up).
-const RETICLE = { radius: 0 };
+const RETICLE = { radius: 70 };
 const camQ = new THREE.Quaternion(), aimC = new THREE.Vector3(), noseC = new THREE.Vector3(), pinAt = [0, 0];
 function placeReticle(R) {
   const cam = renderer.camera;
@@ -412,12 +414,12 @@ addEventListener('keydown', (e) => { if (e.code === 'KeyX' && follow) stopFollow
 Object.assign(window.__flight, { startFollow, stopFollow, reticle: RETICLE });
 
 // ---- bumps: off the ground and off other jets ----
-// Off by default: the live game keeps its 9,000 m hard deck, far above the peaks. The mechanics
-// jig drops the deck and turns these on so you can fly down among the mountains. A bump reflects
+// No hard deck: you can fly down among the mountains (the room server keeps its own deck for the
+// bots, which never see terrain). A bump reflects
 // your heading off the surface (the ground's slope, or the line between two jets) and costs speed
 // in proportion to how square the hit was. Only your own jet bounces; other players' jets are
 // drawn where their own clients put them.
-const COLLIDE = { ground: false, jets: false, keep: 0.6, clearance: 6, radius: 18 };
+const COLLIDE = { ground: true, jets: true, keep: 0.6, clearance: 6, radius: 18 };
 window.__flight.collide = COLLIDE;
 const gN = [0, 0, 0], bA = new THREE.Vector3(), bB = new THREE.Vector3(), bQ = new THREE.Quaternion(), jQ = new THREE.Quaternion();
 let bumpLogAt = 0;
