@@ -22,18 +22,56 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const SCREENS = ['main', 'maps', 'settings', 'credits'];
 function show(id) {
   if (!SCREENS.includes(id)) id = 'main';
+  const from = $('.screen[data-on]')?.id;
   for (const s of $$('.screen')) s.toggleAttribute('data-on', s.id === id);
+  document.body.classList.toggle('leaving', false);
   document.body.classList.toggle('deep', id !== 'main');
   document.body.classList.toggle('globe', id === 'maps');
-  if (id === 'maps') openGlobe(); else globe?.stop();
+  sky.lift = id === 'maps' ? LIFT : 0;
   sel = -1;
-  if (id === 'maps') cards.get(picked)?.focus({ preventScroll: true });
-  else focusables()[0]?.focus({ preventScroll: true });
+  if (id === 'maps') openGlobe({ intro: from === 'main' || !from });
+  else { globe?.stop(); focusables()[0]?.focus({ preventScroll: true }); }
 }
 const current = () => $('.screen[data-on]').id;
 const go = (id) => { location.hash = id === 'main' ? '' : id; };
 addEventListener('hashchange', () => show(location.hash.slice(1)));
-for (const b of $$('[data-go]')) b.addEventListener('click', () => go(b.dataset.go));
+for (const b of $$('[data-go]')) b.addEventListener('click', () => (b.dataset.go === 'maps' ? toGlobe() : go(b.dataset.go)));
+
+// Play: the menu fades, the backdrop camera rises over the jet until it looks straight down on
+// the Sierra, and the globe takes over from just above that same ground and pulls back to space.
+const LIFT = 1.25;   // radians the backdrop camera rises (rig.orbit.pitch)
+let leaving = 0;
+function toGlobe() {
+  if (leaving) return;
+  document.body.classList.add('leaving');
+  sky.lift = LIFT;
+  leaving = setTimeout(() => { leaving = 0; go('maps'); }, 900);
+}
+
+// ---- the backdrop: the live game's attract mode in #sky. It pans on its own, slowly, and leans a
+// little toward the pointer, like the home page's backdrop under scroll and swipes. ----
+const sky = { lift: 0, liftNow: 0, px: 0, py: 0, pxNow: 0, pyNow: 0, t: 0 };
+const skyFlight = () => { try { return $('#sky').contentWindow.__flight; } catch { return null; } };
+addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  sky.px = e.clientX / innerWidth - 0.5; sky.py = e.clientY / innerHeight - 0.5;
+});
+let skyLast = performance.now();
+(function skyLoop(now) {
+  requestAnimationFrame(skyLoop);
+  const dt = Math.min(0.1, (now - skyLast) / 1000 || 0); skyLast = now;
+  const rig = skyFlight()?.renderer?.rig;
+  if (!rig) return;
+  sky.t += dt;
+  const k = 1 - Math.exp(-dt * 1.5);
+  sky.pxNow += (sky.px - sky.pxNow) * k; sky.pyNow += (sky.py - sky.pyNow) * k;
+  sky.liftNow += (sky.lift - sky.liftNow) * (1 - Math.exp(-dt * 2.2));
+  rig.orbit.yaw = sky.t * 0.03 + sky.pxNow * 0.25;   // a full turn about every 3.5 minutes
+  rig.orbit.pitch = 0.06 * Math.sin(sky.t * 0.09) - sky.pyNow * 0.1 + sky.liftNow;
+  // The jet sits right of the menu on wide screens, low in the frame on tall ones.
+  const out = 1 - sky.liftNow / LIFT;
+  rig.frame = innerWidth >= innerHeight ? { x: 0.2 * out, y: 0.04 * out } : { x: 0, y: 0.18 * out };
+})(skyLast);
 for (const b of $$('[data-back]')) b.addEventListener('click', () => history.length > 1 && location.hash ? history.back() : go('main'));
 
 // ---- maps: a globe above, a carousel of cards along the bottom ----
@@ -66,7 +104,7 @@ function choose(id, { scroll = false } = {}) {
   picked = id;
   for (const [k, c] of cards) c.classList.toggle('sel', k === id);
   if (scroll) cards.get(id).scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-  globe?.focus(id);
+  if (!quiet) globe?.focus(id);
 }
 const nudge = (step) => {
   const i = MAPS.findIndex((m) => m.id === picked);
@@ -75,14 +113,32 @@ const nudge = (step) => {
 };
 $('#prev').addEventListener('click', () => nudge(-1));
 $('#next').addEventListener('click', () => nudge(1));
-async function openGlobe() {
-  if (!globe) {
-    const { createGlobe } = await import('./globe.js');
+// Built ahead of time (a couple of seconds after the menu loads), so the Earth's textures are in
+// before Play: the pull-back has to start on a lit planet.
+let globeReady = null;
+function loadGlobe() {
+  globeReady ??= import('./globe.js').then(({ createGlobe }) => {
     globe = createGlobe({ canvas: $('#globe'), maps: MAPS, onPick: (id) => cards.get(id).focus({ preventScroll: true }) });
-  }
-  globe.start();
-  choose(picked, { scroll: true });
+    return globe;
+  });
+  return globeReady;
 }
+setTimeout(loadGlobe, 2000);
+async function openGlobe({ intro = false } = {}) {
+  await loadGlobe();
+  await globe.loaded;
+  if (current() !== 'maps') return;
+  globe.start();
+  // In from the menu, the globe opens on the Sierra (where the backdrop jet flies), whatever was
+  // picked before; that card's focus must not cut the pull-back short.
+  if (intro) picked = 'sierra';
+  quiet = intro;
+  cards.get(picked).focus({ preventScroll: true });
+  choose(picked, { scroll: true });
+  quiet = false;
+  if (intro) globe.intro(picked);
+}
+let quiet = false;   // set while the screen opens: picking its card then leaves the globe alone
 function play(world) {
   const q = new URLSearchParams({ world });
   location.href = `play/?${q}`;
