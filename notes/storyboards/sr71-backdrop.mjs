@@ -6,7 +6,7 @@ import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
 import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
 import { Pane } from './vendor/tweakpane.min.js';
-const STORE = 'sr71-backdrop-v13';   // v13: Had's banded-sky defaults, silver outline on the jet   // v10: Had's star tuning as defaults, horizon thinning
+const STORE = 'sr71-backdrop-v14';   // v14: site overlay off by default   // v10: Had's star tuning as defaults, horizon thinning
 
 // ---------- settings ----------
 const PRESETS = {
@@ -37,7 +37,7 @@ const DEFAULTS = {
   rim: 2.5, rimWidth: 5.5,
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
-  site: true, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
+  site: false, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
 };
 const CLEAN = new URLSearchParams(location.search).has('clean');
 if (CLEAN) document.documentElement.classList.add('clean');
