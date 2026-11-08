@@ -70,7 +70,7 @@ addEventListener('message', (e) => {
 function load() {
   hello = ready = false; flying = false; document.body.classList.remove('flying'); sky.classList.remove('on'); flyBtn.disabled = true;
   t0 = performance.now(); logEl.textContent = '';
-  sky.src = `${ORIGIN}/?embed=1&mode=watch&map=${encodeURIComponent(MAP)}&server=${encodeURIComponent(SERVER)}`;
+  sky.src = `${ORIGIN}/play/?embed=1&mode=watch&map=${encodeURIComponent(MAP)}&server=${encodeURIComponent(SERVER)}`;
   log('loading ' + sky.src);
 }
 sky.addEventListener('load', () => log('frame loaded'));
