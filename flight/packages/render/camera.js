@@ -41,6 +41,7 @@ export function createCameraRig(camera, {
     blend: 1, target: 1,                    // chase by default; the backdrop sets both to 0
     boosting: false,                        // set each frame; eases the boost pull-back in and out
     focus: null,                            // a Vector3 to keep in frame too (the jet you follow), or null
+    floor: null,                            // (x, z) => lowest y the camera may sit at, or null (no ground)
     orbit: { yaw: 0, pitch: 0, spin: 0 },   // yaw/pitch: gesture offsets; spin: accumulated drift
     // Where the jet sits on screen in the orbit, as a fraction of the screen from center (+x right, +y down).
     // The site backdrop can park it in a lighter corner of the page; the chase cam is always centered.
@@ -128,6 +129,7 @@ export function createCameraRig(camera, {
       look.lerpVectors(oLook, camLook, k * k);
       upv.lerpVectors(yAxis, camUp, k * k).normalize();
     }
+    if (rig.floor) camera.position.y = Math.max(camera.position.y, rig.floor(camera.position.x, camera.position.z));
     camera.up.copy(upv);
     camera.lookAt(look);
 

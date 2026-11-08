@@ -11,8 +11,10 @@ import { SLOT, ESCORT } from '../flight/packages/bots/pilot.js';
 import { CHASE } from '../flight/packages/render/camera.js';
 import { Pane } from './tweakpane.min.js';
 
-// Where the jig starts out different from the live game (Had, 2026-11-07: reticle held to a small radius).
-const JIG_DEFAULTS = { 'reticle.radius': 70 };
+// Where the jig starts out different from the live game (Had, 2026-11-07): reticle held to a small
+// radius; no hard deck, so you can fly down among the mountains, which are taller, and bounce off
+// them and off other jets.
+const JIG_DEFAULTS = { 'reticle.radius': 70, 'limits.minAlt': 0, 'collide.ground': true, 'collide.jets': true, 'terrain.exag': 2.5 };
 const STORE = 'game-jig-v1', OPEN = 'game-jig-folders';
 const FT = 3.281, DEG = 180 / Math.PI, NM = 1 / 1852;
 
@@ -22,7 +24,7 @@ const stickSize = { frac: 0.17 };   // drag radius as a share of the screen's sh
 const T = {
   rate: () => RATE, limits: () => LIMITS, feel: () => FEEL, slot: () => SLOT, escort: () => ESCORT, chase: () => CHASE,
   stickSize: () => stickSize,
-  assist: () => F?.assist.tune, stick: () => F?.stick.tune, keys: () => F?.keys.tune, lens: () => F?.renderer.rig.lens, reticle: () => F?.reticle,
+  assist: () => F?.assist.tune, stick: () => F?.stick.tune, keys: () => F?.keys.tune, lens: () => F?.renderer.rig.lens, reticle: () => F?.reticle, collide: () => F?.collide, terrain: () => F?.renderer.terrain,
 };
 
 // [folder, open, rows]; row = [target, key, label, min, max, step, scale?]. scale converts the
@@ -80,8 +82,16 @@ const SPEC = [
     ['escort', 'gain', 'Bank eagerness', 0.3, 3, 0.05],
     ['escort', 'catchUp', 'Auto boost beyond (m)', 500, 20000, 100],
   ]],
+  ['Mountains and bumps', true, [
+    ['terrain', 'exag', 'Mountain height (× real)', 1, 6, 0.1],
+    ['collide', 'ground', 'Bounce off the ground'],
+    ['collide', 'jets', 'Bounce off other jets'],
+    ['collide', 'keep', 'Speed kept after a head-on bump', 0.1, 1, 0.05],
+    ['collide', 'clearance', 'Ground clearance (m)', 0, 50, 1],
+    ['collide', 'radius', 'Jet bump radius (m)', 5, 60, 1],
+  ]],
   ['Map limits', false, [
-    ['limits', 'minAlt', 'Hard deck (ft)', 10000, 60000, 500, FT],
+    ['limits', 'minAlt', 'Hard deck (ft, 0 = none)', 0, 60000, 500, FT],
     ['limits', 'maxAlt', 'Ceiling (ft)', 50000, 130000, 500, FT],
     ['feel', 'band', 'Starts rounding out within (ft)', 0, 30000, 500, FT],
     ['limits', 'radius', 'Map edge (nm)', 10, 200, 1, NM],

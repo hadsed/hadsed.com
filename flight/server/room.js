@@ -243,7 +243,9 @@ export function createRoom({
       jet.pos[0] = clampR(jet.pos[0]);
       jet.pos[2] = clampR(jet.pos[2]);
       e.placed = true;
-      jet.pos[1] = Math.min(LIMITS.maxAlt, Math.max(LIMITS.minAlt, jet.pos[1]));
+      // Players may fly down among the mountains (the mechanics jig lowers its floor), so a
+      // report is only kept above sea level, not above the bots' floor.
+      jet.pos[1] = Math.min(LIMITS.maxAlt, Math.max(0, jet.pos[1]));
       jet.speed = Math.min(LIMITS.maxSpeed * 1.1, Math.max(0, jet.speed));
       // How much later than usual did this report land? Compare its client
       // timestamp with our clock; the fastest recent report sets "usual".

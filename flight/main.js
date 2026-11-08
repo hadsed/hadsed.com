@@ -201,7 +201,7 @@ function frame(nowMs) {
     const it = attract ? attractPilot.think(jet, remoteList, STEP) : flyIntent(input);
     lastIntent = it;
     step(jet, it, STEP);
-    if (attract) attractPilot.hold(jet, STEP);
+    if (attract) attractPilot.hold(jet, STEP); else collide();
     waggleLeft = Math.max(0, waggleLeft - STEP);
     jet.flags = (waggleLeft > 0 ? FLAG.WAGGLE : 0) | (it.boost ? FLAG.BOOST : 0);
     if (!attract) rumble(it.boost);
@@ -282,7 +282,7 @@ function statusLog() {
   log.hold('edge', r > LIMITS.radius ? 'autopilot: turning you back toward the middle of the map'
     : r > LIMITS.radius * 0.88 ? `nearing the edge of the map · ${range(LIMITS.radius - r)} to go` : null);
   const alt = jet.pos[1];
-  log.hold('floor', alt < LIMITS.minAlt + 3000 && nose < -0.05 ? `hard deck ${ft(LIMITS.minAlt)} ft: pulling up` : null);
+  log.hold('floor', LIMITS.minAlt > 0 && alt < LIMITS.minAlt + 3000 && nose < -0.05 ? `hard deck ${ft(LIMITS.minAlt)} ft: pulling up` : null);
   log.hold('ceiling', alt > LIMITS.maxAlt - 3000 && nose > 0.05 ? `ceiling ${ft(LIMITS.maxAlt)} ft: leveling off` : null);
   log.hold('rejoin', follow && lastIntent?.boost && lastIntent === followIntent ? 'boost: rejoining formation' : null);
   log.hold('loop', assist.loop > 0 && !follow ? 'full back: looping' : assist.loop < 0 && !follow ? 'full forward: diving' : null);
@@ -410,6 +410,54 @@ function followAxes(dash = false) {
 $('unfollow').addEventListener('click', () => stopFollow());
 addEventListener('keydown', (e) => { if (e.code === 'KeyX' && follow) stopFollow(); });
 Object.assign(window.__flight, { startFollow, stopFollow, reticle: RETICLE });
+
+// ---- bumps: off the ground and off other jets ----
+// Off by default: the live game keeps its 9,000 m hard deck, far above the peaks. The mechanics
+// jig drops the deck and turns these on so you can fly down among the mountains. A bump reflects
+// your heading off the surface (the ground's slope, or the line between two jets) and costs speed
+// in proportion to how square the hit was. Only your own jet bounces; other players' jets are
+// drawn where their own clients put them.
+const COLLIDE = { ground: false, jets: false, keep: 0.6, clearance: 6, radius: 18 };
+window.__flight.collide = COLLIDE;
+const gN = [0, 0, 0], bA = new THREE.Vector3(), bB = new THREE.Vector3(), bQ = new THREE.Quaternion(), jQ = new THREE.Quaternion();
+let bumpLogAt = 0;
+function bounce(nx, ny, nz, what) {
+  forwardOf(jet.q, _f);
+  const d = _f[0] * nx + _f[1] * ny + _f[2] * nz;
+  if (d >= 0) return;   // already moving away
+  bA.set(_f[0], _f[1], _f[2]);
+  bB.set(_f[0] - 2 * d * nx, _f[1] - 2 * d * ny, _f[2] - 2 * d * nz).normalize();
+  bQ.setFromUnitVectors(bA, bB);
+  jQ.set(jet.q[0], jet.q[1], jet.q[2], jet.q[3]).premultiply(bQ).normalize();
+  jet.q[0] = jQ.x; jet.q[1] = jQ.y; jet.q[2] = jQ.z; jet.q[3] = jQ.w;
+  jet.speed = Math.max(LIMITS.minSpeed * 0.8, jet.speed * (1 - (1 - COLLIDE.keep) * -d));
+  assist.reset(jet);
+  const t = performance.now();
+  if (t - bumpLogAt > 1500) { bumpLogAt = t; log.post('bump', what, 2500); }
+}
+function collide() {
+  const g = renderer?.ground;
+  renderer.rig.floor = COLLIDE.ground && g ? (x, z) => g.height(x, z) + 3 : null;
+  if (COLLIDE.ground && g) {
+    const floor = g.height(jet.pos[0], jet.pos[2]) + COLLIDE.clearance;
+    if (jet.pos[1] < floor) {
+      jet.pos[1] = floor;
+      g.normal(jet.pos[0], jet.pos[2], gN);
+      bounce(gN[0], gN[1], gN[2], 'bounced off the ground');
+    }
+  }
+  if (COLLIDE.jets) {
+    const R2 = COLLIDE.radius * 2;
+    for (const r of remoteList) {
+      if (!r.view || !r.visible) continue;
+      const p = r.view.pos, dx = jet.pos[0] - p[0], dy = jet.pos[1] - p[1], dz = jet.pos[2] - p[2], d = Math.hypot(dx, dy, dz);
+      if (d >= R2 || d < 1e-3) continue;
+      const nx = dx / d, ny = dy / d, nz = dz / d;
+      jet.pos[0] = p[0] + nx * R2; jet.pos[1] = p[1] + ny * R2; jet.pos[2] = p[2] + nz * R2;
+      bounce(nx, ny, nz, `bumped ${r.callsign || 'another jet'}`);
+    }
+  }
+}
 
 // ---- attract <-> flying (the site backdrop's Fly and Back) ----
 // Before the backdrop is shown, drop the jet next to a live one if any are about,
