@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Mach 20 frame test</title>
+<link rel="preconnect" href="https://mach20.appliedrealities.ai">
+<link rel="preconnect" href="https://mach20-rooms.hadsed.workers.dev">
+<!--
+  Previews only. The bare minimum of what hadsed.com's home does: Mach 20 framed from its own
+  domain, driven only over postMessage (Mach 20's embed.js). No site, no wash, no styling to
+  hide behind, plus a log of every bridge message with timings. Options in the URL:
+  ?origin=https://... (another Mach 20 build), ?map=sierra, ?server=prod|staging.
+-->
+<style>
+  :root { --gold: #e4c56f; --dim: #8a919c; --bg: #0f1520; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #c8cdd5; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; overflow: hidden; }
+  /* Never quite invisible: Chrome runs a cross-origin frame that is fully transparent, or fully
+     covered, at one frame a second, and the backdrop couldn't settle in before it was shown. */
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; opacity: .01; transition: opacity 1s; }
+  #sky.on { opacity: 1; }
+  #panel { position: fixed; left: 16px; top: 16px; width: min(380px, calc(100vw - 32px)); max-height: calc(100% - 32px); display: flex; flex-direction: column;
+    background: rgba(15, 21, 32, .82); border: 1px solid rgba(228, 197, 111, .35); border-radius: 6px; transition: opacity .6s; }
+  body.flying #panel { opacity: 0; pointer-events: none; }
+  #panel header { padding: 12px 14px 8px; color: var(--gold); letter-spacing: .1em; text-transform: uppercase; font-size: 11px; }
+  #scroller { overflow: auto; padding: 0 14px; flex: 1; min-height: 120px; max-height: 38vh; }
+  #scroller p { margin: 0 0 12px; color: var(--dim); }
+  #row { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid rgba(255,255,255,.08); }
+  button { font: inherit; color: var(--gold); background: none; border: 1px solid var(--gold); border-radius: 3px; padding: 6px 12px; cursor: pointer; }
+  #log { padding: 8px 14px 12px; font-size: 11px; color: var(--dim); max-height: 22vh; overflow: auto; border-top: 1px solid rgba(255,255,255,.08); white-space: pre-wrap; }
+  #back { position: fixed; left: 50%; transform: translateX(-50%); top: 14px; opacity: 0; pointer-events: none; transition: opacity .6s .6s; }
+  body.flying #back { opacity: .8; pointer-events: auto; }
+</style>
+</head>
+<body>
+<iframe id="sky" title="Mach 20" allow="gamepad; fullscreen; accelerometer; gyroscope"></iframe>
+<div id="panel">
+  <header>Mach 20 in an iframe</header>
+  <div id="scroller">
+    <p>Scroll this box: the camera pans with it, sent over postMessage to the game on its own domain.</p>
+    <p>Press Fly to glide into the chase cam and take a seat in the room you're watching. Esc or "Back" glides out again.</p>
+    <p id="where"></p>
+    <p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>·</p><p>(end)</p>
+  </div>
+  <div id="row"><button id="fly" disabled>Fly</button><button id="reload">Reload frame</button></div>
+  <div id="log"></div>
+</div>
+<button id="back">Back</button>
+<script>
+const q = new URLSearchParams(location.search);
+const ORIGIN = /^https?:\/\/[a-z0-9.:-]+$/i.test(q.get('origin') || '') ? q.get('origin') : 'https://mach20.appliedrealities.ai';
+const MAP = q.get('map') || 'sierra', SERVER = q.get('server') || 'prod';
+const sky = document.getElementById('sky'), logEl = document.getElementById('log'), flyBtn = document.getElementById('fly');
+document.getElementById('where').textContent = `Frame: ${ORIGIN} · map ${MAP} · server ${SERVER}`;
+let t0 = 0, hello = false, ready = false, flying = false;
+const log = (s) => { logEl.textContent = `${((performance.now() - t0) / 1000).toFixed(2)}s  ${s}\n` + logEl.textContent; };
+const tell = (t, m = {}) => sky.contentWindow?.postMessage({ mach20: 1, t, ...m }, ORIGIN);
+
+addEventListener('message', (e) => {
+  if (e.origin !== ORIGIN || e.source !== sky.contentWindow || e.data?.mach20 !== 1) return;
+  const m = e.data;
+  if (m.t === 'hello' && !hello) { hello = true; log('game answered hello'); tell('frame', { x: 0, y: 0.1 }); }
+  if (m.t === 'ready' && !ready) { ready = true; sky.classList.add('on'); flyBtn.disabled = false; log('ready: backdrop settled, showing it');
+    // The game's own load timings (ms from when its page started), when it sends them.
+    if (m.marks) log('game: ' + Object.entries(m.marks).sort((x, y) => (typeof x[1] === 'number' ? x[1] : 1e9) - (typeof y[1] === 'number' ? y[1] : 1e9)).map(([k, v]) => `${k} ${v}`).join(', '));
+  }
+  if (m.t === 'key' && m.key === 'Escape') { log('game sent Escape'); land(); }
+});
+
+function load() {
+  hello = ready = false; flying = false; document.body.classList.remove('flying'); sky.classList.remove('on'); flyBtn.disabled = true;
+  t0 = performance.now(); logEl.textContent = '';
+  sky.src = `${ORIGIN}/?embed=1&mode=watch&map=${encodeURIComponent(MAP)}&server=${encodeURIComponent(SERVER)}`;
+  log('loading ' + sky.src);
+}
+sky.addEventListener('load', () => log('frame loaded'));
+setInterval(() => { if (!hello && sky.src) tell('hello'); }, 100);
+
+// Scroll position pans the camera, eased, sent only when it moves.
+const scroller = document.getElementById('scroller');
+let target = 0, yaw = 0, sent = Infinity;
+scroller.addEventListener('scroll', () => { target = Math.min(scroller.scrollTop / 400, 1.5); });
+(function step() {
+  requestAnimationFrame(step);
+  yaw += (target - yaw) * 0.1;
+  if (hello && Math.abs(yaw - sent) > 1e-4) { sent = yaw; tell('orbit', { yaw, pitch: yaw * 0.15 }); }
+})();
+
+function fly() { if (!ready || flying) return; flying = true; document.body.classList.add('flying'); tell('fly'); sky.focus(); log('fly'); }
+function land() { if (!flying) return; flying = false; document.body.classList.remove('flying'); tell('land'); log('land'); }
+flyBtn.onclick = fly;
+document.getElementById('back').onclick = land;
+document.getElementById('reload').onclick = load;
+addEventListener('keydown', (e) => { if (e.key === 'Escape') land(); });
+// ---------- tilt: the game asks, this page reads the motion sensors ----------
+// iOS won't let a frame from another domain use the motion sensors, so when you tap TILT in
+// the game it asks this page, which asks permission and forwards each reading (Mach 20's embed.js).
+// The permission prompt needs a tap on this page; if the game's tap doesn't count, a button asks for one.
+const tiltAsk = document.createElement('button');
+tiltAsk.textContent = 'Tap to allow tilt';
+tiltAsk.style.cssText = 'position:fixed;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);font:12px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#e4c56f;background:rgba(15,21,32,.9);border:1px solid #e4c56f;border-radius:4px;padding:14px 18px;display:none';
+document.body.appendChild(tiltAsk);
+const orient = (e) => tell('orient', { beta: e.beta, gamma: e.gamma });
+async function tiltPermission() {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) return 'no';
+  if (typeof DOE.requestPermission !== 'function') return 'granted';
+  try { return await DOE.requestPermission(); } catch { return 'needs-tap'; }
+}
+async function tiltOn() {
+  let r = await tiltPermission();
+  if (r === 'needs-tap') {
+    tiltAsk.style.display = 'block';
+    r = await new Promise((done) => { tiltAsk.onclick = async () => { tiltAsk.style.display = 'none'; done(await tiltPermission()); }; });
+  }
+  const ok = r === 'granted';
+  if (ok) { removeEventListener('deviceorientation', orient); addEventListener('deviceorientation', orient); }
+  tell('tilt', { ok });
+}
+addEventListener('message', (e) => {
+  if (e.origin !== ORIGIN || e.source !== sky.contentWindow || e.data?.mach20 !== 1 || e.data.t !== 'tilt') return;
+  if (e.data.on) tiltOn(); else { removeEventListener('deviceorientation', orient); tiltAsk.style.display = 'none'; }
+});
+addEventListener('message', (e) => { if (e.origin === ORIGIN && e.data?.mach20 === 1 && e.data.t === 'tilt') log('tilt ' + (e.data.on ? 'on: asking for motion sensors' : 'off')); });
+load();
+</script>
+</body>
+</html>

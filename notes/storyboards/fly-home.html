@@ -4,9 +4,13 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Had Seddiqi</title>
+<!-- Warm up Mach 20 and its room server while the site loads: the sky frame needs both. -->
+<link rel="preconnect" href="https://mach20.appliedrealities.ai">
+<link rel="preconnect" href="https://mach20-rooms.hadsed.workers.dev">
 <!--
   Staging home: the website over a live 3D sky, with Fly pinned at the foot of the sidebar.
-  One renderer for everything: #sky is the flight lab in ?attract mode, which draws the backdrop
+  One renderer for everything: #sky is Mach 20 (mach20.appliedrealities.ai, its own repo) in watch
+  mode, framed from its own domain and driven over postMessage (Mach 20's embed.js). It draws the backdrop
   (your jet held still in the backdrop's framing, the live MMO jets flying around it) and is also
   the game. Clicking Fly fades the site out and glides that same camera into the chase cam behind
   your jet, as one shot; the HUD fades in and the watch-only socket becomes a seat. Esc/Back glides
@@ -21,7 +25,9 @@
      pushes the pinned Fly under the visible edge. */
   iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
   /* The sky fades in once it has drawn the ground; the site is readable on navy before that. */
-  #sky { opacity: 0; transition: opacity 1.2s ease; z-index: 1; }
+  /* Never quite invisible: Chrome runs a cross-origin frame that is fully transparent, or fully
+     covered, at one frame a second, and the backdrop couldn't settle in before it was shown. */
+  #sky { opacity: .01; transition: opacity 1.2s ease; z-index: 1; }
   #sky.on { opacity: 1; }
   #site { z-index: 2; background: transparent; color-scheme: normal; transition: opacity .9s ease; }
   body.flying #site { opacity: 0; pointer-events: none; }
@@ -48,7 +54,20 @@
 const $ = (s) => document.querySelector(s);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const skyFrame = $('#sky'), site = $('#site');
-const F = () => { try { return skyFrame.contentWindow.__flight; } catch { return null; } };
+// Mach 20 lives on its own domain; previews may try another build with ?mach20=<origin>.
+// Which Mach 20 the home page frames and flies in place: domain, map, room server. Set here
+// rather than in a separate file so the frame can start loading without another request.
+const M = { origin: 'https://mach20.appliedrealities.ai', map: 'sierra', server: 'prod' };
+// The only way to talk to the game: messages, both ways, checked against its origin (Mach 20's embed.js).
+const BRIDGE = 1;
+const sky = { hello: false, ready: false };
+const tell = (t, m = {}) => { try { skyFrame.contentWindow.postMessage({ mach20: BRIDGE, t, ...m }, M.origin); } catch {} };
+addEventListener('message', (e) => {
+  if (e.origin !== M.origin || e.source !== skyFrame.contentWindow || e.data?.mach20 !== BRIDGE) return;
+  if (e.data.t === 'hello') sky.hello = true;
+  if (e.data.t === 'ready') sky.ready = true;
+  if (e.data.t === 'key' && e.data.key === 'Escape') leave();
+});
 const siteDoc = () => { try { return site.contentDocument; } catch { return null; } };
 let state = 'site';   // site | flying
 
@@ -118,8 +137,7 @@ function styleSite(doc = siteDoc()) {
 }
 // The jet's side of the settings, pushed into the backdrop renderer.
 function styleSky() {
-  const f = F(); if (!f || !f.renderer) return;
-  f.renderer.rig.frame = innerWidth >= innerHeight ? { x: WASH.jx, y: WASH.jy } : { x: 0, y: 0 };
+  tell('frame', innerWidth >= innerHeight ? { x: WASH.jx, y: WASH.jy } : { x: 0, y: 0 });
 }
 addEventListener('resize', styleSky);
 // Each site page calls this from the end of its <head> when it's framed here (src/_includes/base.njk),
@@ -142,21 +160,55 @@ site.addEventListener('load', () => {
   site.src = (p && p.startsWith('/') && !p.startsWith('//') ? p : '/') + location.hash;
 }
 // The sky loads behind the site and fades up when it has settled next to a live jet (or found none).
-skyFrame.src = '../flight/?attract';
+{
+  const o = new URLSearchParams(location.search).get('mach20');
+  if (o && !/(^|\.)hadsed\.com$/.test(location.hostname) && /^https?:\/\/[a-z0-9.:-]+$/i.test(o)) M.origin = o;
+  skyFrame.src = `${M.origin}/?embed=1&mode=watch&map=${encodeURIComponent(M.map)}&server=${encodeURIComponent(M.server)}`;
+}
+// Say hello until the game answers (its listener starts once its modules load), then wait for ready.
 const waitSky = setInterval(() => {
-  const f = F(); if (!f) return;
+  if (!sky.hello) { tell('hello'); return; }
   styleSky();
-  if (!f.ready) return;
+  if (!sky.ready) return;
   clearInterval(waitSky);
   skyFrame.classList.add('on');
-  try { skyFrame.contentWindow.addEventListener('keydown', onKey); } catch {}
 }, 100);
+
+// ---------- tilt: the game asks, this page reads the motion sensors ----------
+// iOS won't let a frame from another domain use the motion sensors, so when you tap TILT in
+// the game it asks this page, which asks permission and forwards each reading (Mach 20's embed.js).
+// The permission prompt needs a tap on this page; if the game's tap doesn't count, a button asks for one.
+const tiltAsk = document.createElement('button');
+tiltAsk.textContent = 'Tap to allow tilt';
+tiltAsk.style.cssText = 'position:fixed;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);font:12px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#e4c56f;background:rgba(15,21,32,.9);border:1px solid #e4c56f;border-radius:4px;padding:14px 18px;display:none';
+document.body.appendChild(tiltAsk);
+const orient = (e) => tell('orient', { beta: e.beta, gamma: e.gamma });
+async function tiltPermission() {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) return 'no';
+  if (typeof DOE.requestPermission !== 'function') return 'granted';
+  try { return await DOE.requestPermission(); } catch { return 'needs-tap'; }
+}
+async function tiltOn() {
+  let r = await tiltPermission();
+  if (r === 'needs-tap') {
+    tiltAsk.style.display = 'block';
+    r = await new Promise((done) => { tiltAsk.onclick = async () => { tiltAsk.style.display = 'none'; done(await tiltPermission()); }; });
+  }
+  const ok = r === 'granted';
+  if (ok) { removeEventListener('deviceorientation', orient); addEventListener('deviceorientation', orient); }
+  tell('tilt', { ok });
+}
+addEventListener('message', (e) => {
+  if (e.origin !== M.origin || e.source !== skyFrame.contentWindow || e.data?.mach20 !== BRIDGE || e.data.t !== 'tilt') return;
+  if (e.data.on) tiltOn(); else { removeEventListener('deviceorientation', orient); tiltAsk.style.display = 'none'; }
+});
 
 // ---------- gestures on the site pan the backdrop camera ----------
 // Page position pans (a pure function of scroll, so it always reverses); sideways swipes and
 // wheel turn it. Same feel as the backdrop lab; offsets go to the flight lab's camera rig.
 const DEG = Math.PI / 180;
-const G = { scrollYaw: 0, scrollPitch: 0, sideYaw: 0, yaw: 0, pitch: 0 };
+const G = { scrollYaw: 0, scrollPitch: 0, sideYaw: 0, yaw: 0, pitch: 0, sentYaw: Infinity, sentPitch: Infinity };
 function readScroll(w) {
   const screens = w.scrollY / Math.max(w.innerHeight, 1);
   G.scrollYaw = Math.min(screens * 10, 90) * DEG;
@@ -190,8 +242,11 @@ let lastG = performance.now();
   const k = 1 - Math.exp(-dt / 0.18);
   G.yaw += (G.scrollYaw + G.sideYaw - G.yaw) * k;
   G.pitch += (G.scrollPitch - G.pitch) * k;
-  const rig = F()?.renderer?.rig;
-  if (rig) { rig.orbit.yaw = G.yaw; rig.orbit.pitch = G.pitch; }
+  // Only when it moved: an idle page sends nothing.
+  if (sky.hello && (Math.abs(G.yaw - G.sentYaw) > 1e-4 || Math.abs(G.pitch - G.sentPitch) > 1e-4)) {
+    G.sentYaw = G.yaw; G.sentPitch = G.pitch;
+    tell('orbit', { yaw: G.yaw, pitch: G.pitch });
+  }
 })(performance.now());
 
 // ---------- Fly blink: a slow swell to the gold of the "next role" orb and back ----------
@@ -209,19 +264,19 @@ if (!reduceMotion) setTimeout(function blink() {
 
 // ---------- enter / leave: one camera move in one scene ----------
 function enter() {
-  const f = F(); if (state !== 'site' || !f || !f.fly) return;
+  if (state !== 'site' || !sky.hello) return;
   state = 'flying';
   document.body.classList.add('flying');
-  f.fly();
+  tell('fly');
   skyFrame.classList.add('on');
   skyFrame.tabIndex = 0;
   skyFrame.focus();
 }
 function leave() {
-  const f = F(); if (state !== 'flying' || !f) return;
+  if (state !== 'flying') return;
   state = 'site';
   document.body.classList.remove('flying');
-  f.land();
+  tell('land');
   $('#exit').blur();
   skyFrame.tabIndex = -1;
   site.focus();
