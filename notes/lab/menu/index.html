@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Fly: menu prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:wght@300&display=swap">
+<link rel="stylesheet" href="menu.css">
+</head>
+<body>
+<!-- The live game's own backdrop: the jet flies itself over the Sierra, other players' jets pass by. -->
+<iframe id="sky" title="" tabindex="-1" aria-hidden="true" src="/lab/flight/?attract"></iframe>
+<div id="wash"></div>
+
+<main>
+  <section class="screen" id="main" data-on>
+    <h1>Fly</h1>
+    <p class="sub">SR-71 · shared sky</p>
+    <nav class="menu">
+      <button data-go="maps" class="primary">Play</button>
+      <button data-go="settings">Settings</button>
+      <button data-go="credits">Credits</button>
+    </nav>
+  </section>
+
+  <section class="screen" id="maps">
+    <header><button class="back" data-back>‹ back</button><h2>Choose a map</h2></header>
+    <div class="maps" id="mapList"></div>
+  </section>
+
+  <section class="screen" id="settings">
+    <header><button class="back" data-back>‹ back</button><h2>Settings</h2></header>
+    <div class="rows">
+      <label class="row"><span>Invert up / down<small>Push forward to climb, pull back to dive. Applies to keys, drag, tilt and gamepad.</small></span>
+        <input type="checkbox" id="invertY"></label>
+      <div class="row"><span>Look<small>Realistic jets and ground, or the site's gold outlines over a survey grid.</small></span>
+        <div class="seg" id="look"><button data-v="real">Realistic</button><button data-v="site">Gold</button></div></div>
+    </div>
+  </section>
+
+  <section class="screen" id="credits">
+    <header><button class="back" data-back>‹ back</button><h2>Credits</h2></header>
+    <div class="credits">
+      <h3>Made by</h3>
+      <p>Had Seddiqi<span class="dim">design, direction, flying</span></p>
+      <p>Claude (Anthropic)<span class="dim">code</span></p>
+      <h3>Aircraft</h3>
+      <p>SR-71 Blackbird model by <a href="https://sketchfab.com/helijah" target="_blank" rel="noopener">helijah</a><span class="dim">Sketchfab Standard license</span></p>
+      <h3>Icons</h3>
+      <p>"Jet fighter" by Delapouite, <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a><span class="dim"><a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a></span></p>
+      <h3>Terrain</h3>
+      <p>Elevation from <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Terrain Tiles on AWS</a> (Mapzen)<span class="dim">SRTM, USGS 3DEP, ETOPO1 and others</span></p>
+      <h3>Software</h3>
+      <p><a href="https://threejs.org" target="_blank" rel="noopener">three.js</a><span class="dim">MIT</span></p>
+      <p><a href="https://github.com/zeux/meshoptimizer" target="_blank" rel="noopener">meshoptimizer</a><span class="dim">MIT</span></p>
+      <p>Petrona typeface<span class="dim">SIL Open Font License</span></p>
+    </div>
+  </section>
+</main>
+
+<p class="keys">↑↓ choose · enter select · esc back</p>
+<script type="module" src="menu.js"></script>
+</body>
+</html>
