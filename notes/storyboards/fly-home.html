@@ -163,7 +163,7 @@ site.addEventListener('load', () => {
 {
   const o = new URLSearchParams(location.search).get('mach20');
   if (o && !/(^|\.)hadsed\.com$/.test(location.hostname) && /^https?:\/\/[a-z0-9.:-]+$/i.test(o)) M.origin = o;
-  skyFrame.src = `${M.origin}/?embed=1&mode=watch&map=${encodeURIComponent(M.map)}&server=${encodeURIComponent(M.server)}`;
+  skyFrame.src = `${M.origin}/play/?embed=1&mode=watch&map=${encodeURIComponent(M.map)}&server=${encodeURIComponent(M.server)}`;
 }
 // Say hello until the game answers (its listener starts once its modules load), then wait for ready.
 const waitSky = setInterval(() => {
