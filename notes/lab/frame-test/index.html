@@ -58,7 +58,10 @@ addEventListener('message', (e) => {
   if (e.origin !== ORIGIN || e.source !== sky.contentWindow || e.data?.mach20 !== 1) return;
   const m = e.data;
   if (m.t === 'hello' && !hello) { hello = true; log('game answered hello'); tell('frame', { x: 0, y: 0.1 }); }
-  if (m.t === 'ready' && !ready) { ready = true; sky.classList.add('on'); flyBtn.disabled = false; log('ready: backdrop settled, showing it'); }
+  if (m.t === 'ready' && !ready) { ready = true; sky.classList.add('on'); flyBtn.disabled = false; log('ready: backdrop settled, showing it');
+    // The game's own load timings (ms from when its page started), when it sends them.
+    if (m.marks) log('game: ' + Object.entries(m.marks).sort((x, y) => (typeof x[1] === 'number' ? x[1] : 1e9) - (typeof y[1] === 'number' ? y[1] : 1e9)).map(([k, v]) => `${k} ${v}`).join(', '));
+  }
   if (m.t === 'key' && m.key === 'Escape') { log('game sent Escape'); land(); }
 });
 
