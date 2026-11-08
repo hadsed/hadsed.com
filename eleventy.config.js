@@ -40,6 +40,8 @@ export default function (eleventyConfig) {
     eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
   }
   eleventyConfig.addPassthroughCopy({ "notes/storyboards/fly-home.html": "lab/home/index.html" });
+  // Which Mach 20 the home page frames as its backdrop and flies in place: domain, map, room server.
+  eleventyConfig.addPassthroughCopy({ "mach20.json": "lab/home/mach20.json" });
 
   // Branch previews (SITE_URL set) also carry the SR-71 backdrop lab at /lab/sr71/,
   // so it can be explored on any device. Production builds never include it.
