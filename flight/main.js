@@ -253,7 +253,7 @@ function frame(nowMs) {
   assist.direction(aimDir);
   const pin = RETICLE.radius > 0 && placeReticle(RETICLE.radius);
   if (!pin) proj.set(view.pos[0] + aimDir[0] * 20000, view.pos[1] + aimDir[1] * 20000, view.pos[2] + aimDir[2] * 20000).project(renderer.camera);
-  const showReticle = !follow && !attract && renderer.rig.blend === 1 && (pin || proj.z < 1);
+  const showReticle = !follow && !attract && !down && renderer.rig.blend === 1 && (pin || proj.z < 1);
   reticle.style.display = showReticle ? 'block' : 'none';
   if (showReticle) reticle.style.transform = pin ? `translate(${pin[0]}px, ${pin[1]}px)` : `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
 }
@@ -584,8 +584,8 @@ function showCard() {
     ['lowest pass', lowest == null ? '—' : `${Math.round(lowest * 3.281).toLocaleString()} ft`, b && lowest != null && lowest < b.lowest],
     ['under 1,000 ft', `${Math.round(s.lowTime)} s`, b && s.lowTime > b.lowTime],
     ['hits survived', `${s.scrapes + (s.hard || 0)}`, false],
-    ['maneuver kills', `${session.kills} this session`, false],
-    ['crashes', `${session.lives} this session`, false],
+    ['kills this session', `${session.kills}`, false],
+    ['crashes this session', `${session.lives}`, false],
   ];
   session.best = b ? { distance: Math.max(b.distance, s.distance), time: Math.max(b.time, s.time), topSpeed: Math.max(b.topSpeed, s.topSpeed), lowest: Math.min(b.lowest, lowest ?? Infinity), lowTime: Math.max(b.lowTime, s.lowTime) }
     : { distance: s.distance, time: s.time, topSpeed: s.topSpeed, lowest: lowest ?? Infinity, lowTime: s.lowTime };

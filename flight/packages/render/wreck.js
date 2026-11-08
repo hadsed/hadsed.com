@@ -67,6 +67,7 @@ function pool(n, fs, blending, scene, uProj) {
   const points = new THREE.Points(g, new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: fs, uniforms: { uProj }, transparent: true, depthWrite: false, blending }));
   points.frustumCulled = false;
   scene.add(points);
+  points.renderOrder = blending === THREE.AdditiveBlending ? 3 : 2;   // flame over smoke, both after the jets
   // Per particle: velocity, age, life, size from/to, alpha peak, color from/to, drag, lift.
   const vel = new Float32Array(n * 3), age = new Float32Array(n), life = new Float32Array(n).fill(-1);
   const s0 = new Float32Array(n), s1 = new Float32Array(n), a0 = new Float32Array(n), c0 = new Float32Array(n * 3), c1 = new Float32Array(n * 3), drag = new Float32Array(n), lift = new Float32Array(n);
@@ -130,14 +131,15 @@ export function createWreck({ scene, height }) {
     for (let i = 0; i < 140; i++) {
       const s = 30 + Math.random() * 70;
       glow.emit(x + rnd(8), y + rnd(8), z + rnd(8), vx * 0.12 + rnd(s), vy * 0.05 + Math.random() * s, vz * 0.12 + rnd(s),
-        0.5 + Math.random() * 1.2, 10 + Math.random() * 10, 45 + Math.random() * 55, 1.4, 1, 0.9, 0.6, 0.9, 0.25, 0.05, 1.6, 6);
+        0.6 + Math.random() * 1.4, 14 + Math.random() * 12, 55 + Math.random() * 65, 2.2, 1, 0.92, 0.65, 1, 0.3, 0.06, 1.6, 6);
     }
     // Black smoke rolling up out of it.
     for (let i = 0; i < 160; i++) {
       const s = 20 + Math.random() * 45;
       const g = 0.06 + Math.random() * 0.08;
+      // Lit orange from inside at first, cooling to grey-black as it rolls up.
       smoke.emit(x + rnd(12), y + rnd(6), z + rnd(12), vx * 0.08 + rnd(s), Math.random() * s + 10, vz * 0.08 + rnd(s),
-        4 + Math.random() * 6, 18 + Math.random() * 15, 90 + Math.random() * 90, 0.75, g, g, g, g * 2.2, g * 2.2, g * 2.4, 0.9, 9);
+        4 + Math.random() * 6, 18 + Math.random() * 15, 90 + Math.random() * 90, 0.6, 0.55, 0.3, 0.12, g, g, g * 1.05, 0.9, 9);
     }
     // Debris keeps most of the jet's momentum along the ground, kicked up and out.
     for (let i = 0; i < 26; i++) {
