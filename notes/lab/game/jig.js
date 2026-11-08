@@ -14,7 +14,9 @@ import { Pane } from './tweakpane.min.js';
 // Where the jig starts out different from the live game (Had, 2026-11-07): reticle held to a small
 // radius; no hard deck, so you can fly down among the mountains, which are taller, and bounce off
 // them and off other jets.
-const JIG_DEFAULTS = { 'reticle.radius': 70, 'limits.minAlt': 0, 'collide.ground': true, 'collide.jets': true, 'terrain.exag': 2.5, 'terrain.steadyKm': 90 };
+// The jig starts from the game's own defaults. The jig reads LIMITS before main.js drops the
+// client's hard deck to 0 (the shared module keeps 9,000 m for the server's bots), so say it here.
+const JIG_DEFAULTS = { 'limits.minAlt': 0 };
 const STORE = 'game-jig-v1', OPEN = 'game-jig-folders';
 const FT = 3.281, DEG = 180 / Math.PI, NM = 1 / 1852;
 
