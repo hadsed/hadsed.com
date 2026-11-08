@@ -15,8 +15,11 @@
 <style>
   :root { --gold: #e4c56f; --dim: #8a919c; --bg: #0f1520; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: #c8cdd5; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; overflow: hidden; }
-  #sky { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; transition: opacity 1s; }
-  #sky.on { opacity: 1; }
+  /* The game frame stays fully opaque under a cover that fades: Chrome runs a cross-origin frame with
+     opacity 0 at one frame a second, so the backdrop couldn't settle in before it was shown. */
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+  #cover { position: fixed; inset: 0; background: var(--bg); pointer-events: none; transition: opacity 1s; }
+  #sky.on + #cover { opacity: 0; }
   #panel { position: fixed; left: 16px; top: 16px; width: min(380px, calc(100vw - 32px)); max-height: calc(100% - 32px); display: flex; flex-direction: column;
     background: rgba(15, 21, 32, .82); border: 1px solid rgba(228, 197, 111, .35); border-radius: 6px; transition: opacity .6s; }
   body.flying #panel { opacity: 0; pointer-events: none; }
@@ -32,6 +35,7 @@
 </head>
 <body>
 <iframe id="sky" title="Mach 20" allow="gamepad; fullscreen; accelerometer; gyroscope"></iframe>
+<div id="cover"></div>
 <div id="panel">
   <header>Mach 20 in an iframe</header>
   <div id="scroller">
