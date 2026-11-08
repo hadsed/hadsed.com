@@ -183,8 +183,6 @@ Object.defineProperty(window.__flight, 'jet', { get: () => jet });
 if (attract) renderer.rig.blend = renderer.rig.target = 0;
 // The backdrop shows once it has drawn the ground and, if the sky has company, sits next to it.
 let readyAt = 0;
-// Steady ground out to 90 km so tall mountains hold still (see world.steadyRadius).
-renderer.terrain.steadyKm = 90;
 renderer.setWorld(world).then(() => { readyAt = performance.now(); });
 
 // ---- loop: fixed 60 Hz sim, render interpolated, send at 10 Hz ----
