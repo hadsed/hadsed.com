@@ -1,0 +1,5 @@
+/* In-game "‹ menu" button, under the top-left HUD's safe area, out of the way of "you are". */
+#toMenu { position: fixed; left: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 62px); font: inherit; letter-spacing: inherit;
+  text-transform: uppercase; color: var(--dim); background: none; border: 1px solid rgba(133, 146, 168, 0.5); border-radius: 3px;
+  padding: 5px 9px; cursor: pointer; opacity: 0.8; }
+#toMenu:hover { color: var(--gold); border-color: var(--gold); opacity: 1; }

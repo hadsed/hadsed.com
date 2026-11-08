@@ -70,21 +70,32 @@ export default function (eleventyConfig) {
   if (process.env.SITE_URL || process.env.LAB) {
     eleventyConfig.addPassthroughCopy({ "notes/lab/game": "lab/game" });
     eleventyConfig.on("eleventy.after", async ({ dir }) => {
-      const { readFile, writeFile, mkdir } = await import("node:fs/promises");
-      const swap = (html, from, to) => {
-        if (!html.includes(from)) throw new Error(`/lab/game/: flight/index.html no longer has ${from}`);
-        return html.replace(from, to);
-      };
-      let html = await readFile("flight/index.html", "utf8");
-      html = swap(html, "<head>", '<head>\n<base href="/lab/flight/">');
-      html = swap(html, "<title>Flight lab</title>", '<title>Game mechanics jig</title>\n<link rel="stylesheet" href="/lab/game/jig.css">');
-      // Absolute, not via <base>: Cloudflare turns the preload into an Early Hints header
-      // resolved against the page's own URL.
-      html = swap(html, '<link rel="modulepreload" href="vendor/three.module.js">', '<link rel="modulepreload" href="/lab/flight/vendor/three.module.js">');
-      html = swap(html, '"three": "./vendor/three.module.js"', '"three": "/lab/flight/vendor/three.module.js"');
-      html = swap(html, '<script type="module" src="main.js"></script>', '<script type="module" src="/lab/game/jig.js"></script>');
-      await mkdir(`${dir.output}/lab/game`, { recursive: true });
-      await writeFile(`${dir.output}/lab/game/index.html`, html);
+      await writeGamePage(`${dir.output}/lab/game`, "Game mechanics jig", "/lab/game/jig.css", "/lab/game/jig.js");
+    });
+  }
+
+  // Branch previews (SITE_URL set) carry the game's main menu prototype at /lab/menu/: Play ->
+  // map select -> the game at /lab/menu/play/ (the same generated page as the jig, with the
+  // menu's settings applied instead of a panel). Previews also get the four other terrain
+  // regions as worlds in the flight manifest, so every map on the menu flies. The room server
+  // already knows all five. Production builds never include any of it.
+  if (process.env.SITE_URL || process.env.LAB) {
+    eleventyConfig.addPassthroughCopy({
+      "notes/lab/menu": "lab/menu",
+      "notes/storyboards/terrain/*.webp": "lab/flight/assets/terrain",
+    });
+    eleventyConfig.on("eleventy.after", async ({ dir }) => {
+      const { readFile, writeFile } = await import("node:fs/promises");
+      await writeGamePage(`${dir.output}/lab/menu/play`, "Fly", "/lab/menu/play.css", "/lab/menu/play.js");
+      const manifest = JSON.parse(await readFile("flight/assets/manifest.json", "utf8"));
+      const regions = JSON.parse(await readFile("notes/storyboards/terrain/regions.json", "utf8"));
+      const exaggeration = manifest.worlds[0].exaggeration;
+      for (const r of regions) {
+        if (manifest.worlds.some((w) => w.id === r.id)) continue;
+        manifest.worlds.push({ id: r.id, label: r.label, heightmap: `assets/terrain/${r.id}.webp`, encoding: "terrarium",
+          size: r.size, metersPerPixel: r.metersPerPixel, minM: r.minM, maxM: r.maxM, exaggeration, snowM: r.snowM, arid: r.arid });
+      }
+      await writeFile(`${dir.output}/lab/flight/assets/manifest.json`, JSON.stringify(manifest, null, 2));
     });
   }
 
@@ -144,4 +155,25 @@ export default function (eleventyConfig) {
     markdownTemplateEngine: "njk",
     htmlTemplateEngine: "njk",
   };
+}
+
+// The flight lab's own index.html, re-pointed with a <base> at /lab/flight/ so the same game
+// modules load, with a different stylesheet and entry script (which imports main.js itself).
+// Used by the previews-only /lab/game/ jig and /lab/menu/play/.
+async function writeGamePage(outDir, title, css, script) {
+  const { readFile, writeFile, mkdir } = await import("node:fs/promises");
+  const swap = (html, from, to) => {
+    if (!html.includes(from)) throw new Error(`${outDir}: flight/index.html no longer has ${from}`);
+    return html.replace(from, to);
+  };
+  let html = await readFile("flight/index.html", "utf8");
+  html = swap(html, "<head>", '<head>\n<base href="/lab/flight/">');
+  html = swap(html, "<title>Flight lab</title>", `<title>${title}</title>\n<link rel="stylesheet" href="${css}">`);
+  // Absolute, not via <base>: Cloudflare turns the preload into an Early Hints header
+  // resolved against the page's own URL.
+  html = swap(html, '<link rel="modulepreload" href="vendor/three.module.js">', '<link rel="modulepreload" href="/lab/flight/vendor/three.module.js">');
+  html = swap(html, '"three": "./vendor/three.module.js"', '"three": "/lab/flight/vendor/three.module.js"');
+  html = swap(html, '<script type="module" src="main.js"></script>', `<script type="module" src="${script}"></script>`);
+  await mkdir(outDir, { recursive: true });
+  await writeFile(`${outDir}/index.html`, html);
 }
