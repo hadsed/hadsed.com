@@ -40,8 +40,6 @@ export default function (eleventyConfig) {
     eleventyConfig.addPassthroughCopy({ [`flight/${part}`]: `lab/flight/${part}` });
   }
   eleventyConfig.addPassthroughCopy({ "notes/storyboards/fly-home.html": "lab/home/index.html" });
-  // Which Mach 20 the home page frames as its backdrop and flies in place: domain, map, room server.
-  eleventyConfig.addPassthroughCopy({ "mach20.json": "lab/home/mach20.json" });
   // Branch previews carry a bare Mach 20 iframe test at /lab/frame-test/ (no site around it).
   if (process.env.SITE_URL || process.env.LAB) {
     eleventyConfig.addPassthroughCopy({ "notes/lab/frame-test": "lab/frame-test" });

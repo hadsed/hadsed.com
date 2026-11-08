@@ -4,6 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Mach 20 frame test</title>
+<link rel="preconnect" href="https://mach20.appliedrealities.ai">
+<link rel="preconnect" href="https://mach20-rooms.hadsed.workers.dev">
 <!--
   Previews only. The bare minimum of what hadsed.com's home does: Mach 20 framed from its own
   domain, driven only over postMessage (Mach 20's embed.js). No site, no wash, no styling to
@@ -85,6 +87,36 @@ flyBtn.onclick = fly;
 document.getElementById('back').onclick = land;
 document.getElementById('reload').onclick = load;
 addEventListener('keydown', (e) => { if (e.key === 'Escape') land(); });
+// ---------- tilt: the game asks, this page reads the motion sensors ----------
+// iOS won't let a frame from another domain use the motion sensors, so when you tap TILT in
+// the game it asks this page, which asks permission and forwards each reading (Mach 20's embed.js).
+// The permission prompt needs a tap on this page; if the game's tap doesn't count, a button asks for one.
+const tiltAsk = document.createElement('button');
+tiltAsk.textContent = 'Tap to allow tilt';
+tiltAsk.style.cssText = 'position:fixed;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);font:12px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#e4c56f;background:rgba(15,21,32,.9);border:1px solid #e4c56f;border-radius:4px;padding:14px 18px;display:none';
+document.body.appendChild(tiltAsk);
+const orient = (e) => tell('orient', { beta: e.beta, gamma: e.gamma });
+async function tiltPermission() {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) return 'no';
+  if (typeof DOE.requestPermission !== 'function') return 'granted';
+  try { return await DOE.requestPermission(); } catch { return 'needs-tap'; }
+}
+async function tiltOn() {
+  let r = await tiltPermission();
+  if (r === 'needs-tap') {
+    tiltAsk.style.display = 'block';
+    r = await new Promise((done) => { tiltAsk.onclick = async () => { tiltAsk.style.display = 'none'; done(await tiltPermission()); }; });
+  }
+  const ok = r === 'granted';
+  if (ok) { removeEventListener('deviceorientation', orient); addEventListener('deviceorientation', orient); }
+  tell('tilt', { ok });
+}
+addEventListener('message', (e) => {
+  if (e.origin !== ORIGIN || e.source !== sky.contentWindow || e.data?.mach20 !== 1 || e.data.t !== 'tilt') return;
+  if (e.data.on) tiltOn(); else { removeEventListener('deviceorientation', orient); tiltAsk.style.display = 'none'; }
+});
+addEventListener('message', (e) => { if (e.origin === ORIGIN && e.data?.mach20 === 1 && e.data.t === 'tilt') log('tilt ' + (e.data.on ? 'on: asking for motion sensors' : 'off')); });
 load();
 </script>
 </body>
