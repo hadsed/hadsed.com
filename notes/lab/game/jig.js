@@ -14,7 +14,7 @@ import { Pane } from './tweakpane.min.js';
 // Where the jig starts out different from the live game (Had, 2026-11-07): reticle held to a small
 // radius; no hard deck, so you can fly down among the mountains, which are taller, and bounce off
 // them and off other jets.
-const JIG_DEFAULTS = { 'reticle.radius': 70, 'limits.minAlt': 0, 'collide.ground': true, 'collide.jets': true, 'terrain.exag': 2.5 };
+const JIG_DEFAULTS = { 'reticle.radius': 70, 'limits.minAlt': 0, 'collide.ground': true, 'collide.jets': true, 'terrain.exag': 2.5, 'terrain.steadyKm': 45 };
 const STORE = 'game-jig-v1', OPEN = 'game-jig-folders';
 const FT = 3.281, DEG = 180 / Math.PI, NM = 1 / 1852;
 
@@ -84,6 +84,7 @@ const SPEC = [
   ]],
   ['Mountains and bumps', true, [
     ['terrain', 'exag', 'Mountain height (× real)', 1, 6, 0.1],
+    ['terrain', 'steadyKm', 'Steady ground out to (km)', 10, 90, 1],
     ['collide', 'ground', 'Bounce off the ground'],
     ['collide', 'jets', 'Bounce off other jets'],
     ['collide', 'keep', 'Speed kept after a head-on bump', 0.1, 1, 0.05],

@@ -124,7 +124,7 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
   resize();
   addEventListener('resize', resize);
 
-  let exagSet = null;
+  let exagSet = null, steadySet = null;
   const api = {
     renderer, scene, camera, rig, world,
     async setWorld(w) {
@@ -132,6 +132,7 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       world.setHeight(t.tex, { size: w.size, metersPerPixel: w.metersPerPixel, maxM: w.maxM, snowM: w.snowM, arid: w.arid ?? 0.3, encoded: false });
       const e = exagSet ?? t.exaggeration;
       world.setLook({ exag: e });
+      if (steadySet != null) world.steadyRadius = steadySet * 1000;
       api.ground = createGround({ heights: t.heights, size: w.size, metersPerPixel: w.metersPerPixel, exag: e });
     },
     ground: null,   // height under any point, once setWorld has loaded the terrain
@@ -140,6 +141,10 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
     terrain: {
       get exag() { return exagSet ?? (api.ground ? api.ground.exag : manifest.worlds?.[0]?.exaggeration ?? 1); },
       set exag(v) { exagSet = v; world.look.exag = v; world.terrainUniforms.uExag.value = v; if (api.ground) api.ground.exag = v; },
+      // Steady ground radius in km (see world.steadyRadius). Set before the world loads, it is
+      // applied once the heightmap's texel size is known.
+      get steadyKm() { return steadySet ?? (api.ground ? world.steadyRadius : world.steadyRadius / world.cellSize * (manifest.worlds?.[0]?.metersPerPixel ?? world.cellSize)) / 1000; },
+      set steadyKm(v) { steadySet = v; if (api.ground) world.steadyRadius = v * 1000; },
     },
     draw({ self, remotes, time, dt, focus = null }) {   // focus: [x, y, z] to keep in frame, or null
       // Your jet
