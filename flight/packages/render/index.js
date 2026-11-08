@@ -124,7 +124,7 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
   resize();
   addEventListener('resize', resize);
 
-  let exagSet = null, steadySet = null;
+  let exagSet = null, steadySet = null, ringSize = software ? 64 : coarse ? 96 : 128;   // ~90k, ~180k, ~320k vertices
   const api = {
     renderer, scene, camera, rig, world,
     async setWorld(w) {
@@ -145,6 +145,13 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       // applied once the heightmap's texel size is known.
       get steadyKm() { return steadySet ?? (api.ground ? world.steadyRadius : world.steadyRadius / world.cellSize * (manifest.worlds?.[0]?.metersPerPixel ?? world.cellSize)) / 1000; },
       set steadyKm(v) { steadySet = v; if (api.ground) world.steadyRadius = v * 1000; },
+      // Nested rings (world.clipmap) in place of the one stretched sheet: distant ridges never reshape
+      // as you fly. Off in the live game for now. ringSize: vertices from a ring's center to its edge.
+      get clipmap() { return !!world.clipmap; },
+      set clipmap(v) { world.clipmap = v ? ringSize : false; },
+      get ringSize() { return ringSize; },
+      set ringSize(v) { ringSize = Math.max(16, Math.round(v / 8) * 8); if (world.clipmap) world.clipmap = ringSize; },
+      get vertices() { return world.vertexCount; },
     },
     draw({ self, remotes, time, dt, focus = null }) {   // focus: [x, y, z] to keep in frame, or null
       // Your jet

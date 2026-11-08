@@ -182,6 +182,39 @@ export function terrainGeometry(segments = 512, R = 750000, cell = 352, flat = 0
   return g;
 }
 
+// Nested rings (geometry clipmap) for a filtered heightmap. Every level is the same lattice of
+// (2H + 1)^2 integer points (i, 0, j), scaled in the shader by the level's spacing (one texel, two, four,
+// ...) and centered on the camera, snapped to twice that spacing, so every vertex sits on a fixed world
+// point and reads the heightmap pre-filtered to its spacing there: as you fly, rings add and drop whole
+// rows at their edges, where they have already blended into the next ring out (see the vertex shader),
+// so nothing pops and nothing slides. Level 0 is the full square; each outer
+// level leaves a hole of H x H cells for the level inside it, which sits 0 or 1 cell off center per axis
+// (the four `rings`). All geometries share one position buffer; only the index differs.
+export function clipmapGeometries(H = 96) {
+  H = Math.max(8, H - (H % 2));
+  const n = 2 * H + 1;
+  const pos = new Float32Array(n * n * 3);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = (j * n + i) * 3; pos[k] = i - H; pos[k + 2] = j - H; }
+  const position = new THREE.BufferAttribute(pos, 3);
+  const make = (hole) => {
+    const idx = [];
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+      if (hole) {
+        const ci = i - H, cj = j - H, x0 = -H / 2 + hole[0], z0 = -H / 2 + hole[1];
+        if (ci >= x0 && ci < x0 + H && cj >= z0 && cj < z0 + H) continue;
+      }
+      const v = j * n + i;   // same diagonal as terrainGeometry, and as assets/ground.js collides with
+      idx.push(v, v + n, v + 1, v + 1, v + n, v + n + 1);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', position);
+    g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+    return g;
+  };
+  return { H, full: make(null), rings: [make([0, 0]), make([1, 0]), make([0, 1]), make([1, 1])] };
+}
+
 // A terrarium heightmap (height = R*256 + G + B/256 - 32768) as a texture the terrain decodes on the
 // GPU: exact bytes, no filtering, no CPU pass. Keep heightmaps as their own cacheable files.
 const terrariumCache = new Map();
@@ -252,7 +285,7 @@ function buildHeightMips(tex) {
 
 // lite: a CPU rasterizer (SwiftShader, llvmpipe) runs every branch of a shader whatever the uniforms say,
 // so the night sky, city lights and per-pixel relief are compiled out there.
-export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = false } = {}) {
+export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = false, clipmap = false } = {}) {
   let grid = { segments, flat };
   const defines = lite ? { WORLD_LITE: '' } : {};
   const sunDir = new THREE.Vector3(0, 1, 0);
@@ -336,15 +369,17 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
     uColor: { value: 1 }, uTexture: { value: 1 }, uCity: { value: 1 },
     uFiltered: { value: 0 }, uMaxLod: { value: 0 }, uPixelRelief: { value: 1 },
     uSlide: { value: new THREE.Vector2() }, uCell: { value: cell }, uLodBias: { value: 0.5 },
+    uGridCam: { value: new THREE.Vector2() }, uRing: { value: new THREE.Vector4() }, uMorph: { value: new THREE.Vector2(1e12, 1) },
   };
-  const terrain = new THREE.Mesh(
-    terrainGeometry(segments, 750000, cell, flat),
-    new THREE.ShaderMaterial({ defines,
-      uniforms: { ...U, ...TU },
+  // The terrain's material; the clipmap levels each get their own, sharing every uniform but their ring.
+  const terrainMaterial = (defs = defines, own = {}) =>
+    new THREE.ShaderMaterial({ defines: defs,
+      uniforms: { ...U, ...TU, ...own },
       vertexShader: /* glsl */`
         #include <common>
         #include <logdepthbuf_pars_vertex>
         uniform vec3 uCam, uOrigin; uniform float uEarthR, uWidth, uTexel, uExag, uEncoded, uFiltered, uMaxLod, uCell, uLodBias; uniform vec2 uShift, uSlide;
+        uniform vec4 uRing; uniform vec2 uMorph, uGridCam; uniform float uPixelRelief;
         uniform sampler2D uHeight; uniform int uSize;
         attribute float aSpace;
         varying vec2 vXZ; varying float vDist, vH; varying vec3 vN;
@@ -364,9 +399,33 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           float a = texH(b), bx = texH(b + ivec2(1, 0)), bz = texH(b + ivec2(0, 1)), c = texH(b + ivec2(1, 1));
           return vec3(mix(mix(a, bx, f.x), mix(bz, c, f.x), f.y), mix(bx - a, c - bz, f.y), mix(bz - a, c - bx, f.x));
         }
+        float hLod(vec2 wxz, float lod){ return textureLod(uHeight, wxz / uWidth + 0.5, min(lod, uMaxLod)).r; }
         void main(){
           float h;
-          #ifdef HEIGHT_FILTERED
+          #if defined(CLIPMAP)
+            // One clipmap level (clipmapGeometries): uRing = center (render space), spacing s, level L.
+            // Each vertex sits on a fixed world point and reads mip L there, so it never changes shape.
+            // Toward the level's outer edge it blends (alpha) into what the next level out draws: the
+            // height of mip L + 1 interpolated along its coarser lattice, so the two meet with no seam.
+            float s = uRing.z, L = uRing.w;
+            vec2 xz = uRing.xy + position.xz * s;
+            vec2 wxz = xz + uOrigin.xz;
+            vec2 dd = abs(xz - uGridCam);
+            float a = clamp((max(dd.x, dd.y) - uMorph.x) / uMorph.y, 0.0, 1.0);
+            h = hLod(wxz, L);
+            // Odd rows and columns sit between coarse vertices: on a coarse edge, take the average of its
+            // ends; in a coarse cell's middle, of the ends of the diagonal it is split along. At alpha 1
+            // the fine triangles then lie exactly in the coarse ones.
+            vec2 o = mod(position.xz, 2.0) * s;
+            if (a > 0.0) h = mix(h, 0.5 * (hLod(wxz + vec2(o.x, -o.y), L + 1.0) + hLod(wxz + vec2(-o.x, o.y), L + 1.0)), a);
+            vN = vec3(0.0, 1.0, 0.0);
+            if (uPixelRelief < 0.5) {   // per-vertex normals only where the pixels don't read their own
+              float h0 = hLod(wxz, L), c0 = hLod(wxz, L + 1.0);
+              vec3 nf = vec3(-(hLod(wxz + vec2(s, 0.0), L) - h0) * uExag, s, -(hLod(wxz + vec2(0.0, s), L) - h0) * uExag);
+              vec3 nc = vec3(-(hLod(wxz + vec2(2.0 * s, 0.0), L + 1.0) - c0) * uExag, 2.0 * s, -(hLod(wxz + vec2(0.0, 2.0 * s), L + 1.0) - c0) * uExag);
+              vN = normalize(mix(normalize(nf), normalize(nc), a));
+            }
+          #elif defined(HEIGHT_FILTERED)
             // Two kinds of vertex. The uniform core moves in whole heightmap texels (uShift), so each of
             // its vertices sits on a texel center and reads the exact height there: the ground near you
             // never changes shape. Past the core the grid also slides the leftover fraction (uSlide), so
@@ -518,10 +577,62 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
           #endif
           gl_FragColor = finish(c, ink * uLineGold * (1.0 - fog));   // gold mask: lines the tone may turn gold
         }`,
-    }),
-  );
-  terrain.frustumCulled = false;
+    });
+  // One stretched sheet (terrainGeometry), or with a filtered heightmap and clipmap on, nested rings.
+  const sheet = new THREE.Mesh(terrainGeometry(segments, 750000, cell, flat), terrainMaterial());
+  sheet.frustumCulled = false;
+  const rings = new THREE.Group();
+  rings.visible = false;
+  const terrain = new THREE.Group();
+  terrain.add(sheet, rings);
   terrain.visible = false;
+  // The sheet's geometry, rebuilt only while it is the one drawn (a wide steady core is a lot of vertices).
+  let sheetFor = `${segments}/${flat}/${cell}`;
+  const sheetGrid = () => {
+    if (rings.visible) return;
+    const key = `${grid.segments}/${grid.flat}/${TU.uCell.value}`;
+    if (key === sheetFor) return;
+    sheetFor = key;
+    sheet.geometry.dispose();
+    sheet.geometry = terrainGeometry(grid.segments, 750000, TU.uCell.value, grid.flat);
+  };
+  let clip = null;          // { H, geos, levels: [mesh] } once built
+  let clipWant = clipmap;   // false, or the ring half-size H (vertices from the center to an edge)
+  const buildClip = () => {
+    if (clip) { clip.geos.full.dispose(); clip.geos.rings.forEach((g) => g.dispose()); clip.levels.forEach((m) => m.material.dispose()); rings.clear(); clip = null; }
+    if (!clipWant || !TU.uFiltered.value) { rings.visible = false; sheet.visible = true; sheetGrid(); return; }
+    const geos = clipmapGeometries(clipWant), m = TU.uCell.value;
+    const count = Math.max(1, Math.ceil(Math.log2(600000 / (geos.H * m))) + 1);
+    const defs = { ...defines, HEIGHT_FILTERED: '', CLIPMAP: '' };
+    const levels = [];
+    for (let L = 0; L < count; L++) {
+      const mesh = new THREE.Mesh(L ? geos.rings[0] : geos.full,
+        terrainMaterial(defs, { uRing: { value: new THREE.Vector4(0, 0, m * 2 ** L, L) }, uMorph: { value: new THREE.Vector2(1e12, 1) } }));
+      mesh.frustumCulled = false;
+      mesh.renderOrder = L;   // near rings first: they hide what's behind them from the depth test
+      rings.add(mesh); levels.push(mesh);
+    }
+    clip = { H: geos.H, geos, levels };
+    rings.visible = true; sheet.visible = false;
+  };
+  const placeClip = (gx, gz) => {   // gx, gz: render-space point the rings center on
+    const o = U.uOrigin.value, m = TU.uCell.value, off = 0.5 * m, H = clip.H;
+    TU.uGridCam.value.set(gx, gz);
+    const wx = gx + o.x, wz = gz + o.z;
+    let px = 0, pz = 0;
+    clip.levels.forEach((mesh, L) => {
+      const s = m * 2 ** L;
+      // texel centers sit at world (k + 1/2) m; each level's center snaps to twice its spacing
+      const cx = Math.floor((wx - off) / (2 * s)) * 2 * s + off, cz = Math.floor((wz - off) / (2 * s)) * 2 * s + off;
+      mesh.material.uniforms.uRing.value.set(cx - o.x, cz - o.z, s, L);
+      if (L) mesh.geometry = clip.geos.rings[Math.round((px - cx) / s) + 2 * Math.round((pz - cz) / s)];
+      // The camera sits within [c, c + 2s) of the center, so the outer edge is at least H s - 2s away
+      // and the level next in reaches at most H s / 2 + s: blend over a band between the two.
+      const w = (H / 2 - 4) * s;
+      mesh.material.uniforms.uMorph.value.set(L === clip.levels.length - 1 ? 1e12 : H * s - 2 * s - w, w);
+      px = cx; pz = cz;
+    });
+  };
 
   // ---- cloud deck: scattered cumulus at cloudM, parallax against the ground ----
   const clouds = new THREE.Mesh(
@@ -587,8 +698,20 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       const n0 = grid.segments + (grid.segments % 2 ? 0 : 1), h0 = (n0 - 1) / 2, outer = h0 - Math.round(h0 * grid.flat);
       const K = Math.max(8, Math.round(r / TU.uCell.value)), h = K + outer;
       grid = { segments: 2 * h, flat: K / h };
-      terrain.geometry.dispose();
-      terrain.geometry = terrainGeometry(grid.segments, 750000, TU.uCell.value, grid.flat);
+      sheetGrid();
+    },
+    /**
+     * Nested rings in place of the sheet (filtered heightmaps only): false, or the ring half-size H
+     * (even, vertices from a ring's center to its edge). Ground never slides under itself as you fly:
+     * the only change is a slow, one-way blend toward the next coarser ring in a band near each ring's
+     * edge. Vertices shaded: about (2H + 1)^2 plus 3/4 of that per level, levels doubling out to 600 km.
+     */
+    get clipmap() { return clipWant; },
+    set clipmap(v) { clipWant = v ? Math.max(8, Math.round(v === true ? 96 : v)) : false; buildClip(); },
+    /** Vertices the terrain shades a frame (unique, per draw). */
+    get vertexCount() {
+      if (clip && rings.visible) return clip.levels.reduce((a, l) => a + new Set(l.geometry.index.array).size, 0);
+      return sheet.geometry.attributes.position.count;
     },
     /** Grid spacing under the camera (m). A filtered heightmap sets it to one texel. */
     get cellSize() { return TU.uCell.value; },
@@ -624,19 +747,16 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       // A filtered heightmap: the core grid is one texel apart, so moving it whole texels lands each
       // vertex on a texel center.
       const want = filtered ? metersPerPixel : cell;
-      if (Math.abs(want - TU.uCell.value) > 1e-6) {
-        terrain.geometry.dispose();
-        terrain.geometry = terrainGeometry(grid.segments, 750000, want, grid.flat);
-        TU.uCell.value = want;
-      }
+      TU.uCell.value = want;
       TU.uFiltered.value = filtered ? 1 : 0;
       // which height path the terrain compiles: a shader on a CPU rasterizer pays for every branch
-      const m = terrain.material, had = 'HEIGHT_FILTERED' in m.defines;
+      const m = sheet.material, had = 'HEIGHT_FILTERED' in m.defines;
       if (filtered !== had) {
         m.defines = { ...m.defines };
         if (filtered) m.defines.HEIGHT_FILTERED = ''; else delete m.defines.HEIGHT_FILTERED;
         m.needsUpdate = true;
       }
+      buildClip();
       terrain.visible = true;
     },
     /**
@@ -661,6 +781,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
         S.set(Math.round(shift.x / c) * c, Math.round(shift.y / c) * c);
         slide.set(0, 0);
       }
+      if (clip && rings.visible) placeClip(shift ? shift.x : 0, shift ? shift.y : 0);
       const alt = Math.max(camera.position.y + U.uOrigin.value.y, 1);
       U.uDip.value = Math.acos(EARTH_R / (EARTH_R + alt));
       U.uSkyK.value = 2.5 + 6.5 * Math.min(alt / 26000, 1);
