@@ -6,7 +6,7 @@ import { OrbitControls } from './vendor/OrbitControls.min.js';
 import { createSiteGestures } from './site-gestures.mjs';
 import { createWorld, createPost, loadTerrarium, WORLD_DEFAULTS } from './world/index.js';
 import { Pane } from './vendor/tweakpane.min.js';
-const STORE = 'sr71-backdrop-v14';   // v14: site overlay off by default   // v10: Had's star tuning as defaults, horizon thinning
+const STORE = 'sr71-backdrop-v15';   // v15: gold outline on the jet in the dark (was a silver rim light)
 
 // ---------- settings ----------
 const PRESETS = {
@@ -34,7 +34,7 @@ const DEFAULTS = {
   preset: 'site', ...WORLD_DEFAULTS, style: 'navycolor', tod: 'custom',
   // 2026-11-08 Had's pick: the banded sky with dither, sun just above the horizon
   skyMode: 1, sunAz: 27, sunEl: 1,
-  rim: 2.5, rimWidth: 5.5,
+  outline: 1.5,
   drift: true, driftSpeed: 0.02,
   scrollPan: true, scrollDeg: 10, scrollTilt: 1.5, scrollMax: 90, sidePan: true, sideSens: 1, bgDrag: true, overscroll: true, gestureLog: false,
   site: false, sitePath: '/', siteOpacity: 1, siteBg: 0.49, siteClick: false,
@@ -96,22 +96,22 @@ const plane = new THREE.Group(); nearScene.add(plane);
 const skin = new THREE.MeshStandardMaterial({ color: 0x1d2027, roughness: 0.55, metalness: 0.25 });
 const glass = new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.25, metalness: 0.6 });
 const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
-// A thin silver outline so the jet still reads against a dark sky: light on the edges that face away
-// from you (a rim, like moonlight on the skin), kept silver (capped under the gold highlight), faded in as the sun goes down.
-const RIM = { uRim: { value: 0 }, uRimPow: { value: 3 }, uRimColor: { value: new THREE.Color(0xc8d0dc) } };
 for (const m of [skin, glass, nozzleMat]) {   // the jet never takes the line highlight
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, RIM);
-    sh.fragmentShader = 'uniform float uRim, uRimPow; uniform vec3 uRimColor;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>
-  float rimF = pow(1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0), uRimPow);
-  gl_FragColor.rgb += uRimColor * min(rimF * uRim, 1.2);   // capped below where the tone turns gold
-  gl_FragColor.a = 0.0;`);
-  };
+  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.a = 0.0;'); };
 }
+// A thin gold outline so the jet still reads in the dark (the flight game's inverted hull, a fixed number
+// of pixels wide), faded in as the sun goes down. It lands on the tone's gold highlight.
+let outline = null;
 // how dark it is: none in daylight, full once the sun is a little below the visible horizon
-function rimAmount() {
+function darkness() {
   const dip = THREE.MathUtils.radToDeg(Math.acos(6371000 / (6371000 + S.altitudeFt * 0.3048)));
-  return +S.rim * (1 - THREE.MathUtils.smoothstep(S.sunEl + dip, -2, 8));
+  return 1 - THREE.MathUtils.smoothstep(S.sunEl + dip, -2, 8);
+}
+function applyOutline() {
+  if (!outline) return;
+  const px = +S.outline * darkness();
+  outline.visible = px > 0.05;
+  outline.material.px.value = px;
 }
 const add = (g, m = skin) => { const o = new THREE.Mesh(g, m); plane.add(o); return o; };
 const body = add(new THREE.SphereGeometry(1, 32, 16)); body.scale.set(1.25, 0.7, 10.5);
@@ -140,8 +140,9 @@ plane.position.z = 2;
     const base = new URL('../flight/', location.href);
     const manifest = await fetch(new URL('assets/manifest.json', base)).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
     if (manifest.jet?.kind !== 'packed') return;
-    const [{ decodeJet }, buf] = await Promise.all([
+    const [{ decodeJet }, { outlineMaterial }, buf] = await Promise.all([
       import(new URL('packages/assets/jet-pack.js', base).href),
+      import(new URL('packages/render/outline.js', base).href),
       fetch(new URL(manifest.jet.src, base)).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }),
     ]);
     const j = await decodeJet(buf);
@@ -167,6 +168,9 @@ plane.position.z = 2;
     mesh.scale.setScalar(k);
     mesh.position.set(pc.x - c.x * k, pc.y - c.y * k, pc.z - c.z * k).sub(plane.position);
     plane.add(mesh);
+    outline = new THREE.Mesh(g, outlineMaterial({ color: 0xe4c56f, px: 1.5 }));
+    mesh.add(outline);
+    resize(); applyOutline();
     window.__labJet = { triangles: j.index.length / 3, credit: j.credit };
     dirty = true;
   } catch (err) { console.warn('packed jet unavailable, keeping the proxy', err); }
@@ -195,7 +199,7 @@ function apply() {
   world.setLook(S);
   post.setLook(S);
   sunLight.position.copy(sunDir).multiplyScalar(100);
-  RIM.uRim.value = rimAmount(); RIM.uRimPow.value = +S.rimWidth;
+  applyOutline();
   const altitude = S.altitudeFt * 0.3048;
   const reg = REGIONS[S.region];
   if (reg) origin.set((S.offsetX ?? reg.peakKm[0]) * 1000, altitude, (S.offsetZ ?? reg.peakKm[1]) * 1000);
@@ -213,6 +217,7 @@ function resize() {
   renderer.setSize(w, h, false);
   const pr = renderer.getPixelRatio();
   post.setSize(w, h, pr);
+  if (outline) outline.material.setViewport(w * pr, h * pr);
   const aspect = w / h;
   const fov = aspect < 1 ? S.fov * Math.min(1.8, 1 / aspect) : +S.fov;  // portrait phones: widen so the jet fits
   for (const c of [farCam, camera]) { c.aspect = aspect; c.fov = fov; c.updateProjectionMatrix(); }
@@ -395,8 +400,7 @@ const SPEC = [
     ['lineGold', 'range', { label: 'Lines in highlight color', min: 0, max: 1, step: 0.01 }],
   ]],
   ['Jet', true, [
-    ['rim', 'range', { label: 'Silver outline in the dark', min: 0, max: 3, step: 0.01 }],
-    ['rimWidth', 'range', { label: 'Outline thinness', min: 1, max: 8, step: 0.1 }],
+    ['outline', 'range', { label: 'Gold outline in the dark (px)', min: 0, max: 4, step: 0.05 }],
   ]],
   ['Camera', false, [
     ['drift', 'check', { label: 'Slow drift' }],
