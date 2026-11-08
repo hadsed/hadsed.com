@@ -29,16 +29,36 @@ h2 { font: 300 clamp(32px, 5vw, 46px)/1 Petrona, Georgia, serif; letter-spacing:
 .back { font: inherit; text-transform: uppercase; color: var(--dim); background: none; border: 0; cursor: pointer; padding: 6px 0; }
 .back:hover, .back:focus-visible { color: var(--gold); outline: none; }
 
-.maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
-.map { font: inherit; text-align: left; color: var(--ink); background: rgba(10, 13, 20, 0.6); border: 1px solid rgba(133, 146, 168, 0.25);
-  border-radius: 4px; padding: 0; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; align-items: stretch; transition: border-color .2s, transform .2s; }
-.map img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; filter: saturate(0.85) brightness(0.9); transition: filter .2s; }
-.map .txt { display: block; padding: 12px 14px 14px; }
-.map b { display: block; font: 300 22px/1.1 Petrona, Georgia, serif; letter-spacing: 0; color: #f2f4f8; margin-bottom: 6px; }
-.map .meta { display: block; color: var(--dim); font-size: 11px; text-transform: uppercase; }
-.map .pilots { color: var(--gold); }
-.map:hover, .map:focus-visible, .map.sel { border-color: var(--gold); outline: none; transform: translateY(-2px); }
+/* Map select: the globe fills the top two thirds, the cards ride along the bottom third. */
+body.globe #wash { background: radial-gradient(ellipse 80% 70% at 50% 33%, rgba(8, 11, 18, 0.9), rgba(5, 7, 12, 0.98)); }
+#maps { position: fixed; inset: 0; max-width: none; margin: 0; }
+#maps header { position: absolute; left: max(16px, 6vw); top: max(20px, env(safe-area-inset-top)); margin: 0; z-index: 2; }
+#globe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#globe:active { cursor: grabbing; }
+.hint { position: absolute; right: 16px; top: max(28px, env(safe-area-inset-top)); margin: 0; color: var(--dim); text-transform: uppercase; font-size: 10px; pointer-events: none; }
+.carousel { position: absolute; left: 0; right: 0; bottom: 0; height: 33.3%; min-height: 200px; display: flex; align-items: center; gap: 8px;
+  padding: 0 8px max(10px, env(safe-area-inset-bottom)); box-sizing: border-box; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(5, 7, 12, 0.7) 35%); }
+.carousel > * { pointer-events: auto; }
+.track { flex: 1; height: 100%; display: flex; align-items: center; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth;
+  padding: 0 calc(50% - 120px); scrollbar-width: none; }
+.track::-webkit-scrollbar { display: none; }
+.nudge { flex: none; font: 300 34px/1 Petrona, Georgia, serif; color: var(--dim); background: none; border: 0; width: 40px; height: 64px; cursor: pointer; }
+.nudge:hover { color: var(--gold); }
+@media (hover: none) { .nudge { display: none; } }
+.map { flex: none; width: 240px; max-height: 92%; scroll-snap-align: center; font: inherit; text-align: left; color: var(--ink); background: rgba(10, 13, 20, 0.7);
+  border: 1px solid rgba(133, 146, 168, 0.25); border-radius: 4px; padding: 0; cursor: pointer; overflow: hidden;
+  display: flex; flex-direction: column; align-items: stretch; transition: border-color .2s, transform .25s, box-shadow .25s; }
+.map img { display: block; width: 100%; aspect-ratio: 16 / 9; min-height: 0; flex: 1 1 auto; object-fit: cover; filter: saturate(0.8) brightness(0.8); transition: filter .2s; }
+.map .txt { display: block; padding: 10px 12px 12px; }
+.map b { display: block; font: 300 20px/1.1 Petrona, Georgia, serif; letter-spacing: 0; color: #f2f4f8; margin-bottom: 5px; }
+.map .meta { display: block; color: var(--dim); font-size: 10px; text-transform: uppercase; }
+.map .go { display: none; color: var(--gold); font-size: 10px; text-transform: uppercase; margin-top: 6px; }
+.map:hover, .map:focus-visible, .map.sel { border-color: var(--gold); outline: none; transform: translateY(-4px); box-shadow: 0 0 24px rgba(228, 197, 111, 0.18); }
 .map:hover img, .map:focus-visible img, .map.sel img { filter: none; }
+.map.sel .go { display: block; }
+@media (max-height: 640px) { .map .meta { display: none; } }
+@media (max-width: 700px) { .hint { display: none; } #maps h2 { font-size: 30px; } .map { width: 210px; } .track { padding: 0 calc(50% - 105px); } }
 
 .rows { max-width: 620px; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 0; border-bottom: 1px solid rgba(133, 146, 168, 0.2); cursor: pointer; }
@@ -63,6 +83,7 @@ h2 { font: 300 clamp(32px, 5vw, 46px)/1 Petrona, Georgia, serif; letter-spacing:
 
 .keys { position: fixed; right: 16px; bottom: max(14px, env(safe-area-inset-bottom)); margin: 0; color: var(--dim); text-transform: uppercase; font-size: 10px; pointer-events: none; }
 @media (hover: none) { .keys { display: none; } }
+body.globe .keys { display: none; }
 @media (max-width: 700px) {
   #wash { background: linear-gradient(180deg, rgba(8, 11, 18, 0.8) 0%, rgba(8, 11, 18, 0.5) 55%, rgba(8, 11, 18, 0.2) 100%); }
   #main { padding: 8vh 0 0 4px; }

@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:wght@300&display=swap">
 <link rel="stylesheet" href="menu.css">
+<script type="importmap">{ "imports": { "three": "/lab/flight/vendor/three.module.js" } }</script>
 </head>
 <body>
 <!-- The live game's own backdrop: the jet flies itself over the Sierra, other players' jets pass by. -->
@@ -27,8 +28,14 @@
   </section>
 
   <section class="screen" id="maps">
+    <canvas id="globe" aria-label="Globe: drag to turn, scroll or pinch to zoom, tap a gold square to pick that map"></canvas>
     <header><button class="back" data-back>‹ back</button><h2>Choose a map</h2></header>
-    <div class="maps" id="mapList"></div>
+    <p class="hint">drag to turn · scroll to zoom</p>
+    <div class="carousel">
+      <button class="nudge" id="prev" aria-label="Previous map">‹</button>
+      <div class="track" id="mapList"></div>
+      <button class="nudge" id="next" aria-label="Next map">›</button>
+    </div>
   </section>
 
   <section class="screen" id="settings">
@@ -51,6 +58,8 @@
       <p>SR-71 Blackbird model by <a href="https://sketchfab.com/helijah" target="_blank" rel="noopener">helijah</a><span class="dim">Sketchfab Standard license</span></p>
       <h3>Icons</h3>
       <p>"Jet fighter" by Delapouite, <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a><span class="dim"><a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a></span></p>
+      <h3>Earth</h3>
+      <p>Blue Marble imagery, <a href="https://visibleearth.nasa.gov/collection/1484/blue-marble" target="_blank" rel="noopener">NASA Visible Earth</a><span class="dim">public domain</span></p>
       <h3>Terrain</h3>
       <p>Elevation from <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Terrain Tiles on AWS</a> (Mapzen)<span class="dim">SRTM, USGS 3DEP, ETOPO1 and others</span></p>
       <h3>Software</h3>
