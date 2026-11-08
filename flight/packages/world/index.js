@@ -253,6 +253,7 @@ function buildHeightMips(tex) {
 // lite: a CPU rasterizer (SwiftShader, llvmpipe) runs every branch of a shader whatever the uniforms say,
 // so the night sky, city lights and per-pixel relief are compiled out there.
 export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = false } = {}) {
+  let grid = { segments, flat };
   const defines = lite ? { WORLD_LITE: '' } : {};
   const sunDir = new THREE.Vector3(0, 1, 0);
   const U = {
@@ -572,6 +573,23 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
 
   return {
     uniforms: U, terrainUniforms: TU, sky, terrain, clouds, sunDir, look,
+    /**
+     * Steady ground radius (m): out to here the grid is uniform and moves in whole texels, so the
+     * ground holds still; past it vertices slide over pre-filtered heights, which reads as ridges
+     * gently reshaping (swimming) when you fly low among tall mountains. Keeps the outer ring's
+     * vertex count; a bigger core costs vertices (about (2 * (core / cell + 100))^2).
+     */
+    get steadyRadius() {
+      const n = grid.segments + (grid.segments % 2 ? 0 : 1), h = (n - 1) / 2;
+      return Math.round(h * grid.flat) * TU.uCell.value;
+    },
+    set steadyRadius(r) {
+      const n0 = grid.segments + (grid.segments % 2 ? 0 : 1), h0 = (n0 - 1) / 2, outer = h0 - Math.round(h0 * grid.flat);
+      const K = Math.max(8, Math.round(r / TU.uCell.value)), h = K + outer;
+      grid = { segments: 2 * h, flat: K / h };
+      terrain.geometry.dispose();
+      terrain.geometry = terrainGeometry(grid.segments, 750000, TU.uCell.value, grid.flat);
+    },
     /** Grid spacing under the camera (m). A filtered heightmap sets it to one texel. */
     get cellSize() { return TU.uCell.value; },
     /** Any subset of WORLD_DEFAULTS' look keys: palette, tone, sun, haze, clouds, ground style. */
@@ -608,7 +626,7 @@ export function createWorld({ segments = 512, cell = 352, flat = 0.375, lite = f
       const want = filtered ? metersPerPixel : cell;
       if (Math.abs(want - TU.uCell.value) > 1e-6) {
         terrain.geometry.dispose();
-        terrain.geometry = terrainGeometry(segments, 750000, want, flat);
+        terrain.geometry = terrainGeometry(grid.segments, 750000, want, grid.flat);
         TU.uCell.value = want;
       }
       TU.uFiltered.value = filtered ? 1 : 0;

@@ -8,6 +8,7 @@ import { createRemotes } from './packages/net/interp.js';
 import { FLAG } from './packages/net/protocol.js';
 import { loadManifest } from './packages/assets/index.js';
 import { createRenderer } from './packages/render/index.js';
+import { CHASE } from './packages/render/camera.js';
 import { escort } from './packages/bots/pilot.js';
 import { createLog } from './packages/hud/log.js';
 import { createAttractPilot, SLOTS } from './attract.js';
@@ -44,19 +45,20 @@ const tilter = tilt({ x: 'aimX', y: 'aimY', range: 35 });
 const onControl = (e) => !!e.target.closest?.('button, a, input, select');
 const stick = pointerStick({ element: document.body, x: 'aimX', y: 'aimY', invertX: true, radius: Math.min(innerWidth, innerHeight) * 0.17, ignore: onControl });
 const buttons = scripted('buttons');   // on-screen BOOST
+const keys = keyboard({
+  axes: {
+    aimX: [['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']],
+    aimY: [['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']],   // like a stick: forward dives, back climbs
+    throttle: ['KeyF', 'KeyR'],
+  },
+  actions: { boost: ['Space', 'ShiftLeft', 'ShiftRight'], waggle: 'KeyE' },
+  attack: 5, release: 8,
+});
 const controls = createControls({
   axes: ['aimX', 'aimY', 'throttle'],
   actions: ['boost', 'waggle'],
   sources: [
-    keyboard({
-      axes: {
-        aimX: [['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']],
-        aimY: [['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']],   // like a stick: forward dives, back climbs
-        throttle: ['KeyF', 'KeyR'],
-      },
-      actions: { boost: ['Space', 'ShiftLeft', 'ShiftRight'], waggle: 'KeyE' },
-      attack: 5, release: 8,
-    }),
+    keys,
     stick,
     // Right stick aims, left stick forward/back is throttle, A boosts, B waves.
     gamepad({ axes: { aimX: 2, aimY: 3, throttle: 1 }, invert: { throttle: true }, buttons: { boost: 0, waggle: 1 } }),
@@ -66,7 +68,7 @@ const controls = createControls({
 });
 const assist = createAssist();
 const aimIntent = { pitch: 0, roll: 0, yaw: 0, throttle: 0, boost: false };
-window.__flight = { controls, assist };
+window.__flight = { controls, assist, keys, stick };
 // A long press on a phone would open the select / save-image menu; flying needs the whole screen.
 addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('selectstart', (e) => e.preventDefault());   // hook for voice/gesture experiments in the console
@@ -199,7 +201,7 @@ function frame(nowMs) {
     const it = attract ? attractPilot.think(jet, remoteList, STEP) : flyIntent(input);
     lastIntent = it;
     step(jet, it, STEP);
-    if (attract) attractPilot.hold(jet, STEP);
+    if (attract) attractPilot.hold(jet, STEP); else collide();
     waggleLeft = Math.max(0, waggleLeft - STEP);
     jet.flags = (waggleLeft > 0 ? FLAG.WAGGLE : 0) | (it.boost ? FLAG.BOOST : 0);
     if (!attract) rumble(it.boost);
@@ -238,10 +240,38 @@ function frame(nowMs) {
 
   // Reticle: where the jet is headed. Hidden while the autopilot follows someone.
   assist.direction(aimDir);
-  proj.set(view.pos[0] + aimDir[0] * 20000, view.pos[1] + aimDir[1] * 20000, view.pos[2] + aimDir[2] * 20000).project(renderer.camera);
-  const showReticle = !follow && !attract && renderer.rig.blend === 1 && proj.z < 1;
+  const pin = RETICLE.radius > 0 && placeReticle(RETICLE.radius);
+  if (!pin) proj.set(view.pos[0] + aimDir[0] * 20000, view.pos[1] + aimDir[1] * 20000, view.pos[2] + aimDir[2] * 20000).project(renderer.camera);
+  const showReticle = !follow && !attract && renderer.rig.blend === 1 && (pin || proj.z < 1);
   reticle.style.display = showReticle ? 'block' : 'none';
-  if (showReticle) reticle.style.transform = `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
+  if (showReticle) reticle.style.transform = pin ? `translate(${pin[0]}px, ${pin[1]}px)` : `translate(${(proj.x * 0.5 + 0.5) * innerWidth}px, ${(-proj.y * 0.5 + 0.5) * innerHeight}px)`;
+}
+
+// Reticle radius in px (0 = free, drawn where the aim point projects). Set, the reticle stays
+// inside a circle of that radius fixed on screen, centered where the nose points in level
+// flight. Its distance out is how far the aim is from the nose as a share of a full-stick turn,
+// so it reads the same whatever the assist's limits, and hard pulls, banks and loops pin it to
+// the rim instead of throwing it off screen (the chase cam lags the nose in a hard pull-up).
+const RETICLE = { radius: 0 };
+const camQ = new THREE.Quaternion(), aimC = new THREE.Vector3(), noseC = new THREE.Vector3(), pinAt = [0, 0];
+function placeReticle(R) {
+  const cam = renderer.camera;
+  // Level flight: the camera sits CHASE.up above and looks at a point CHASE.look ahead, so the
+  // nose's vanishing point is that far above the middle of the screen.
+  const tilt = Math.atan2(CHASE.up, CHASE.back + CHASE.look);
+  const cx = innerWidth / 2, cy = innerHeight / 2 * (1 - Math.tan(tilt) / Math.tan(cam.fov * Math.PI / 360));
+  forwardOf(view.q, _f);
+  camQ.copy(cam.quaternion).invert();
+  aimC.set(aimDir[0], aimDir[1], aimDir[2]).applyQuaternion(camQ);
+  noseC.set(_f[0], _f[1], _f[2]).applyQuaternion(camQ);
+  const dx = aimC.x - noseC.x, dy = -(aimC.y - noseC.y), len = Math.hypot(dx, dy);
+  const angle = Math.acos(Math.max(-1, Math.min(1, aimC.dot(noseC))));
+  // Full back is a loop: the assist hands over raw pitch and its aim sits level, behind the
+  // nose, which would drop the reticle while you pull up. Pin it to the top of the rim instead.
+  if (assist.loop > 0) { pinAt[0] = cx; pinAt[1] = cy - R; return pinAt; }
+  const k = len > 1e-6 ? R * Math.min(1, angle / Math.max(assist.tune.maxTurn, assist.tune.maxPitch)) / len : 0;
+  pinAt[0] = cx + dx * k; pinAt[1] = cy + dy * k;
+  return pinAt;
 }
 requestAnimationFrame(frame);
 
@@ -252,7 +282,7 @@ function statusLog() {
   log.hold('edge', r > LIMITS.radius ? 'autopilot: turning you back toward the middle of the map'
     : r > LIMITS.radius * 0.88 ? `nearing the edge of the map · ${range(LIMITS.radius - r)} to go` : null);
   const alt = jet.pos[1];
-  log.hold('floor', alt < LIMITS.minAlt + 3000 && nose < -0.05 ? `hard deck ${ft(LIMITS.minAlt)} ft: pulling up` : null);
+  log.hold('floor', LIMITS.minAlt > 0 && alt < LIMITS.minAlt + 3000 && nose < -0.05 ? `hard deck ${ft(LIMITS.minAlt)} ft: pulling up` : null);
   log.hold('ceiling', alt > LIMITS.maxAlt - 3000 && nose > 0.05 ? `ceiling ${ft(LIMITS.maxAlt)} ft: leveling off` : null);
   log.hold('rejoin', follow && lastIntent?.boost && lastIntent === followIntent ? 'boost: rejoining formation' : null);
   log.hold('loop', assist.loop > 0 && !follow ? 'full back: looping' : assist.loop < 0 && !follow ? 'full forward: diving' : null);
@@ -379,7 +409,55 @@ function followAxes(dash = false) {
 }
 $('unfollow').addEventListener('click', () => stopFollow());
 addEventListener('keydown', (e) => { if (e.code === 'KeyX' && follow) stopFollow(); });
-Object.assign(window.__flight, { startFollow, stopFollow });
+Object.assign(window.__flight, { startFollow, stopFollow, reticle: RETICLE });
+
+// ---- bumps: off the ground and off other jets ----
+// Off by default: the live game keeps its 9,000 m hard deck, far above the peaks. The mechanics
+// jig drops the deck and turns these on so you can fly down among the mountains. A bump reflects
+// your heading off the surface (the ground's slope, or the line between two jets) and costs speed
+// in proportion to how square the hit was. Only your own jet bounces; other players' jets are
+// drawn where their own clients put them.
+const COLLIDE = { ground: false, jets: false, keep: 0.6, clearance: 6, radius: 18 };
+window.__flight.collide = COLLIDE;
+const gN = [0, 0, 0], bA = new THREE.Vector3(), bB = new THREE.Vector3(), bQ = new THREE.Quaternion(), jQ = new THREE.Quaternion();
+let bumpLogAt = 0;
+function bounce(nx, ny, nz, what) {
+  forwardOf(jet.q, _f);
+  const d = _f[0] * nx + _f[1] * ny + _f[2] * nz;
+  if (d >= 0) return;   // already moving away
+  bA.set(_f[0], _f[1], _f[2]);
+  bB.set(_f[0] - 2 * d * nx, _f[1] - 2 * d * ny, _f[2] - 2 * d * nz).normalize();
+  bQ.setFromUnitVectors(bA, bB);
+  jQ.set(jet.q[0], jet.q[1], jet.q[2], jet.q[3]).premultiply(bQ).normalize();
+  jet.q[0] = jQ.x; jet.q[1] = jQ.y; jet.q[2] = jQ.z; jet.q[3] = jQ.w;
+  jet.speed = Math.max(LIMITS.minSpeed * 0.8, jet.speed * (1 - (1 - COLLIDE.keep) * -d));
+  assist.reset(jet);
+  const t = performance.now();
+  if (t - bumpLogAt > 1500) { bumpLogAt = t; log.post('bump', what, 2500); }
+}
+function collide() {
+  const g = renderer?.ground;
+  renderer.rig.floor = COLLIDE.ground && g ? (x, z) => g.height(x, z) + 3 : null;
+  if (COLLIDE.ground && g) {
+    const floor = g.height(jet.pos[0], jet.pos[2]) + COLLIDE.clearance;
+    if (jet.pos[1] < floor) {
+      jet.pos[1] = floor;
+      g.normal(jet.pos[0], jet.pos[2], gN);
+      bounce(gN[0], gN[1], gN[2], 'bounced off the ground');
+    }
+  }
+  if (COLLIDE.jets) {
+    const R2 = COLLIDE.radius * 2;
+    for (const r of remoteList) {
+      if (!r.view || !r.visible) continue;
+      const p = r.view.pos, dx = jet.pos[0] - p[0], dy = jet.pos[1] - p[1], dz = jet.pos[2] - p[2], d = Math.hypot(dx, dy, dz);
+      if (d >= R2 || d < 1e-3) continue;
+      const nx = dx / d, ny = dy / d, nz = dz / d;
+      jet.pos[0] = p[0] + nx * R2; jet.pos[1] = p[1] + ny * R2; jet.pos[2] = p[2] + nz * R2;
+      bounce(nx, ny, nz, `bumped ${r.callsign || 'another jet'}`);
+    }
+  }
+}
 
 // ---- attract <-> flying (the site backdrop's Fly and Back) ----
 // Before the backdrop is shown, drop the jet next to a live one if any are about,

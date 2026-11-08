@@ -51,10 +51,15 @@ export function headingOf(q) {
 // assist.update(intent, jet, aimX, aimY, dt)   // aimX + right, aimY + up, in [-1, 1]
 // assist.direction(out)                         // where the reticle points
 export function createAssist({ maxTurn = 0.75, maxPitch = 0.85, gain = 1.1 } = {}) {
+  // Live-tunable (the mechanics jig edits it): turn/pitch curves are the soft-center
+  // exponents, loopIn/loopOut the stick travel that starts and ends a loop or dive.
+  // reverseY flips up/down for every input at once.
+  const tune = { maxTurn, maxPitch, gain, turnCurve: 1.3, pitchCurve: 1.05, dive: DIVE, loopIn: 0.92, loopOut: 0.8, reverseY: false };
   const aim = { yaw: null, pitch: 0 };
   const dir = [0, 0, 0];
   const api = {
     aim,
+    tune,
     reset(jet) { aim.yaw = headingOf(jet.q); aim.pitch = 0; },
     loop: 0,   // +1 pulling, -1 pushing: stick held all the way up or down
     update(intent, jet, ax = 0, ay = 0, dt = 1 / 60) {
@@ -62,25 +67,27 @@ export function createAssist({ maxTurn = 0.75, maxPitch = 0.85, gain = 1.1 } = {
       // full loop. All the way forward: push over into a near-vertical dive and
       // hold it. Let go and the assist rolls you upright and levels out on
       // whatever heading you have.
-      if (api.loop === 0 && Math.abs(ay) > 0.92) api.loop = Math.sign(ay);
-      else if (api.loop !== 0 && (Math.abs(ay) < 0.8 || Math.sign(ay) !== api.loop)) api.loop = 0;
+      const { maxTurn, maxPitch, gain } = tune;
+      if (tune.reverseY) ay = -ay;
+      if (api.loop === 0 && Math.abs(ay) > tune.loopIn) api.loop = Math.sign(ay);
+      else if (api.loop !== 0 && (Math.abs(ay) < tune.loopOut || Math.sign(ay) !== api.loop)) api.loop = 0;
       if (api.loop > 0) {
         intent.pitch = 1; intent.roll = clamp(ax * 0.8, -1, 1); intent.yaw = 0;
         aim.yaw = headingOf(jet.q); aim.pitch = 0;
         return intent;
       }
       if (api.loop < 0) {
-        aim.yaw = headingOf(jet.q) - ax * 0.4; aim.pitch = -DIVE;
+        aim.yaw = headingOf(jet.q) - ax * 0.4; aim.pitch = -tune.dive;
         const d = api.direction(dir);
-        steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, gain, DIVE);
+        steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, gain, tune.dive);
         intent.yaw = 0;
         return intent;
       }
       // Turns get a soft center (small drags do little); climbs and dives are
       // nearly linear, so up and down answer as readily as left and right.
       const soft = (v, k) => Math.sign(v) * Math.abs(v) ** k;
-      aim.yaw = headingOf(jet.q) - soft(ax, 1.3) * maxTurn;
-      aim.pitch = soft(ay, 1.05) * maxPitch;
+      aim.yaw = headingOf(jet.q) - soft(ax, tune.turnCurve) * maxTurn;
+      aim.pitch = soft(ay, tune.pitchCurve) * maxPitch;
       const d = api.direction(dir);
       steerTo(intent, jet, jet.pos[0] + d[0] * 8000, jet.pos[1] + d[1] * 8000, jet.pos[2] + d[2] * 8000, gain, maxPitch);
       intent.yaw = 0;

@@ -36,9 +36,12 @@ export function createCameraRig(camera, {
   glide = 2.8,             // seconds for a full orbit -> chase move
 } = {}) {
   const rig = {
+    // Chase lenses, vertical degrees; live-tunable.
+    lens: { chase: chaseLens, portraitChase: portraitChaseLens },
     blend: 1, target: 1,                    // chase by default; the backdrop sets both to 0
     boosting: false,                        // set each frame; eases the boost pull-back in and out
     focus: null,                            // a Vector3 to keep in frame too (the jet you follow), or null
+    floor: null,                            // (x, z) => lowest y the camera may sit at, or null (no ground)
     orbit: { yaw: 0, pitch: 0, spin: 0 },   // yaw/pitch: gesture offsets; spin: accumulated drift
     // Where the jet sits on screen in the orbit, as a fraction of the screen from center (+x right, +y down).
     // The site backdrop can park it in a lighter corner of the page; the chase cam is always centered.
@@ -126,13 +129,14 @@ export function createCameraRig(camera, {
       look.lerpVectors(oLook, camLook, k * k);
       upv.lerpVectors(yAxis, camUp, k * k).normalize();
     }
+    if (rig.floor) camera.position.y = Math.max(camera.position.y, rig.floor(camera.position.x, camera.position.z));
     camera.up.copy(upv);
     camera.lookAt(look);
 
     // Lens: the backdrop widens in portrait so the jet fits, the chase cam too.
     const portrait = aspect < 1;
     const oFov = portrait ? orbitLens * Math.min(1.8, 1 / aspect) : orbitLens;
-    const cFov = (portrait ? portraitChaseLens : chaseLens) + CHASE.boostLens * bk;
+    const cFov = (portrait ? rig.lens.portraitChase : rig.lens.chase) + CHASE.boostLens * bk;
     const fov = oFov + (cFov - oFov) * k;
     const fx = rig.frame.x * (1 - k), fy = rig.frame.y * (1 - k);
     if (fx || fy) camera.setViewOffset(1000 * aspect, 1000, -fx * 1000 * aspect, -fy * 1000, 1000 * aspect, 1000);

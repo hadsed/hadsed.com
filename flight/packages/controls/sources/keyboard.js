@@ -3,6 +3,7 @@ import { ramp } from '../util.js';
 // keyboard({ axes: { roll: ['KeyA', 'KeyD'] }, actions: { waggle: ['Space'] } })
 // Each axis lists [negative key(s), positive key(s)]; a string or an array of codes.
 export function keyboard({ axes = {}, actions = {}, target = globalThis, attack = 3, release = 5 } = {}) {
+  const tune = { attack, release };   // live-tunable ramp rates (1/s)
   const down = new Set();
   const value = Object.fromEntries(Object.keys(axes).map((n) => [n, 0]));
   const list = (k) => (Array.isArray(k) ? k : [k]);
@@ -19,6 +20,7 @@ export function keyboard({ axes = {}, actions = {}, target = globalThis, attack 
 
   return {
     id: 'keyboard',
+    tune,
     attach() {
       target.addEventListener?.('keydown', onDown);
       target.addEventListener?.('keyup', onUp);
@@ -33,7 +35,7 @@ export function keyboard({ axes = {}, actions = {}, target = globalThis, attack 
     poll(sink, dt) {
       for (const [name, [neg, pos]] of Object.entries(axes)) {
         const goal = (any(pos) ? 1 : 0) - (any(neg) ? 1 : 0);
-        value[name] = ramp(value[name], goal, dt, attack, release);
+        value[name] = ramp(value[name], goal, dt, tune.attack, tune.release);
         sink.axis(name, value[name]);
       }
       for (const [name, keys] of Object.entries(actions)) sink.action(name, any(keys));

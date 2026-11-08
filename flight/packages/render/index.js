@@ -5,6 +5,7 @@
 // r.draw({ self, remotes, time, dt });   // self: jet view; remotes: [{ id, view, callsign }]
 import * as THREE from 'three';
 import { jetGeometry, loadHeightmap } from '../assets/index.js';
+import { createGround } from '../assets/ground.js';
 import { createWorld, WORLD_DEFAULTS } from '../world/index.js';
 import { createContrails } from './contrails.js';
 import { createCameraRig } from './camera.js';
@@ -123,12 +124,27 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
   resize();
   addEventListener('resize', resize);
 
-  return {
+  let exagSet = null, steadySet = null;
+  const api = {
     renderer, scene, camera, rig, world,
     async setWorld(w) {
       const t = await loadHeightmap(w, manifest.base);
       world.setHeight(t.tex, { size: w.size, metersPerPixel: w.metersPerPixel, maxM: w.maxM, snowM: w.snowM, arid: w.arid ?? 0.3, encoded: false });
-      world.setLook({ exag: t.exaggeration });
+      const e = exagSet ?? t.exaggeration;
+      world.setLook({ exag: e });
+      if (steadySet != null) world.steadyRadius = steadySet * 1000;
+      api.ground = createGround({ heights: t.heights, size: w.size, metersPerPixel: w.metersPerPixel, exag: e });
+    },
+    ground: null,   // height under any point, once setWorld has loaded the terrain
+    // Terrain height exaggeration, drawn and collided alike. Set before the world loads, it wins
+    // over the manifest's.
+    terrain: {
+      get exag() { return exagSet ?? (api.ground ? api.ground.exag : manifest.worlds?.[0]?.exaggeration ?? 1); },
+      set exag(v) { exagSet = v; world.look.exag = v; world.terrainUniforms.uExag.value = v; if (api.ground) api.ground.exag = v; },
+      // Steady ground radius in km (see world.steadyRadius). Set before the world loads, it is
+      // applied once the heightmap's texel size is known.
+      get steadyKm() { return steadySet ?? (api.ground ? world.steadyRadius : world.steadyRadius / world.cellSize * (manifest.worlds?.[0]?.metersPerPixel ?? world.cellSize)) / 1000; },
+      set steadyKm(v) { steadySet = v; if (api.ground) world.steadyRadius = v * 1000; },
     },
     draw({ self, remotes, time, dt, focus = null }) {   // focus: [x, y, z] to keep in frame, or null
       // Your jet
@@ -189,6 +205,7 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       labels?.(camera, remotes);
     },
   };
+  return api;
 }
 
 // True when WebGL is drawn by a CPU rasterizer. Asked on a throwaway context, because antialias has

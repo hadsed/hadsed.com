@@ -107,13 +107,16 @@ export async function loadHeightmap(world, base) {
   ctx.drawImage(bmp, 0, 0);
   const px = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
   const half = new Uint16Array(bmp.width * bmp.height);
+  // The same half-float heights on the CPU, for collisions (packages/assets/ground.js).
+  const heights = new Float32Array(half.length);
   for (let i = 0; i < half.length; i++) {
     half[i] = THREE.DataUtils.toHalfFloat(px[i * 4] * 256 + px[i * 4 + 1] + px[i * 4 + 2] / 256 - 32768);
+    heights[i] = THREE.DataUtils.fromHalfFloat(half[i]);
   }
   const tex = new THREE.DataTexture(half, bmp.width, bmp.height, THREE.RedFormat, THREE.HalfFloatType);
   tex.wrapS = tex.wrapT = THREE.MirroredRepeatWrapping;
   tex.magFilter = tex.minFilter = THREE.LinearFilter;
   tex.generateMipmaps = false;
   tex.needsUpdate = true;
-  return { tex, width: world.metersPerPixel * world.size, maxM: world.maxM, exaggeration: world.exaggeration || 1 };
+  return { tex, heights, width: world.metersPerPixel * world.size, maxM: world.maxM, exaggeration: world.exaggeration || 1 };
 }

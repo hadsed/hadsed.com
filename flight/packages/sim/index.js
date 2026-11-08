@@ -14,7 +14,13 @@ export const LIMITS = {
   radius: 120000,       // m from origin before the jet steers itself home
 };
 
-const RATE = { roll: 1.6, pitch: 0.95, yaw: 0.25, turn: 0.7, level: 0.8, nose: 0.25, home: 0.2, throttle: 0.5 };
+// Rates and feel. Plain objects so the mechanics jig (/lab/game/) can tune them live;
+// nothing in the game changes them.
+export const RATE = { roll: 1.6, pitch: 0.95, yaw: 0.25, turn: 0.7, level: 0.8, nose: 0.25, home: 0.2, throttle: 0.5 };
+// boost: top speed on boost as a multiple of maxSpeed. spool/boostSpool: how fast speed
+// chases its target (1/s). gravity: m/s^2 lost climbing, gained diving. band: meters above
+// the floor / below the ceiling where the jet starts to round out.
+export const FEEL = { boost: 1.25, spool: 0.4, boostSpool: 0.8, gravity: 25, band: 3000 };
 
 export function createJet({ x = 0, y = 25900, z = 0, heading = 0, speed = 900, throttle = 0.85 } = {}) {
   const q = [0, 0, 0, 1];
@@ -33,7 +39,6 @@ export const cloneJet = (j) => copyJet({ pos: [0, 0, 0], q: [0, 0, 0, 1] }, j);
 
 const NO_INPUT = { pitch: 0, roll: 0, yaw: 0, throttle: 0 };
 const tq = [0, 0, 0, 1], fwd = [0, 0, 0], right = [0, 0, 0], upv = [0, 0, 0];
-const BAND = 3000;   // m above the floor / below the ceiling where the jet starts to round out
 
 // Advance one jet by dt seconds. intent axes are in [-1, 1]:
 // pitch +1 nose up, roll +1 roll right, yaw +1 nose right, throttle +1 more power.
@@ -59,7 +64,7 @@ export function step(jet, intent = NO_INPUT, dt = STEP) {
   const alt = jet.pos[1];
   upOf(q, upv);
   const pull = upv[1] >= 0 ? 1 : -1;
-  const floorRoom = clamp((alt - LIMITS.minAlt) / BAND, 0, 9), ceilRoom = clamp((LIMITS.maxAlt - alt) / BAND, 0, 9);   // past 1: no limit
+  const floorRoom = clamp((alt - LIMITS.minAlt) / FEEL.band, 0, 9), ceilRoom = clamp((LIMITS.maxAlt - alt) / FEEL.band, 0, 9);   // past 1: no limit
   if (nose < -floorRoom * 1.4) pitchRate = pull * Math.max(pull * pitchRate, (-floorRoom * 1.4 - nose) * 4);
   if (nose > ceilRoom * 1.4) pitchRate = pull * Math.min(pull * pitchRate, (ceilRoom * 1.4 - nose) * 4);
 
@@ -84,10 +89,10 @@ export function step(jet, intent = NO_INPUT, dt = STEP) {
 
   jet.throttle = clamp(jet.throttle + (intent.throttle || 0) * RATE.throttle * dt, 0, 1);
   // intent.boost: a short dash past top speed, used to catch up with a jet you follow.
-  const target = intent.boost ? LIMITS.maxSpeed * 1.25 : LIMITS.minSpeed + jet.throttle * (LIMITS.maxSpeed - LIMITS.minSpeed);
+  const target = intent.boost ? LIMITS.maxSpeed * FEEL.boost : LIMITS.minSpeed + jet.throttle * (LIMITS.maxSpeed - LIMITS.minSpeed);
   forwardOf(q, fwd);
-  jet.speed += (target - jet.speed) * (intent.boost ? 0.8 : 0.4) * dt - 25 * fwd[1] * dt;
-  jet.speed = clamp(jet.speed, LIMITS.minSpeed * 0.8, LIMITS.maxSpeed * (intent.boost ? 1.25 : 1.05));
+  jet.speed += (target - jet.speed) * (intent.boost ? FEEL.boostSpool : FEEL.spool) * dt - FEEL.gravity * fwd[1] * dt;
+  jet.speed = clamp(jet.speed, LIMITS.minSpeed * 0.8, LIMITS.maxSpeed * (intent.boost ? FEEL.boost : 1.05));
 
   jet.pos[0] += fwd[0] * jet.speed * dt;
   jet.pos[1] = clamp(jet.pos[1] + fwd[1] * jet.speed * dt, LIMITS.minAlt, LIMITS.maxAlt);
