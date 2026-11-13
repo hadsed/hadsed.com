@@ -58,9 +58,6 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
   scene.add(world.sky, world.terrain);
   if (!software) scene.add(world.clouds);
   sun.position.copy(world.sunDir);
-  // Night flight: the jets go dark against the stars, with a little moon and sky light left.
-  const night = +world.look.night || 0;
-  sun.intensity = 2.4 * (1 - 0.9 * night); hemi.intensity = 1.2 * (1 - 0.6 * night);
   const shift = new THREE.Vector2();
   const groundO = new THREE.Vector3();
 
@@ -174,7 +171,7 @@ export function createRenderer({ canvas, manifest, labels, speedStyle = 'dust', 
       const ox = go ? go[0] : 0, oz = go ? go[2] : 0;
       shift.set(camPos.x, camPos.z);
       groundO.set(ox, 0, oz);
-      world.frame(camera, go ? groundO : null, shift);
+      world.frame(camera, go ? groundO : null, shift, renderer);
       world.uniforms.uMono.value = 1 - Math.min(Math.max(rig.blend, 0), 1);
 
       // Ghosts

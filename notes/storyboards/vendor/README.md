@@ -10,3 +10,5 @@ resolves the controls' `three` import locally. No runtime CDN is required.
 Copyright and MIT license: [THREE-LICENSE](THREE-LICENSE).
 
 Minified copies (`*.min.js`) were made with esbuild 0.24 (`--minify --format=esm --legal-comments=inline`) for the backdrop lab; `three.module.min.js` imports `./three.core.min.js`.
+
+Tweakpane **4.0.5** (MIT, cocopon), from `https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js`, as `tweakpane.min.js` (license header inline): the backdrop lab's panel.
