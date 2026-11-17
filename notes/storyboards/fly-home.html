@@ -31,20 +31,12 @@
   #sky.on { opacity: 1; }
   #site { z-index: 2; background: transparent; color-scheme: normal; transition: opacity .9s ease; }
   body.flying #site { opacity: 0; pointer-events: none; }
-  #exit { position: fixed; z-index: 3; right: calc(14px + env(safe-area-inset-right)); top: calc(36px + env(safe-area-inset-top));
-    font: 10px/1 var(--mono); letter-spacing: .16em; color: var(--glow); background: none; border: 0; padding: 10px 2px; cursor: pointer;
-    opacity: 0; pointer-events: none; transition: opacity .6s .6s, color .2s; -webkit-tap-highlight-color: transparent; }
-  /* gold like the flight HUD, which has no gray text */
-  /* only while flying: a tapped button keeps :hover on touch screens, which kept it on over the site */
-  body.flying #exit:hover, body.flying #exit:focus-visible { opacity: 1; }
-  body.flying #exit { opacity: .7; pointer-events: auto; }
 </style>
 </head>
 <body>
 <!-- tilt steering needs the motion sensors; the frame is created by script so its src waits for the site -->
 <iframe id="sky" title="Fly" tabindex="-1" allow="gamepad; fullscreen; accelerometer; gyroscope"></iframe>
 <iframe id="site" title="Had Seddiqi"></iframe>
-<button id="exit" >Back to site</button>
 <script>
 const $ = (s) => document.querySelector(s);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -61,6 +53,7 @@ addEventListener('message', (e) => {
   if (e.origin !== M.origin || e.source !== skyFrame.contentWindow || e.data?.mach20 !== BRIDGE) return;
   if (e.data.t === 'hello') sky.hello = true;
   if (e.data.t === 'ready') sky.ready = true;
+  // Esc, or Back to site at the top left of the game's flight HUD (Mach 20 draws it when framed).
   if (e.data.t === 'key' && e.data.key === 'Escape') leave();
 });
 const siteDoc = () => { try { return site.contentDocument; } catch { return null; } };
@@ -272,13 +265,11 @@ function leave() {
   state = 'site';
   document.body.classList.remove('flying');
   tell('land');
-  $('#exit').blur();
   skyFrame.tabIndex = -1;
   site.focus();
 }
 function onKey(e) { if (e.key === 'Escape') leave(); }
 addEventListener('keydown', onKey);
-$('#exit').addEventListener('click', leave);
 </script>
 </body>
 </html>
