@@ -62,7 +62,11 @@
     <a class="site-name" href="/">Had Seddiqi</a>
     {%- endif %}
     <ul>
+      {%- if mockNav -%}
+      {%- set items = [["/", "About"], ["/projects/", "Projects"], ["/experience/", "Experience"], ["/blog/", "Blog"]] -%}
+      {%- else -%}
       {%- set items = [["/", "About"], ["/portfolio/", "Portfolio"], ["/experience/", "Experience"], ["/blog/", "Blog"]] -%}
+      {%- endif -%}
       {%- for item in items -%}
         {%- set href = item[0] -%}
         {%- set current = (href == "/" and page.url == "/") or (href != "/" and page.url.startsWith(href)) -%}

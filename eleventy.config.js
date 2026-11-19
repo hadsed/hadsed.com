@@ -88,6 +88,9 @@ export default function (eleventyConfig) {
     });
   }
 
+  // Branch previews carry mockups of the projects / blog / notes pages (src/mockups, index at /lab/content/).
+  if (!(process.env.SITE_URL || process.env.LAB)) eleventyConfig.ignores.add("src/mockups/**");
+
   // Branch previews (SITE_URL set) carry the SR-71 model shootout at /lab/sr71-models/.
   // Production builds never include it.
   if (process.env.SITE_URL || process.env.LAB) {
