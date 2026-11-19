@@ -63,5 +63,19 @@
 .spec table { border-collapse: collapse; width: 100%; margin: 0 0 1rem; font-size: 0.85rem; }
 .spec th, .spec td { text-align: left; vertical-align: top; padding: 0.35rem 0.6rem 0.35rem 0; border-bottom: 1px solid color-mix(in srgb, var(--rule) 30%, transparent); }
 .spec th { color: var(--muted); font-weight: 400; }
+
+/* Sidebar options (A flat, B two groups split by space, C labeled groups) */
+html[data-nav="a"] .mock-nav li[data-v]:not([data-v~="a"]),
+html[data-nav="b"] .mock-nav li[data-v]:not([data-v~="b"]),
+html[data-nav="c"] .mock-nav li[data-v]:not([data-v~="c"]) { display: none; }
+.mock-nav .nav-gap { height: 1.1rem; margin: 0; }
+.mock-nav .nav-head { color: var(--muted); font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; margin: 1.15rem 0 0.4rem; }
+@media (max-width: 640px) {
+  /* phones: one row, groups only set the order */
+  .mock-nav .nav-gap, .mock-nav .nav-head { display: none !important; }
+}
+.mock-tag .opt { margin-left: 0.35rem; color: var(--muted); }
+.mock-tag .opt.on { color: var(--glow); text-decoration: underline; text-underline-offset: 2px; }
 </style>
-<div class="mock-tag"><a href="/lab/content/">Mockup · placeholder copy</a></div>
+<div class="mock-tag"><a href="/lab/content/">Mockup</a><span class="sep"> · sidebar</span><a class="opt" href="?nav=a">A</a><a class="opt" href="?nav=b">B</a><a class="opt" href="?nav=c">C</a></div>
+<script>for (const a of document.querySelectorAll('.mock-tag .opt')) if (a.textContent.toLowerCase() === document.documentElement.dataset.nav) a.classList.add('on');</script>
