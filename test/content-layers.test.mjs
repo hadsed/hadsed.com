@@ -123,7 +123,7 @@ test("a post shows the projects it appears in, heading anchors, and an HTML embe
   assert.match(read("blog/index.html"), /href="\/blog\/2026-11-19-first-post\/">A first post</);
 });
 
-test("an article's share_image (bare or [[wikilink]]) sets its link preview; one without it keeps og.jpg", () => {
+test("an article's share_image (bare or [[wikilink]]) sets its link preview; a page with neither keeps og.jpg", () => {
   const tags = (p) => {
     const html = read(p);
     const meta = (prop) => html.match(new RegExp(`<meta property="og:${prop}" content="([^"]*)">`))?.[1];
@@ -136,7 +136,7 @@ test("an article's share_image (bare or [[wikilink]]) sets its link preview; one
     image: `${preview}/assets/hero-kitchen-edges.jpg`, width: "1200", height: "630", alt: "Preview without alt text",
   });
   const fallback = { image: `${preview}/assets/og.jpg`, width: "1200", height: "630", alt: "Had Seddiqi, hadsed.com" };
-  assert.deepEqual(tags("blog/2026-11-19-first-post/index.html"), fallback);
+  assert.deepEqual(tags("notes/zz-fixture-plan-fit/index.html"), fallback);
   assert.deepEqual(tags("index.html"), fallback);
 });
 
