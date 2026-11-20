@@ -11,6 +11,8 @@
   --gap: 2.5rem;
   --menu-width: 6.5rem;
   --date-col: 6.5rem;
+  /* The home frame (notes/storyboards/fly-home.html) pins the menu by this width too. */
+  --page-width: 64rem;
 }
 
 * { box-sizing: border-box; }
@@ -29,7 +31,7 @@ body {
 .page {
   flex: 1 0 auto;
   width: 100%;
-  max-width: 64rem;
+  max-width: var(--page-width);
   margin: 0 auto;
   padding: 3rem 1.5rem 0;
   display: grid;
@@ -334,7 +336,7 @@ h1 .status { margin-left: 0.6rem; }
 
 /* A post with sections gets a Contents column on the right. Narrower screens fold it
    into a "Contents" drop-down under the title. */
-.page:has(.reading.has-toc) { max-width: 80rem; }
+:root:has(.reading.has-toc) { --page-width: 80rem; }
 .reading.has-toc {
   display: grid;
   grid-template-columns: minmax(0, var(--measure)) minmax(12rem, 17rem);
@@ -436,66 +438,54 @@ details.callout:not([open]) > summary { border-bottom: 0; }
 .callout-example { --c: #b18cff; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E"); }
 .callout-quote, .callout-cite { --c: var(--muted); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z'/%3E%3Cpath d='M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z'/%3E%3C/svg%3E"); }
 
-/* Article themes, candidates on branch previews (the switcher sets data-theme on <html>).
-   A, Ramp (the default): one typeface, size, weight and a rule set the levels apart. */
-.reading .prose > h1:not([id]) { font-size: 1.9rem; line-height: 1.2; color: var(--bright); margin-bottom: 0.4rem; }
+/* Article headings: sections and subsections in Petrona, the name's serif; the third level in
+   bold Verdana. Pink stays on emphasis and links. A heading right under another sits close to it. */
+.reading .prose > h1:not([id]) {
+  font-family: Petrona, Georgia, serif; font-weight: 300; font-size: 2.6rem; line-height: 1.1;
+  letter-spacing: -0.015em; color: var(--bright); margin-bottom: 0.5rem;
+}
 .prose h1[id] {
-  font-size: 1.45rem; line-height: 1.3; color: var(--bright);
-  margin: 3.25rem 0 1rem; padding-top: 1.4rem;
-  border-top: 1px solid color-mix(in srgb, var(--rule) 30%, transparent);
+  font-family: Petrona, Georgia, serif; font-weight: 400; font-size: 1.9rem; line-height: 1.15;
+  letter-spacing: -0.01em; color: var(--bright); margin: 2.75rem 0 0.6rem;
 }
-.prose h1[id] .anchor { top: 1.4rem; }
-.prose h2 { font-size: 1.1rem; font-weight: 700; color: var(--bright); margin: 2.25rem 0 0.6rem; }
-.prose h3, .prose h4 {
-  font-size: 0.75rem; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--muted); margin: 1.75rem 0 0.5rem;
+.prose h2 {
+  font-family: Petrona, Georgia, serif; font-weight: 400; font-style: italic; font-size: 1.4rem; line-height: 1.2;
+  color: var(--accent); margin: 2rem 0 0.5rem;
+}
+.prose h3, .prose h4 { font-size: 0.92rem; font-weight: 700; color: var(--bright); margin: 1.5rem 0 0.4rem; }
+.prose :is(h1, h2, h3, h4) + :is(h2, h3, h4) { margin-top: 0.6rem; }
+.prose :is(h1, h2, h3, h4) + :is(.figure, .embed, .callout) { margin-top: 0.75rem; }
+
+/* Mockup on branch previews: the menu as a row across the top on wide screens too, as on phones
+   (data-nav="top" on <html>, set by the preview's layout switcher). */
+@media (min-width: 641px) {
+  :root[data-nav="top"] { --page-width: 64rem; }
+  :root[data-nav="top"]:has(.reading.has-toc) { --page-width: 68rem; }
+  [data-nav="top"] .page { grid-template-columns: minmax(0, 1fr); row-gap: 2.75rem; }
+  [data-nav="top"] .menu {
+    position: static !important; width: auto !important; padding: 0 !important;
+    display: flex !important; flex-direction: row !important; align-items: baseline; gap: 2.5rem;
+  }
+  [data-nav="top"] .site-name + ul { margin-top: 0; }
+  [data-nav="top"] .menu ul.nav { flex: 1 1 auto; display: flex; flex-direction: row !important; align-items: baseline; }
+  [data-nav="top"] .menu .nav-scroll > ul { display: flex; flex-direction: row; gap: 1.5rem; }
+  [data-nav="top"] .menu .nav-gap { width: 0.75rem; height: auto; }
+  [data-nav="top"] .menu li { margin: 0; }
+  [data-nav="top"] .menu .fly-item { margin: 0 0 0 auto !important; align-self: center; }
+  [data-nav="top"] main { grid-column: auto !important; }
 }
 
-/* B, Serif: sections and subsections in Petrona, the name's serif; pink stays on emphasis and links. */
-[data-theme="b"] .reading .prose > h1:not([id]) { font-family: Petrona, Georgia, serif; font-weight: 300; font-size: 2.6rem; line-height: 1.1; letter-spacing: -0.015em; }
-[data-theme="b"] .prose h1[id] {
-  font-family: Petrona, Georgia, serif; font-weight: 400; font-size: 1.9rem; line-height: 1.15; letter-spacing: -0.01em;
-  border-top: 0; padding-top: 0; margin-top: 3.5rem;
-}
-[data-theme="b"] .prose h1[id] .anchor { top: auto; }
-[data-theme="b"] .prose h2 { font-family: Petrona, Georgia, serif; font-weight: 400; font-style: italic; font-size: 1.4rem; line-height: 1.2; color: var(--accent); }
-[data-theme="b"] .prose h3, [data-theme="b"] .prose h4 {
-  font-size: 0.92rem; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--bright);
-}
-
-/* C, Marked: numbered sections with pink numerals; bold reads as a highlighter stroke. */
-[data-theme="c"] .prose { counter-reset: s1; }
-[data-theme="c"] .prose h1[id] { counter-increment: s1; counter-reset: s2; border-top: 0; padding-top: 0; font-size: 1.4rem; }
-[data-theme="c"] .prose h1[id] .anchor { top: auto; }
-[data-theme="c"] .prose h1[id]::before {
-  content: counter(s1, decimal-leading-zero); display: block; margin-bottom: 0.3rem;
-  font: 600 0.78rem/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; color: var(--pink);
-}
-[data-theme="c"] .prose h2 { counter-increment: s2; font-weight: 400; font-size: 1.1rem; }
-[data-theme="c"] .prose h2::before {
-  content: counter(s1) "." counter(s2); display: inline-block; min-width: 2.6rem;
-  font: 600 0.78rem/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pink); vertical-align: 0.12em;
-}
-[data-theme="c"] .prose h3, [data-theme="c"] .prose h4 {
-  font-size: 0.95rem; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text);
-  padding-left: 2.6rem;
-}
-[data-theme="c"] .prose strong {
-  color: var(--bright);
-  background: linear-gradient(transparent 60%, color-mix(in srgb, var(--pink) 45%, transparent) 60%, color-mix(in srgb, var(--pink) 45%, transparent) 92%, transparent 92%);
-}
-
-/* The preview-only theme picker */
-.theme-switcher {
+/* The preview-only layout picker */
+.preview-switcher {
   position: fixed; z-index: 10; right: 1rem; bottom: 1rem;
   display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.5rem;
   background: rgba(15, 21, 32, 0.92); border: 1px solid color-mix(in srgb, var(--rule) 50%, transparent); border-radius: 4px;
   font: 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--muted);
 }
-.theme-switcher span { letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.2rem; }
-.theme-switcher button {
+.preview-switcher span { letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.2rem; }
+.preview-switcher button {
   font: inherit; color: var(--text); background: none; cursor: pointer;
   border: 1px solid color-mix(in srgb, var(--rule) 40%, transparent); border-radius: 3px; padding: 0.3rem 0.45rem;
 }
-.theme-switcher button[aria-pressed="true"] { color: var(--pink); border-color: var(--pink); }
-@media (max-width: 640px) { .theme-switcher span { display: none; } .theme-switcher { left: 1rem; right: 1rem; justify-content: center; } }
+.preview-switcher button[aria-pressed="true"] { color: var(--pink); border-color: var(--pink); }
+@media (max-width: 640px) { .preview-switcher { display: none; } }

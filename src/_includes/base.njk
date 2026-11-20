@@ -38,9 +38,14 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:wght@300&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:ital,wght@0,300;0,400;1,400&display=swap">
   {%- if themeSwitcher %}
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:ital,wght@0,400;0,500;1,400&display=swap">
+  {#- Branch previews only: try the menu as a left column or a row across the top (?nav=side|top). #}
+  <script>(function () {
+    var pick = new URLSearchParams(location.search).get('nav');
+    try { pick = pick || localStorage.getItem('nav-layout'); } catch (e) {}
+    document.documentElement.dataset.nav = pick === 'top' ? 'top' : 'side';
+  })();</script>
   {%- endif %}
   <link rel="stylesheet" href="/css/site.css">
   {%- if page.url == "/" %}
@@ -86,6 +91,23 @@
   </main>
 </div>
 <footer>© {{ buildYear }} Had Seddiqi</footer>
+{%- if themeSwitcher %}
+<div class="preview-switcher" role="group" aria-label="Menu layout (preview only)">
+  <span>Menu</span><button type="button" data-pick="side">Side</button><button type="button" data-pick="top">Top</button>
+</div>
+<script>(function () {
+  var root = document.documentElement, box = document.currentScript.previousElementSibling;
+  function sync() { box.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.pick === root.dataset.nav); }); }
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    root.dataset.nav = b.dataset.pick;
+    try { localStorage.setItem('nav-layout', b.dataset.pick); } catch (err) {}
+    var u = new URL(location.href); u.searchParams.set('nav', b.dataset.pick); history.replaceState(null, '', u);
+    sync();
+  });
+  sync();
+})();</script>
+{%- endif %}
 <script>(function () {
   // Phones: the menu row scrolls sideways. Fade its left edge once scrolled, drop the right fade
   // at the end, and start with the current page's item in view.
