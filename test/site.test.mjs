@@ -137,10 +137,10 @@ test("agents and feed readers get llms.txt and an Atom feed", () => {
 
 test("no page waits on a third-party font host; fonts and hashed CSS cache for a year", () => {
   for (const p of ["index.html", "projects/index.html", "experience/index.html"]) assert.doesNotMatch(read(p), /fonts\.(googleapis|gstatic)\.com/);
-  assert.match(read("index.html"), /<link rel="preload" href="\/assets\/fonts\/petrona-300-latin\.woff2" as="font" type="font\/woff2" crossorigin>/);
+  assert.match(read("index.html"), /<link rel="preload" href="\/fonts\/petrona-300-latin\.woff2" as="font" type="font\/woff2" crossorigin>/);
   assert.doesNotMatch(read("projects/index.html"), /rel="preload"[^>]*font/);
-  assert.ok(existsSync(new URL("../_site/assets/fonts/petrona-300-latin.woff2", import.meta.url)));
+  assert.ok(existsSync(new URL("../_site/fonts/petrona-300-latin.woff2", import.meta.url)));
   const headers = read("_headers");
-  assert.match(headers, /\/assets\/fonts\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
+  assert.match(headers, /\/fonts\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
   assert.match(headers, /\/css\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
 });

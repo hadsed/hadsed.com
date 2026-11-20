@@ -10,7 +10,7 @@ export default function (eleventyConfig) {
     eleventyConfig.ignores.add(path);
   }
 
-  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
+  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/fonts": "fonts", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
 
   // Flight (multiplayer jets) and the home that wraps the site over its live sky ship everywhere,
   // production included: every site page hands a top-level visit to /lab/home/ (see base.njk).

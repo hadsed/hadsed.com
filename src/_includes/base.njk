@@ -41,7 +41,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   {#- Petrona (self-hosted, src/assets/fonts) only sets the name on the home page: preload it there, nowhere else. #}
   {%- if page.url == "/" %}
-  <link rel="preload" href="/assets/fonts/petrona-300-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/petrona-300-latin.woff2" as="font" type="font/woff2" crossorigin>
   {%- endif %}
   <link rel="stylesheet" href="/css/site.css?v={{ assetHash['css/site.css'] }}">
   <link rel="alternate" type="application/atom+xml" title="Blog" href="/feed.xml">
