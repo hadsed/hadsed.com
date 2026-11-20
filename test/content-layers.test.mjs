@@ -28,6 +28,8 @@ title: A first post
 date: 2026-11-19
 slug: first-post
 summary: What goes in and what comes out.
+hero_image: "[[zz-fixture-hero.png]]"
+hero_image_alt: A house
 ---
 Intro paragraph.
 
@@ -57,6 +59,25 @@ layout: raw
 ---
 <!doctype html><title>Raw</title><canvas id="c"></canvas> Links to [[zz-fixture-plan-fit]].
 `,
+  "content/blog/zz-fixture-lead.md": `---
+title: Lead image post
+date: 2026-11-18
+---
+
+![[zz-fixture-hero.png|The house at dusk]]
+
+Body text.
+`,
+  "content/blog/zz-fixture-same.md": `---
+title: Same hero twice
+date: 2026-11-17
+hero_image: "[[zz-fixture-hero.png]]"
+---
+![[zz-fixture-hero.png|600]]
+
+Body.
+`,
+  "content/assets/zz-fixture-hero.png": "png",
   "content/assets/zz-fixture-viewer.html": `<!doctype html><title>Viewer</title><script>const a = {{ b }};</script>`,
 };
 const broken = new URL("content/notes/zz-fixture-broken.md", root);
@@ -84,11 +105,12 @@ test("project page lists its posts and key notes; the index shows status and cou
   const html = read("projects/fixture-house/index.html");
   assert.match(html, /<h1>Fixture House <span class="status status-active">active<\/span><\/h1>/);
   assert.match(html, /Started October 2026/);
-  assert.match(html, /updated 19 November 2026/);
-  assert.match(html, /Blog posts[\s\S]*href="\/blog\/2026-11-19-first-post\/">A first post<[\s\S]*19 Nov 2026/);
+  assert.match(html, /Started October 2026, last updated 19 November 2026/);
+  assert.match(html, /Blog posts[\s\S]*href="\/blog\/2026-11-19-first-post\/">A first post<[\s\S]*19 November 2026/);
   assert.match(html, /Key notes[\s\S]*href="\/notes\/zz-fixture-plan-fit\/">Fitting a plan</);
+  assert.doesNotMatch(html, /class="(orb|kind)"|<p class="meta">[^<]*·/);
   const index = read("projects/index.html");
-  assert.match(index, /Fixture House[\s\S]*?Updated 19 Nov 2026 · 1 post · 1 note/);
+  assert.match(index, /Fixture House[\s\S]*?Last updated 19 Nov 2026, 1 post, 1 note/);
   assert.match(index, /aria-current="page" href="\/projects\/"/);
 });
 
@@ -102,6 +124,27 @@ test("a post shows the projects it appears in, heading anchors, and an HTML embe
   // the embed is copied as a file, untouched by the template engine
   assert.equal(read("assets/zz-fixture-viewer.html"), fixtures["content/assets/zz-fixture-viewer.html"]);
   assert.match(read("blog/index.html"), /href="\/blog\/2026-11-19-first-post\/">A first post</);
+});
+
+test("a hero image from front matter leads the page and becomes its link preview", () => {
+  const html = read("blog/2026-11-19-first-post/index.html");
+  assert.match(html, /<img class="hero" src="\/assets\/zz-fixture-hero.png" alt="A house">/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/zz-fixture-hero.png">/);
+  assert.doesNotMatch(read("projects/fixture-house/index.html"), /class="hero"/);
+});
+
+test("an image embed on a note's first line becomes the hero and is not repeated", () => {
+  const html = read("blog/2026-11-18-zz-fixture-lead/index.html");
+  assert.match(html, /<img class="hero" src="\/assets\/zz-fixture-hero.png" alt="The house at dusk">/);
+  assert.equal((html.match(/zz-fixture-hero\.png" alt/g) || []).length, 1);
+  assert.doesNotMatch(html, /<figure class="figure">/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/zz-fixture-hero.png">/);
+  assert.match(html, /<p>Body text\.<\/p>/);
+});
+
+test("a first-line image that is also hero_image shows once", () => {
+  const html = read("blog/2026-11-17-zz-fixture-same/index.html");
+  assert.equal((html.match(/<img[^>]*zz-fixture-hero\.png/g) || []).length, 1);
 });
 
 test("wikilinks reach headings on other pages and on the same page", () => {

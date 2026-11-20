@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {%- set heroSrc = hero_image or (page.inputPath | leadImage).src %}
   {%- set pageTitle %}{% if title %}{{ title }} · Had Seddiqi{% else %}Had Seddiqi{% endif %}{% endset %}
   {%- set pageDescription = description or summary or "Applying AI to hard science and engineering problems." %}
   <title>{{ pageTitle }}</title>
@@ -27,9 +28,11 @@
   <meta property="og:title" content="{{ pageTitle }}">
   <meta property="og:description" content="{{ pageDescription }}">
   <meta property="og:url" content="https://hadsed.com{{ page.url }}">
-  <meta property="og:image" content="{{ siteUrl }}/assets/og.jpg">
+  <meta property="og:image" content="{{ siteUrl }}{{ (heroSrc | assetUrl) or '/assets/og.jpg' }}">
+  {%- if not heroSrc %}
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  {%- endif %}
   <meta property="og:image:alt" content="Had Seddiqi, hadsed.com">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
@@ -58,9 +61,8 @@
 <body>
 <div class="page">
   <nav class="menu">
-    {%- if page.url != "/" %}
+    {#- On every page, the landing page included, so the menu sits at the same height everywhere. #}
     <a class="site-name" href="/">Had Seddiqi</a>
-    {%- endif %}
     {#- Two groups: who (About, Experience), then what (Projects, Blog, Notes). The items sit in
         their own list so the home's Fly button (added after it) stays put while, on phones,
         the row scrolls sideways and fades out half-cut into Fly. -#}
