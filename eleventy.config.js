@@ -2,6 +2,7 @@ import { basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
+import { markdownCallouts, tocFrom } from "./lib/article.mjs";
 
 export default function (eleventyConfig) {
   // content/articles is the blog's old folder (now content/blog); a copy left in the vault stays unbuilt.
@@ -101,6 +102,10 @@ export default function (eleventyConfig) {
       }
     });
   });
+
+  // Obsidian callouts (> [!note] Title) and the reading pages' table of contents (lib/article.mjs).
+  eleventyConfig.amendLibrary("md", markdownCallouts);
+  eleventyConfig.addFilter("toc", tocFrom);
 
   // Obsidian links: [[page]], [[page|text]], [[page#Heading]], [[#Heading]] (this page).
   // Embeds: ![[image.png]] becomes an image; ![[viz.html]], a self-contained page from content/assets,

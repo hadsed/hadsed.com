@@ -75,6 +75,8 @@ Or skip the front matter and start the note with the image embed (`![[home-3d.gi
 
 To break a note out of a post: link the section first (`[[post#Heading]]`), then move the text into `content/notes/`, point the links at the note, and leave a line in the post. A link to a heading that no longer exists fails the build.
 
+Obsidian callouts render as boxes: `> [!note] Title` with the body on the following `>` lines; `[!tip]`, `[!warning]`, `[!danger]`, `[!example]` and Obsidian's other types get their own color and icon, and `[!note]-` (folded) or `[!note]+` (open) makes one that opens and closes. A blog post with more than two sections gets a table of contents from its headings: an outline column on the right on wide screens, a "Contents" drop-down under the title on narrower ones.
+
 Custom HTML, three ways: raw HTML right in the markdown; a self-contained `.html` file in `content/assets/` embedded with `![[viz.html]]` (or `![[viz.html|caption]]` on its own line), which runs in its own frame inside the page; or `layout: raw` in front matter (or a page written as `.html`), which skips the site template but keeps the URL, project listings and backlinks.
 
 The About page's name, tagline, avatar, links, education, and publications are front matter in `content/about.md`; its body is the blurb.
