@@ -126,12 +126,12 @@ test("project page lists its posts and key notes; the index shows status and cou
   const html = read("projects/fixture-house/index.html");
   assert.match(html, /<h1>Fixture House <span class="status status-active">active<\/span><\/h1>/);
   assert.match(html, /Started October 2026/);
-  assert.match(html, /Started October 2026, last updated 19 November 2026/);
-  assert.match(html, /Blog posts[\s\S]*href="\/blog\/2026-11-19-first-post\/">A first post<[\s\S]*19 November 2026/);
+  assert.match(html, /Started October 2026, last updated November 19th, 2026/);
+  assert.match(html, /Blog posts[\s\S]*href="\/blog\/2026-11-19-first-post\/">A first post<[\s\S]*November 19th, 2026/);
   assert.match(html, /Key notes[\s\S]*href="\/notes\/zz-fixture-plan-fit\/">Fitting a plan</);
   assert.doesNotMatch(html, /class="(orb|kind)"|<p class="meta">[^<]*·/);
   const index = read("projects/index.html");
-  assert.match(index, /Fixture House[\s\S]*?Last updated 19 Nov 2026, 1 post, 1 note/);
+  assert.match(index, /Fixture House[\s\S]*?Last updated Nov 19th, 2026, 1 post, 1 note/);
   assert.match(index, /aria-current="page" href="\/projects\/"/);
 });
 
@@ -194,7 +194,7 @@ test("wikilinks reach headings on other pages and on the same page", () => {
 test("a note lists every page that links to it, with the sentence around the link", () => {
   const html = read("notes/zz-fixture-plan-fit/index.html");
   assert.match(html, /Linked from/);
-  assert.match(html, /href="\/blog\/2026-11-19-first-post\/">A first post<\/a><span class="where">blog · 19 Nov 2026/);
+  assert.match(html, /href="\/blog\/2026-11-19-first-post\/">A first post<\/a><span class="where">blog · Nov 19th, 2026/);
   assert.match(html, /This section is now its own note: <mark>Fitting a plan<\/mark>\./);
   assert.match(html, /href="\/projects\/fixture-house\/">Fixture House<\/a><span class="where">project/);
   assert.match(html, /The living summary\. See <mark>the plan fit<\/mark>\./);
