@@ -2,6 +2,7 @@ import { basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
+import { markdownCallouts, tocFrom } from "./lib/article.mjs";
 import { prepareHeroes, heroHtml } from "./lib/hero.mjs";
 
 export default function (eleventyConfig) {
@@ -110,6 +111,10 @@ export default function (eleventyConfig) {
     });
   });
 
+  // Obsidian callouts (> [!note] Title) and the reading pages' table of contents (lib/article.mjs).
+  eleventyConfig.amendLibrary("md", markdownCallouts);
+  eleventyConfig.addFilter("toc", tocFrom);
+
   // Obsidian links: [[page]], [[page|text]], [[page#Heading]], [[#Heading]] (this page).
   // Embeds: ![[image.png]] becomes an image; ![[viz.html]], a self-contained page from content/assets,
   // runs in its own frame inside the page (its CSS and JS can't touch the site's).
@@ -140,7 +145,7 @@ export default function (eleventyConfig) {
         if (!hit) throw new Error(`Unresolved wikilink ${match} in ${where}`);
         let href = hit.url;
         if (heading) {
-          const id = slugify(heading);
+          const id = slugify(heading.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
           if (hit.headings && hit.kind !== "experience" && !hit.headings.has(id)) {
             throw new Error(`Wikilink ${match} in ${where}: ${hit.url} has no heading "${heading.trim()}"`);
           }
@@ -180,12 +185,12 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("readableDate", (date) =>
     new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(asDate(date))
   );
-  // A hero image in front matter (hero_image: hero.jpg, or "[[hero.jpg]]" as Obsidian writes it) is a file
-  // in content/assets. A name that isn't there fails the build rather than shipping a broken image.
+  // A hero or share image in front matter (hero_image / share_image: hero.jpg, or "[[hero.jpg]]" as Obsidian
+  // writes it) is a file in content/assets. A name that isn't there fails the build rather than shipping a broken image.
   eleventyConfig.addFilter("assetUrl", (value) => {
     if (!value) return "";
     const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");
-    if (!existsSync(`content/assets/${name}`) && !existsSync(`src/assets/${name}`)) throw new Error(`hero_image: ${value} is not in content/assets`);
+    if (!existsSync(`content/assets/${name}`) && !existsSync(`src/assets/${name}`)) throw new Error(`${value} is not in content/assets`);
     return `/assets/${encodeURI(name)}`;
   });
   // With no hero_image in front matter, an image embed on the first line of a post or project is the

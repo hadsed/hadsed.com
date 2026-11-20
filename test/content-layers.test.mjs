@@ -59,6 +59,23 @@ layout: raw
 ---
 <!doctype html><title>Raw</title><canvas id="c"></canvas> Links to [[zz-fixture-plan-fit]].
 `,
+  "content/blog/zz-fixture-share.md": `---
+title: A post with its own preview
+date: 2026-11-18
+slug: share
+share_image: zz-fixture share card.jpg
+share_image_alt: Kitchen edges traced over a floor plan
+---
+Body.
+`,
+  "content/blog/zz-fixture-share-no-alt.md": `---
+title: Preview without alt text
+date: 2026-11-17
+slug: share-no-alt
+share_image: "[[zz-fixture-share-card.jpg]]"
+---
+Body.
+`,
   "content/blog/zz-fixture-lead.md": `---
 title: Lead image post
 date: 2026-11-18
@@ -68,7 +85,18 @@ date: 2026-11-18
 
 Body text.
 `,
+  "content/blog/zz-fixture-same.md": `---
+title: Same hero twice
+date: 2026-11-17
+hero_image: "[[zz-fixture-hero.png]]"
+---
+![[zz-fixture-hero.png|600]]
+
+Body.
+`,
   "content/assets/zz-fixture-hero.png": "png",
+  "content/assets/zz-fixture share card.jpg": "jpg",
+  "content/assets/zz-fixture-share-card.jpg": "jpg",
   "content/blog/zz-fixture-tour.md": `---
 title: Tour post
 date: 2026-11-17
@@ -83,7 +111,9 @@ Body text.
   "content/assets/zz-fixture-viewer.html": `<!doctype html><title>Viewer</title><script>const a = {{ b }};</script>`,
 };
 const broken = new URL("content/notes/zz-fixture-broken.md", root);
-const build = () => execFileSync("npx", ["@11ty/eleventy", "--quiet", "--output=_site-layers"], { stdio: "pipe" });
+// Built as a preview deploy would be (.github/workflows/deploy.yml sets SITE_URL to the branch alias).
+const preview = "https://fixture-branch.hadsed-com.pages.dev";
+const build = () => execFileSync("npx", ["@11ty/eleventy", "--quiet", "--output=_site-layers"], { stdio: "pipe", env: { ...process.env, SITE_URL: preview } });
 
 before(() => {
   for (const [path, body] of Object.entries(fixtures)) writeFileSync(new URL(path, root), body);
@@ -118,7 +148,7 @@ test("project page lists its posts and key notes; the index shows status and cou
 
 test("a post shows the projects it appears in, heading anchors, and an HTML embed", () => {
   const html = read("blog/2026-11-19-first-post/index.html");
-  assert.match(html, /Appears in <a href="\/projects\/fixture-house\/">Fixture House<\/a>/);
+  assert.match(html, /<span class="appears-label">Appears in<\/span> <a href="\/projects\/fixture-house\/">Fixture House<\/a>/);
   assert.match(html, /<h2 id="fitting-the-plan"><a class="anchor" href="#fitting-the-plan"/);
   assert.match(html, /<h2 id="fitting-the-plan-2">/);
   assert.match(html, /<figure class="embed"><iframe class="embed-frame" src="\/assets\/zz-fixture-viewer.html"[^>]*><\/iframe><figcaption>A viewer<\/figcaption><\/figure>/);
@@ -126,6 +156,23 @@ test("a post shows the projects it appears in, heading anchors, and an HTML embe
   // the embed is copied as a file, untouched by the template engine
   assert.equal(read("assets/zz-fixture-viewer.html"), fixtures["content/assets/zz-fixture-viewer.html"]);
   assert.match(read("blog/index.html"), /href="\/blog\/2026-11-19-first-post\/">A first post</);
+});
+
+test("an article's share_image (bare or [[wikilink]]) sets its link preview; a page with neither keeps og.jpg", () => {
+  const tags = (p) => {
+    const html = read(p);
+    const meta = (prop) => html.match(new RegExp(`<meta property="og:${prop}" content="([^"]*)">`))?.[1];
+    return { image: meta("image"), width: meta("image:width"), height: meta("image:height"), alt: meta("image:alt") };
+  };
+  assert.deepEqual(tags("blog/2026-11-18-share/index.html"), {
+    image: `${preview}/assets/zz-fixture%20share%20card.jpg`, width: "1200", height: "630", alt: "Kitchen edges traced over a floor plan",
+  });
+  assert.deepEqual(tags("blog/2026-11-17-share-no-alt/index.html"), {
+    image: `${preview}/assets/zz-fixture-share-card.jpg`, width: "1200", height: "630", alt: "Preview without alt text",
+  });
+  const fallback = { image: `${preview}/assets/og.jpg`, width: "1200", height: "630", alt: "Had Seddiqi, hadsed.com" };
+  assert.deepEqual(tags("notes/zz-fixture-plan-fit/index.html"), fallback);
+  assert.deepEqual(tags("index.html"), fallback);
 });
 
 test("a hero image from front matter leads the page and becomes its link preview", () => {
@@ -142,6 +189,11 @@ test("an image embed on a note's first line becomes the hero and is not repeated
   assert.doesNotMatch(html, /<figure class="figure">/);
   assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/zz-fixture-hero.png">/);
   assert.match(html, /<p>Body text\.<\/p>/);
+});
+
+test("a first-line image that is also hero_image shows once", () => {
+  const html = read("blog/2026-11-17-zz-fixture-same/index.html");
+  assert.equal((html.match(/<img[^>]*zz-fixture-hero\.png/g) || []).length, 1);
 });
 
 test("wikilinks reach headings on other pages and on the same page", () => {
