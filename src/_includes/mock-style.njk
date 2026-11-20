@@ -71,11 +71,42 @@ html[data-nav="c"] .mock-nav li[data-v]:not([data-v~="c"]) { display: none; }
 .mock-nav .nav-gap { height: 1.1rem; margin: 0; }
 .mock-nav .nav-head { color: var(--muted); font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; margin: 1.15rem 0 0.4rem; }
 @media (max-width: 640px) {
-  /* phones: one row, groups only set the order */
+  /* phones: one row that scrolls sideways. Fly sits outside the scroller at the right end,
+     and the item running into it fades out half-cut, so the row reads as "there's more". */
   .mock-nav .nav-gap, .mock-nav .nav-head { display: none !important; }
+  .menu ul.mock-nav { flex-wrap: nowrap; gap: 0; }
+  .mock-nav .nav-scroll { flex: 1 1 auto; min-width: 0; }
+  .mock-nav .nav-scroll > ul {
+    --fade: 2.75rem;
+    display: flex; flex-wrap: nowrap; gap: 1.25rem; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
+  }
+  .mock-nav .nav-scroll > ul::-webkit-scrollbar { display: none; }
+  .mock-nav .nav-scroll > ul.at-end { --fade: 0px; }
+  .mock-nav .nav-scroll > ul.scrolled { --fade-l: 1.5rem; }
+  .mock-nav .nav-scroll li { flex: none; white-space: nowrap; }
+  .mock-nav .fly-item { flex: none; margin-left: 0.75rem !important; }
 }
 .mock-tag .opt { margin-left: 0.35rem; color: var(--muted); }
 .mock-tag .opt.on { color: var(--glow); text-decoration: underline; text-underline-offset: 2px; }
 </style>
 <div class="mock-tag"><a href="/lab/content/">Mockup</a><span class="sep"> · sidebar</span><a class="opt" href="?nav=a">A</a><a class="opt" href="?nav=b">B</a><a class="opt" href="?nav=c">C</a></div>
-<script>for (const a of document.querySelectorAll('.mock-tag .opt')) if (a.textContent.toLowerCase() === document.documentElement.dataset.nav) a.classList.add('on');</script>
+<script>
+(() => {
+  const ul = document.querySelector('.mock-nav .nav-scroll > ul'); if (!ul) return;
+  const mark = () => { ul.classList.toggle('scrolled', ul.scrollLeft > 2); ul.classList.toggle('at-end', ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 2); };
+  ul.addEventListener('scroll', mark, { passive: true });
+  const cur = [...ul.querySelectorAll('[aria-current="page"]')].find((a) => a.offsetParent);
+  // Keep the current page's item clear of the fade.
+  const show = () => {
+    if (cur && ul.scrollWidth > ul.clientWidth) {
+      const limit = ul.getBoundingClientRect().right - 48;
+      const over = cur.getBoundingClientRect().right - limit;
+      if (over > 0) ul.scrollLeft += over;
+    }
+    mark();
+  };
+  addEventListener('load', show);
+})();
+for (const a of document.querySelectorAll('.mock-tag .opt')) if (a.textContent.toLowerCase() === document.documentElement.dataset.nav) a.classList.add('on');</script>

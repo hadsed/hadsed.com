@@ -69,9 +69,9 @@
     <a class="site-name" href="/">Had Seddiqi</a>
     {%- endif %}
     {%- if mockNav %}
-    {#- Mockups only: three sidebar options in one list (so Fly still lands at its end);
+    {#- Mockups only: three sidebar options in one inner list (Fly lands after it, outside the part that scrolls on phones);
         <html data-nav> picks which items and group headings show. -#}
-    <ul class="mock-nav">
+    <ul class="mock-nav"><li class="nav-scroll"><ul>
       {%- set items = [
         ["a b c", "", "/", "About"], ["a", "", "/projects/", "Projects"], ["a", "", "/blog/", "Blog"], ["a", "", "/notes/", "Notes"], ["a", "", "/experience/", "Experience"],
         ["b c", "", "/experience/", "Experience"],
@@ -91,7 +91,7 @@
         <li data-v="{{ item[0] }}"><a{% if current %} aria-current="page"{% endif %} href="{{ href }}">{{ item[3] }}</a></li>
         {%- endif -%}
       {%- endfor -%}
-    </ul>
+    </ul></li></ul>
     {%- else %}
     <ul>
       {%- set items = [["/", "About"], ["/portfolio/", "Portfolio"], ["/experience/", "Experience"], ["/blog/", "Blog"]] -%}
