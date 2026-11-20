@@ -11,6 +11,9 @@ layout: base.njk
     {%- if info.updated %}updated {{ info.updated | readableDate }}{% endif %}
     {%- if link %}<span class="sep">·</span><a href="{{ link }}">{{ link | replace("https://", "") }}</a>{% endif %}
   </p>
+  {%- if image %}
+  <img class="hero" src="{{ image | assetUrl }}" alt="{{ image_alt or '' }}">
+  {%- endif %}
   {{ content | safe }}
 </article>
 {%- if info.posts.length %}

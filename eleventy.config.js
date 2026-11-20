@@ -1,4 +1,5 @@
 import { basename, dirname } from "node:path";
+import { existsSync } from "node:fs";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
 
 export default function (eleventyConfig) {
@@ -161,6 +162,14 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("readableDate", (date) =>
     new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(asDate(date))
   );
+  // A hero image in front matter (image: hero.jpg, or "[[hero.jpg]]" as Obsidian writes it) is a file
+  // in content/assets. A name that isn't there fails the build rather than shipping a broken image.
+  eleventyConfig.addFilter("assetUrl", (value) => {
+    if (!value) return "";
+    const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^.*\//, "");
+    if (!existsSync(`content/assets/${name}`) && !existsSync(`src/assets/${name}`)) throw new Error(`image: ${value} is not in content/assets`);
+    return `/assets/${encodeURI(name)}`;
+  });
   // "2026-10" -> "October 2026"; a bare year stays as is.
   eleventyConfig.addFilter("monthYear", (value) => {
     const m = String(value).match(/^(\d{4})-(\d{2})/);

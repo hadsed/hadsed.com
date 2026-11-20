@@ -69,6 +69,8 @@ order: 3
 ---
 ```
 
+A hero image, on a project or a blog post: put the file in `content/assets/` and name it in front matter as `image: home-3d.jpg` (Obsidian's `"[[home-3d.jpg]]"` works too), with an optional `image_alt`. It sits under the title and becomes the page's link-preview image. A name that isn't in `content/assets/` fails the build.
+
 To break a note out of a post: link the section first (`[[post#Heading]]`), then move the text into `content/notes/`, point the links at the note, and leave a line in the post. A link to a heading that no longer exists fails the build.
 
 Custom HTML, three ways: raw HTML right in the markdown; a self-contained `.html` file in `content/assets/` embedded with `![[viz.html]]` (or `![[viz.html|caption]]` on its own line), which runs in its own frame inside the page; or `layout: raw` in front matter (or a page written as `.html`), which skips the site template but keeps the URL, project listings and backlinks.

@@ -28,6 +28,8 @@ title: A first post
 date: 2026-11-19
 slug: first-post
 summary: What goes in and what comes out.
+image: "[[zz-fixture-hero.png]]"
+image_alt: A house
 ---
 Intro paragraph.
 
@@ -57,6 +59,7 @@ layout: raw
 ---
 <!doctype html><title>Raw</title><canvas id="c"></canvas> Links to [[zz-fixture-plan-fit]].
 `,
+  "content/assets/zz-fixture-hero.png": "png",
   "content/assets/zz-fixture-viewer.html": `<!doctype html><title>Viewer</title><script>const a = {{ b }};</script>`,
 };
 const broken = new URL("content/notes/zz-fixture-broken.md", root);
@@ -102,6 +105,13 @@ test("a post shows the projects it appears in, heading anchors, and an HTML embe
   // the embed is copied as a file, untouched by the template engine
   assert.equal(read("assets/zz-fixture-viewer.html"), fixtures["content/assets/zz-fixture-viewer.html"]);
   assert.match(read("blog/index.html"), /href="\/blog\/2026-11-19-first-post\/">A first post</);
+});
+
+test("a hero image from front matter leads the page and becomes its link preview", () => {
+  const html = read("blog/2026-11-19-first-post/index.html");
+  assert.match(html, /<img class="hero" src="\/assets\/zz-fixture-hero.png" alt="A house">/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/zz-fixture-hero.png">/);
+  assert.doesNotMatch(read("projects/fixture-house/index.html"), /class="hero"/);
 });
 
 test("wikilinks reach headings on other pages and on the same page", () => {

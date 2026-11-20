@@ -48,7 +48,6 @@ test("landing page shows about, timeline, and projects", () => {
   assert.match(html, /<svg[\s\S]*?mailto:h@hadsed.com|mailto:h@hadsed.com[\s\S]*?<svg/);
   assert.match(html, /Intelligent Robotics Group/);
   assert.match(html, /class="about-head">\s*<img class="avatar"[\s\S]*?<h1>Had Seddiqi<\/h1>/);
-  assert.doesNotMatch(html, /class="site-name"/);
   assert.doesNotMatch(html, /class="link"/);
   assert.doesNotMatch(html, /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/);
 });
@@ -111,4 +110,13 @@ test("crawlers get robots.txt, a sitemap, a real 404 and a Person schema", () =>
   assert.ok(ld.sameAs.includes("https://github.com/hadsed"));
   assert.ok(!ld.sameAs.some((url) => url.startsWith("mailto:")));
   assert.match(read("projects/subassembler/index.html"), /<meta name="description" content="Step-by-step assembly walkthroughs generated from CAD\.">/);
+});
+
+test("the menu is the same on every page, apart from which item is current", () => {
+  const nav = (p) => read(p).match(/<nav class="menu">[\s\S]*?<\/nav>/)[0].replace(/ aria-current="page"/g, "");
+  const home = nav("index.html");
+  assert.match(home, /class="site-name"/);
+  for (const p of ["experience/index.html", "projects/index.html", "blog/index.html", "notes/index.html", "projects/subassembler/index.html", "404.html"]) {
+    assert.equal(nav(p), home, p);
+  }
 });

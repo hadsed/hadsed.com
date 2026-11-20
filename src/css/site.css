@@ -293,6 +293,9 @@ h1 .status { margin-left: 0.6rem; }
 .prose pre { background: color-mix(in srgb, #000 25%, transparent); border-radius: 3px; padding: 0.8rem 1rem; overflow-x: auto; font-size: 0.85rem; }
 .prose blockquote { margin: 0 0 1rem; padding-left: 1rem; border-left: 1px solid var(--rule); color: var(--muted); }
 
+/* Hero image (image: in front matter) */
+.prose .hero { display: block; width: 100%; height: auto; margin: 0.25rem 0 1.75rem; border-radius: 3px; }
+
 /* ![[viz.html]]: a self-contained page in its own frame */
 .embed { margin: 1.25rem 0 1.5rem; }
 .embed-frame { display: block; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--rule); border-radius: 3px; background: #0f1520; }
