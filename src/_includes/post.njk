@@ -3,28 +3,6 @@ layout: base.njk
 ---
 {%- set projectsIn = site.appearsIn[page.url] %}
 {%- set toc = content | toc %}
-{%- if previewSwitcher and projectsIn %}
-<script>(function () {
-  var pick = new URLSearchParams(location.search).get('appears');
-  try { pick = pick || localStorage.getItem('appears-box'); } catch (e) {}
-  document.documentElement.dataset.appears = /^[123]$/.test(pick || '') ? pick : '1';
-})();</script>
-<div class="preview-switcher" role="group" aria-label="Appears-in box (preview only)">
-  <span>Box</span><button type="button" data-pick="1">1 Outline</button><button type="button" data-pick="2">2 Gold rule</button><button type="button" data-pick="3">3 Chip</button>
-</div>
-<script>(function () {
-  var root = document.documentElement, box = document.currentScript.previousElementSibling;
-  function sync() { box.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.pick === root.dataset.appears); }); }
-  box.addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b) return;
-    root.dataset.appears = b.dataset.pick;
-    try { localStorage.setItem('appears-box', b.dataset.pick); } catch (err) {}
-    var u = new URL(location.href); u.searchParams.set('appears', b.dataset.pick); history.replaceState(null, '', u);
-    sync();
-  });
-  sync();
-})();</script>
-{%- endif %}
 <div class="reading{% if toc.length > 2 %} has-toc{% endif %}">
 <div class="reading-main">
 <article class="prose">
