@@ -1,9 +1,7 @@
 {#- Consumes: projects (sorted project items) -#}
 <section class="panels">
 {%- for item in projects %}
-  {%- set hero = site.heroByUrl[item.url] %}
   <article class="panel">
-    {%- if hero %}<a class="card-hero-link" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{{ hero | heroHtml("", true) | safe }}</a>{% endif %}
     <h3><a href="{{ item.url }}">{{ item.data.title }}</a></h3>
     <span class="year">{{ item.data.year }}</span>
     <p class="summary">{{ item.data.summary }}</p>

@@ -22,8 +22,7 @@ layout: base.njk
   <h2 class="label">Blog posts</h2>
   <ul class="posts">
     {%- for post in info.posts %}
-    <li{% if post.hero %} class="has-hero"{% endif %}>
-      {%- if post.hero %}<a class="card-hero-link" href="{{ post.url }}" tabindex="-1" aria-hidden="true">{{ post.hero | heroHtml("", true) | safe }}</a>{% endif %}
+    <li>
       <a href="{{ post.url }}">{{ post.title }}</a>
       <span class="dates">{{ post.date | readableDate }}</span>
       {%- if post.summary %}<p class="summary">{{ post.summary }}</p>{% endif %}
