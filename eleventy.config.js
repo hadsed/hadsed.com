@@ -135,6 +135,11 @@ export default function (eleventyConfig) {
   // Absolute URLs for link previews. Branch previews set SITE_URL to their own
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
+  // share_image: a file in assets/, written bare ("hero.jpg") or as an Obsidian embed ("[[hero.jpg]]", "![[hero.jpg|alt]]").
+  eleventyConfig.addFilter("shareImagePath", (value) => {
+    const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");
+    return `/assets/${encodeURI(name)}`;
+  });
 
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
 

@@ -61,8 +61,8 @@ layout: raw
 title: A post with its own preview
 date: 2026-11-18
 slug: share
-og_image: hero kitchen-edges.jpg
-og_image_alt: Kitchen edges traced over a floor plan
+share_image: hero kitchen-edges.jpg
+share_image_alt: Kitchen edges traced over a floor plan
 ---
 Body.
 `,
@@ -70,7 +70,7 @@ Body.
 title: Preview without alt text
 date: 2026-11-17
 slug: share-no-alt
-og_image: hero-kitchen-edges.jpg
+share_image: "[[hero-kitchen-edges.jpg]]"
 ---
 Body.
 `,
@@ -123,7 +123,7 @@ test("a post shows the projects it appears in, heading anchors, and an HTML embe
   assert.match(read("blog/index.html"), /href="\/blog\/2026-11-19-first-post\/">A first post</);
 });
 
-test("an article's og_image sets its link preview; one without it keeps og.jpg", () => {
+test("an article's share_image (bare or [[wikilink]]) sets its link preview; one without it keeps og.jpg", () => {
   const tags = (p) => {
     const html = read(p);
     const meta = (prop) => html.match(new RegExp(`<meta property="og:${prop}" content="([^"]*)">`))?.[1];
