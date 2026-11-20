@@ -5,8 +5,10 @@ eleventyExcludeFromCollections: true
 <?xml version="1.0" encoding="utf-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 {%- for item in collections.all %}
-{%- if item.url and item.url.endsWith("/") %}
-  <url><loc>https://hadsed.com{{ item.url }}</loc></url>
+{%- if item.url and item.url.endsWith("/") and not item.data.noindex %}
+{#- lastmod where the site knows it: a post's date, a project's last activity, a note's last edit. #}
+{%- set lastmod = site.projectByUrl[item.url].updated if site.projectByUrl[item.url] else (site.tended[item.url] if site.tended[item.url] else (item.date | isoDate if "blog" in (item.data.tags or []) else "")) %}
+  <url><loc>https://hadsed.com{{ item.url }}</loc>{% if lastmod %}<lastmod>{{ lastmod }}</lastmod>{% endif %}</url>
 {%- endif %}
 {%- endfor %}
 </urlset>

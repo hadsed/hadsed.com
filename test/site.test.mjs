@@ -9,7 +9,8 @@ before(() => { execFileSync("npx", ["@11ty/eleventy", "--quiet"], { stdio: "inhe
 test("landing page carries the shell", () => {
   const html = read("index.html");
   for (const label of ["About", "Experience", "Projects", "Blog", "Notes"]) assert.match(html, new RegExp(`>${label}<`));
-  assert.match(html, /href="\/css\/site\.css"/);
+  assert.match(html, /<style>[^<]*\.menu[^<]*<\/style>/);   // stylesheet inline: no request before text
+  assert.doesNotMatch(html, /<link rel="stylesheet"/);
   assert.match(html, /<title>Had Seddiqi<\/title>/);
   assert.match(html, /<\/main>\s*<\/div>\s*<footer>© \d{4} Had Seddiqi<\/footer>/);
 });
@@ -105,11 +106,65 @@ test("crawlers get robots.txt, a sitemap, a real 404 and a Person schema", () =>
   assert.doesNotMatch(sitemap, /404|robots|sitemap\.xml/);
   assert.match(read("404.html"), /<meta name="robots" content="noindex">/);
   assert.match(read("_headers"), /X-Robots-Tag: noindex/);
-  const ld = JSON.parse(read("index.html").match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
-  assert.equal(ld["@type"], "Person");
+  const ld = JSON.parse(read("index.html").match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])["@graph"]
+    .find((node) => node["@type"] === "Person");
+  assert.equal(ld["@id"], "https://hadsed.com/#person");
   assert.ok(ld.sameAs.includes("https://github.com/hadsed"));
   assert.ok(!ld.sameAs.some((url) => url.startsWith("mailto:")));
   assert.match(read("projects/subassembler/index.html"), /<meta name="description" content="Step-by-step assembly walkthroughs generated from CAD\.">/);
+});
+
+test("every indexable page carries JSON-LD tied to the same person; the sitemap has lastmod", () => {
+  const ld = (p) => JSON.parse(read(p).match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(ld("projects/subassembler/index.html")["@type"], "CreativeWork");
+  assert.equal(ld("projects/subassembler/index.html").author["@id"], "https://hadsed.com/#person");
+  assert.equal(ld("experience/index.html")["@type"], "ProfilePage");
+  assert.equal(ld("blog/index.html")["@type"], "CollectionPage");
+  assert.doesNotMatch(read("404.html"), /ld\+json/);
+  assert.match(read("sitemap.xml"), /<loc>https:\/\/hadsed\.com\/projects\/subassembler\/<\/loc><lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+});
+
+test("agents and feed readers get llms.txt and an Atom feed", () => {
+  const llms = read("llms.txt");
+  assert.match(llms, /^# Had Seddiqi\n\n> /);
+  assert.match(llms, /- \[Subassembler\]\(https:\/\/hadsed\.com\/projects\/subassembler\/\): /);
+  assert.doesNotMatch(llms, /&#|&amp;|<[a-z]/);
+  const feed = read("feed.xml");
+  assert.match(feed, /<feed xmlns="http:\/\/www\.w3\.org\/2005\/Atom">/);
+  assert.match(feed, /<link href="https:\/\/hadsed\.com\/feed\.xml" rel="self"\/>/);
+  assert.match(read("index.html"), /<link rel="alternate" type="application\/atom\+xml" title="Blog" href="\/feed\.xml">/);
+});
+
+test("no page waits on a third-party font host; fonts cache for a year", () => {
+  for (const p of ["index.html", "projects/index.html", "experience/index.html"]) assert.doesNotMatch(read(p), /fonts\.(googleapis|gstatic)\.com/);
+  assert.match(read("index.html"), /<link rel="preload" href="\/fonts\/petrona-300-latin\.woff2" as="font" type="font\/woff2" crossorigin>/);
+  assert.doesNotMatch(read("projects/index.html"), /rel="preload"[^>]*font/);
+  assert.ok(existsSync(new URL("../_site/fonts/petrona-300-latin.woff2", import.meta.url)));
+  const headers = read("_headers");
+  assert.match(headers, /\/fonts\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
+});
+
+test("the Pages Function serves the sky wrapper at a page's own URL, never to crawlers or for files", async () => {
+  const { onRequest } = await import("../functions/_middleware.js");
+  const shell = "<html><head><meta name=\"robots\" content=\"noindex\"></head><body>wrapper</body></html>";
+  globalThis.HTMLRewriter ??= class { on() { return this; } transform(r) { return r; } };
+  const run = async (path, { dest = "document", ua = "Mozilla/5.0 Chrome/131", status = 200, type = "text/html" } = {}) => {
+    const request = new Request(`https://hadsed.com${path}`, { headers: { "Sec-Fetch-Dest": dest, "User-Agent": ua } });
+    const next = async () => new Response("page", { status, headers: { "Content-Type": type } });
+    const env = { ASSETS: { fetch: async () => new Response(shell, { headers: { "Content-Type": "text/html" } }) } };
+    return (await onRequest({ request, next, env })).text();
+  };
+  assert.equal(await run("/projects/"), shell);
+  assert.equal(await run("/projects/", { dest: "iframe" }), "page");
+  assert.equal(await run("/projects/", { dest: "" }), "page");
+  for (const ua of ["Mozilla/5.0 (compatible; Googlebot/2.1)", "Mozilla/5.0 (compatible; Google-InspectionTool/1.0)", "ClaudeBot/1.0", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ChatGPT-User/1.0)"]) {
+    assert.equal(await run("/projects/", { ua }), "page", ua);
+  }
+  assert.equal(await run("/nope/", { status: 404 }), "page");
+  assert.equal(await run("/feed.xml", { type: "application/atom+xml" }), "page");
+  assert.equal(await run("/lab/home/"), "page");
+  const routes = JSON.parse(read("_routes.json"));
+  for (const p of ["/assets/*", "/fonts/*", "/lab/*"]) assert.ok(routes.exclude.includes(p), p);
 });
 
 test("the menu is the same on every page, apart from which item is current", () => {

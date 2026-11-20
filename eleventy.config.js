@@ -1,7 +1,7 @@
 import { basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import matter from "gray-matter";
-import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
+import { buildModel, urlFor, roleSlug, slugify, uniqueId, isoDate } from "./lib/content.mjs";
 import { markdownCallouts, tocFrom } from "./lib/article.mjs";
 import { prepareHeroes, heroHtml } from "./lib/hero.mjs";
 
@@ -12,7 +12,7 @@ export default function (eleventyConfig) {
     eleventyConfig.ignores.add(path);
   }
 
-  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
+  eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/fonts": "fonts", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
 
   // Flight (multiplayer jets) and the home that wraps the site over its live sky ship everywhere,
   // production included: every site page hands a top-level visit to /lab/home/ (see base.njk).
@@ -127,10 +127,8 @@ export default function (eleventyConfig) {
     const alt = alias && !width ? alias.trim() : "";
     return `<img src="/assets/${encodeURI(file)}" alt="${alt}"${width ? ` width="${width}"` : ""} loading="lazy">`;
   };
-  eleventyConfig.addTransform("wikilinks", function (content) {
-    if (!(this.page.outputPath || "").endsWith(".html")) return content;
-    const where = this.page.inputPath;
-    const self = model.byUrl.get(this.page.url);
+  const resolveLinks = (content, where, url) => {
+    const self = model.byUrl.get(url);
     return content
       .replace(/<p>\s*!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*<\/p>/g, (m, file, alias) => {
         file = file.trim();
@@ -154,13 +152,63 @@ export default function (eleventyConfig) {
         const text = alias ? alias.trim() : heading && !name ? heading.trim() : hit.title;
         return `<a href="${href}">${text}</a>`;
       });
+  };
+  eleventyConfig.addTransform("wikilinks", function (content) {
+    if (!(this.page.outputPath || "").endsWith(".html")) return content;
+    return resolveLinks(content, this.page.inputPath, this.page.url);
   });
-
+  // The feed carries a post's body before page transforms run: resolve its links here, and make
+  // site-relative links absolute so they work in a feed reader.
+  eleventyConfig.addFilter("feedHtml", (html, inputPath, url) =>
+    resolveLinks(html, inputPath, url).replace(/(href|src)="\/(?!\/)/g, '$1="https://hadsed.com/')
+  );
   // Absolute URLs for link previews. Branch previews set SITE_URL to their own
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
 
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
+  eleventyConfig.addGlobalData("buildDate", () => new Date().toISOString().slice(0, 10));
+
+  // The stylesheet goes inline in every page's <head>: text can paint as soon as the HTML lands,
+  // with no second request in its way on a slow connection. Comments and runs of whitespace go.
+  eleventyConfig.addGlobalData("siteCss", () =>
+    readFileSync("src/css/site.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ").replace(/\s*([{};,>])\s*/g, "$1").replace(/:\s+/g, ":").trim()
+  );
+
+  eleventyConfig.addFilter("isoDate", (value) => (value instanceof Date ? value.toISOString().slice(0, 10) : isoDate(value)));
+
+  // schema.org JSON-LD for every indexable page: who wrote it, what kind of page it is, when.
+  // Search engines and LLM crawlers read this to tie the site's pages to one person.
+  eleventyConfig.addFilter("structuredData", function (page, title, description, about, site) {
+    const base = "https://hadsed.com";
+    const url = base + page.url;
+    const person = { "@type": "Person", "@id": `${base}/#person`, name: about.name, url: `${base}/` };
+    const tags = this.ctx?.tags || [];
+    if (page.url === "/") {
+      return {
+        "@context": "https://schema.org",
+        "@graph": [
+          { "@type": "WebSite", "@id": `${base}/#website`, url: `${base}/`, name: about.name, description, publisher: { "@id": person["@id"] } },
+          { ...person, image: `${base}/assets/avatar.jpg`, description, jobTitle: about.tagline, email: "mailto:h@hadsed.com",
+            sameAs: about.links.map((l) => l.url).filter((u) => u.startsWith("http")) },
+        ],
+      };
+    }
+    const common = { "@context": "https://schema.org", url, name: title || about.name, description, author: person, isPartOf: { "@id": `${base}/#website` } };
+    if (tags.includes("blog")) {
+      return { ...common, "@type": "BlogPosting", headline: title, datePublished: isoDate(page.date), mainEntityOfPage: url, image: `${base}/assets/og.jpg` };
+    }
+    if (tags.includes("notes")) {
+      const tended = site.tended[page.url];
+      return { ...common, "@type": "Article", headline: title, ...(tended && { dateModified: tended }), mainEntityOfPage: url };
+    }
+    if (tags.includes("projects")) {
+      const info = site.projectByUrl[page.url] || {};
+      return { ...common, "@type": "CreativeWork", headline: title, ...(info.updated && { dateModified: info.updated }), creator: person };
+    }
+    if (page.url === "/experience/") return { ...common, "@type": "ProfilePage", mainEntity: person };
+    return { ...common, "@type": "CollectionPage" };
+  });
 
   eleventyConfig.addFilter("year", (value) =>
     value instanceof Date ? String(value.getUTCFullYear()) : String(value).slice(0, 4)

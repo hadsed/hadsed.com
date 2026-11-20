@@ -23,7 +23,12 @@
       location.replace('/lab/home/?p=' + encodeURIComponent(location.pathname + location.search) + location.hash);
     } catch (e) {}
   })();</script>
+  {%- if "blog" in (tags or []) %}
+  <meta property="og:type" content="article">
+  <meta property="article:published_time" content="{{ page.date | isoDate }}">
+  {%- else %}
   <meta property="og:type" content="website">
+  {%- endif %}
   <meta property="og:site_name" content="Had Seddiqi">
   <meta property="og:title" content="{{ pageTitle }}">
   <meta property="og:description" content="{{ pageDescription }}">
@@ -47,22 +52,16 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:ital,wght@0,300;0,400;1,400&display=swap">
-  <link rel="stylesheet" href="/css/site.css">
+  {#- Petrona (self-hosted, src/fonts) only sets the name on the home page: preload it there, nowhere else. #}
   {%- if page.url == "/" %}
-  {%- set about = collections.about[0].data %}
+  <link rel="preload" href="/fonts/petrona-300-latin.woff2" as="font" type="font/woff2" crossorigin>
+  {%- endif %}
+  {#- Inline (src/css/site.css, via eleventy.config.js): no request stands between the HTML and its text. #}
+  <style>{{ siteCss | safe }}</style>
+  <link rel="alternate" type="application/atom+xml" title="Blog" href="/feed.xml">
+  {%- if not noindex %}
   <script type="application/ld+json">
-  {{ {
-    "@context": "https://schema.org",
-    "@type": "Person",
-    "name": about.name,
-    "url": "https://hadsed.com/",
-    "image": "https://hadsed.com/assets/avatar.jpg",
-    "description": pageDescription,
-    "sameAs": about.links | profileUrls
-  } | dump | safe }}
+  {{ page | structuredData(title, pageDescription, collections.about[0].data, site) | dump | replace("<", "\\u003c") | safe }}
   </script>
   {%- endif %}
   {#- Framed by the home's 3D backdrop: let it dress the page before first paint (no flicker on navigation). -#}
