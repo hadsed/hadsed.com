@@ -3,12 +3,17 @@ layout: base.njk
 ---
 {%- set projectsIn = site.appearsIn[page.url] %}
 <article class="prose">
-  <p class="kind"><a href="/blog/">Blog</a></p>
   <h1>{{ title }}</h1>
   <p class="meta">{{ page.date | readableDate }}</p>
   {%- if projectsIn %}
   <p class="appears">Appears in {% for p in projectsIn %}<a href="{{ p.url }}">{{ p.title }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
   {%- endif %}
-  {{ content | safe }}
+  {#- A first-line image embed is the hero when hero_image is unset, or when it is the same file. #}
+  {%- set lead = page.inputPath | leadImage %}
+  {%- if lead and hero_image and (hero_image | assetUrl) != (lead.src | assetUrl) %}{% set lead = null %}{% endif %}
+  {%- if hero_image or lead %}
+  <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
+  {%- endif %}
+  {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
 {% include "backlinks.njk" %}

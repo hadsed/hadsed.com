@@ -65,7 +65,7 @@ test("wikilinks resolve to project, experience, and blog pages; embeds become im
   assert.match(html, /<a href="\/experience\/#ontra">the Ontra years<\/a>/);
   assert.match(html, /<a href="\/experience\/#ontra">Ontra<\/a>/);
   assert.match(html, /<a href="\/blog\/2026-01-02-zz-fixture-links\/">Links fixture<\/a>/);
-  assert.match(html, /<img src="\/assets\/diagram.png" alt="">/);
+  assert.match(html, /<figure class="figure"><img src="\/assets\/diagram.png" alt="" loading="lazy"><\/figure>/);
   assert.doesNotMatch(html, /\[\[/);
   assert.match(read("experience/index.html"), /id="ontra"/);
 });

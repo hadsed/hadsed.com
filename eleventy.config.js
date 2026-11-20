@@ -1,4 +1,6 @@
 import { basename, dirname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
 
 export default function (eleventyConfig) {
@@ -93,11 +95,9 @@ export default function (eleventyConfig) {
         const inline = tokens[i + 1];
         const id = uniqueId(slugify(inline.content), seen);
         tokens[i].attrSet("id", id);
-        if (tokens[i].tag !== "h1") {
-          const open = new state.Token("html_inline", "", 0);
-          open.content = `<a class="anchor" href="#${id}" aria-hidden="true">#</a>`;
-          inline.children.unshift(open);
-        }
+        const open = new state.Token("html_inline", "", 0);
+        open.content = `<a class="anchor" href="#${id}" aria-hidden="true">#</a>`;
+        inline.children.unshift(open);
       }
     });
   });
@@ -106,22 +106,33 @@ export default function (eleventyConfig) {
   // Embeds: ![[image.png]] becomes an image; ![[viz.html]], a self-contained page from content/assets,
   // runs in its own frame inside the page (its CSS and JS can't touch the site's).
   const embedFrame = (file) =>
-    `<iframe class="embed-frame" src="/assets/${file}" title="${file.replace(/\.html$/, "")}" loading="lazy" allow="fullscreen; xr-spatial-tracking"></iframe>`;
+    `<iframe class="embed-frame" src="/assets/${encodeURI(file)}" title="${file.replace(/\.html$/, "")}" loading="lazy" allow="fullscreen; xr-spatial-tracking"></iframe>`;
+  // ![[pic.png|600]] sets a width, as in Obsidian; any other text after the | is the alt text,
+  // and an image on its own line shows that text as a caption.
+  const embedImage = (file, alias) => {
+    const width = alias && /^\d+(x\d+)?$/.test(alias.trim()) ? alias.trim().split("x")[0] : null;
+    const alt = alias && !width ? alias.trim() : "";
+    return `<img src="/assets/${encodeURI(file)}" alt="${alt}"${width ? ` width="${width}"` : ""} loading="lazy">`;
+  };
   eleventyConfig.addTransform("wikilinks", function (content) {
     if (!(this.page.outputPath || "").endsWith(".html")) return content;
     const where = this.page.inputPath;
     const self = model.byUrl.get(this.page.url);
     return content
-      .replace(/<p>\s*!\[\[([^\]|]+\.html)(?:\|([^\]]+))?\]\]\s*<\/p>/g, (m, file, caption) =>
-        `<figure class="embed">${embedFrame(file.trim())}${caption ? `<figcaption>${caption.trim()}</figcaption>` : ""}</figure>`)
+      .replace(/<p>\s*!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*<\/p>/g, (m, file, alias) => {
+        file = file.trim();
+        if (file.endsWith(".html")) return `<figure class="embed">${embedFrame(file)}${alias ? `<figcaption>${alias.trim()}</figcaption>` : ""}</figure>`;
+        const caption = alias && !/^\d+(x\d+)?$/.test(alias.trim()) ? `<figcaption>${alias.trim()}</figcaption>` : "";
+        return `<figure class="figure">${embedImage(file, alias)}${caption}</figure>`;
+      })
       .replace(/(!?)\[\[([^\]|#]*)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g, (match, embed, name, heading, alias) => {
         name = name.trim();
-        if (embed) return name.endsWith(".html") ? embedFrame(name) : `<img src="/assets/${name}" alt="${alias ? alias.trim() : ""}">`;
+        if (embed) return name.endsWith(".html") ? embedFrame(name) : embedImage(name, alias);
         const hit = name ? model.targets.get(name) : self;
         if (!hit) throw new Error(`Unresolved wikilink ${match} in ${where}`);
         let href = hit.url;
         if (heading) {
-          const id = slugify(heading);
+          const id = slugify(heading.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
           if (hit.headings && hit.kind !== "experience" && !hit.headings.has(id)) {
             throw new Error(`Wikilink ${match} in ${where}: ${hit.url} has no heading "${heading.trim()}"`);
           }
@@ -135,11 +146,6 @@ export default function (eleventyConfig) {
   // Absolute URLs for link previews. Branch previews set SITE_URL to their own
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
-  // share_image: a file in assets/, written bare ("hero.jpg") or as an Obsidian embed ("[[hero.jpg]]", "![[hero.jpg|alt]]").
-  eleventyConfig.addFilter("shareImagePath", (value) => {
-    const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");
-    return `/assets/${encodeURI(name)}`;
-  });
 
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
 
@@ -166,6 +172,26 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("readableDate", (date) =>
     new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(asDate(date))
   );
+  // A hero or share image in front matter (hero_image / share_image: hero.jpg, or "[[hero.jpg]]" as Obsidian
+  // writes it) is a file in content/assets. A name that isn't there fails the build rather than shipping a broken image.
+  eleventyConfig.addFilter("assetUrl", (value) => {
+    if (!value) return "";
+    const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");
+    if (!existsSync(`content/assets/${name}`) && !existsSync(`src/assets/${name}`)) throw new Error(`${value} is not in content/assets`);
+    return `/assets/${encodeURI(name)}`;
+  });
+  // With no hero_image in front matter, an image embed on the first line of a post or project is the
+  // hero, so the note shows it at the top in Obsidian too. The page renders it once, as the hero
+  // (the embed is still raw <p>![[...]]</p> here; the wikilinks transform runs later).
+  eleventyConfig.addFilter("leadImage", (inputPath) => {
+    const path = String(inputPath || "").replace(/^\.\//, "");
+    if (!/^content\/(blog|projects)\/[^/]+\.md$/.test(path) || !existsSync(path)) return null;
+    const first = matter(readFileSync(path, "utf8")).content.split("\n").find((line) => line.trim());
+    const m = first && first.trim().match(/^!\[\[([^\]|]+\.(?:png|jpe?g|gif|webp|avif|svg))(?:\|([^\]]*))?\]\]$/i);
+    if (!m) return null;
+    return { src: m[1].trim(), alt: m[2] && !/^\d+(x\d+)?$/.test(m[2].trim()) ? m[2].trim() : "" };
+  });
+  eleventyConfig.addFilter("dropLeadFigure", (html) => String(html).replace(/^\s*<p>!\[\[[^\]]*\]\]<\/p>/, ""));
   // "2026-10" -> "October 2026"; a bare year stays as is.
   eleventyConfig.addFilter("monthYear", (value) => {
     const m = String(value).match(/^(\d{4})-(\d{2})/);
