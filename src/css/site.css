@@ -337,7 +337,7 @@ h1 .status { margin-left: 0.6rem; }
 .page:has(.reading.has-toc) { max-width: 80rem; }
 .reading.has-toc {
   display: grid;
-  grid-template-columns: minmax(0, var(--measure)) minmax(11rem, 15rem);
+  grid-template-columns: minmax(0, var(--measure)) minmax(12rem, 17rem);
   column-gap: 3.5rem;
   align-items: start;
 }
@@ -349,21 +349,29 @@ h1 .status { margin-left: 0.6rem; }
 }
 .toc-side .label { margin-bottom: 0.75rem; }
 .toc-inline { display: none; }
-.toc, .toc ol { list-style: none; margin: 0; padding: 0; }
-.toc li { margin: 0; }
-.toc-1 { margin-bottom: 0.4rem; }
+/* Outline like Obsidian's: nested levels hang off thin guide lines; a chevron folds a section. */
+.toc ol { list-style: none; margin: 0; padding: 0; }
+.toc li { position: relative; margin: 0; }
+.toc ol ol { margin-left: 0.55rem; padding-left: 0.65rem; border-left: 1px solid color-mix(in srgb, var(--rule) 30%, transparent); }
 .toc a {
-  display: block; padding: 0.15rem 0 0.15rem 0.7rem; margin-left: -1px;
-  border-left: 1px solid color-mix(in srgb, var(--rule) 30%, transparent);
-  color: var(--muted); line-height: 1.4; text-decoration: none;
+  display: block; padding: 0.2rem 0.4rem 0.2rem 1.05rem; border-radius: 4px;
+  color: var(--text); line-height: 1.4; text-decoration: none;
 }
-.toc-1 > a { color: var(--text); }
-.toc-2 a { padding-left: 1.4rem; font-size: 0.95em; }
-.toc a:hover { color: var(--bright); text-decoration: none; }
-.toc a[aria-current] { color: var(--pink); border-left-color: var(--pink); }
-/* The side list shows the subsections of the section being read. */
-.toc-side .toc-1 > ol { display: none; }
-.toc-side .toc-1.open > ol { display: block; }
+.toc ol ol a { color: var(--muted); }
+.toc a:hover { color: var(--bright); background: color-mix(in srgb, var(--rule) 12%, transparent); text-decoration: none; }
+.toc a[aria-current] { color: var(--pink); background: color-mix(in srgb, var(--pink) 10%, transparent); }
+.toc-fold {
+  position: absolute; left: -0.1rem; top: 0.2rem; width: 1rem; height: 1.15rem; padding: 0;
+  border: 0; background: none; cursor: pointer; color: var(--muted); opacity: 0.7;
+}
+.toc-fold::before {
+  content: ""; position: absolute; left: 0.3rem; top: 0.35rem; width: 0.32rem; height: 0.32rem;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+.toc-fold[aria-expanded="false"]::before { transform: rotate(-45deg); }
+.toc-fold:hover { opacity: 1; color: var(--bright); }
+.toc-fold[aria-expanded="false"] ~ ol { display: none; }
 
 @media (max-width: 1000px) {
   .reading.has-toc { display: block; }
@@ -385,28 +393,48 @@ h1 .status { margin-left: 0.6rem; }
 .prose .kind a, .prose .appears a { color: var(--text); }
 .prose .appears a { text-decoration-color: color-mix(in srgb, var(--text) 40%, transparent); }
 
-/* Obsidian callouts: > [!note] Title. The color follows the type. */
+/* Obsidian callouts: > [!note] Title. A box like Obsidian's: a tinted title bar with the type's
+   icon, a dashed seam, then the body. Color and icon follow the type. */
 .callout {
-  --c: var(--pink);
-  margin: 1.5rem 0; padding: 0.8rem 1.1rem;
-  border-left: 2px solid var(--c); border-radius: 0 4px 4px 0;
-  background: color-mix(in srgb, var(--c) 7%, rgba(15, 21, 32, 0.6));
-  color: var(--text);
+  --c: #6ea8ff; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
+  margin: 1.75rem 0; padding: 0;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); border-radius: 6px;
+  background: color-mix(in srgb, var(--c) 5%, rgba(15, 21, 32, 0.75));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  color: var(--text); overflow: hidden;
 }
-.callout > :last-child { margin-bottom: 0; }
-.callout-title { margin: 0 0 0.45rem; color: var(--c); font-weight: 700; }
-.callout-title:last-child { margin: 0; }
-.callout img { display: block; margin: 0.5rem 0 0; }
-details.callout > summary { cursor: pointer; }
-details.callout:not([open]) > summary { margin: 0; }
+.callout > :not(.callout-title), .prose .callout > :not(.callout-title) { margin-left: 1.1rem; margin-right: 1.1rem; }
+.callout > .callout-title + *, .prose .callout > .callout-title + * { margin-top: 0.85rem; }
+.callout > :last-child, .prose .callout > :last-child { margin-bottom: 1rem; }
+.callout-title {
+  display: flex; align-items: center; gap: 0.55rem;
+  margin: 0 !important; padding: 0.6rem 1.1rem;
+  background: color-mix(in srgb, var(--c) 20%, transparent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--c) 55%, transparent);
+  color: color-mix(in srgb, var(--c) 70%, white); font-weight: 700;
+}
+.callout-title::before {
+  content: ""; flex: none; width: 1.05em; height: 1.05em;
+  background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+}
+.callout-title:last-child { border-bottom: 0; }
+.callout img { display: block; margin: 0.6rem 0 0; }
+details.callout > summary { cursor: pointer; list-style: none; }
+details.callout > summary::-webkit-details-marker { display: none; }
+details.callout > summary::after { content: "\203A"; margin-left: auto; transition: transform 0.15s; }
+details.callout[open] > summary::after { transform: rotate(90deg); }
+details.callout:not([open]) > summary { border-bottom: 0; }
 .callout :is(strong, em, a) { color: var(--bright); }
 .callout a { text-decoration-color: color-mix(in srgb, var(--bright) 40%, transparent); }
-.callout-tip, .callout-hint, .callout-success, .callout-check, .callout-done { --c: #5fd3a8; }
-.callout-question, .callout-help, .callout-faq, .callout-todo { --c: var(--glow); }
-.callout-warning, .callout-caution, .callout-attention { --c: #f0a35a; }
-.callout-danger, .callout-error, .callout-bug, .callout-failure, .callout-fail, .callout-missing { --c: #ff6b6b; }
-.callout-example { --c: #b18cff; }
-.callout-quote, .callout-cite { --c: var(--muted); }
+.callout-info, .callout-todo { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E"); }
+.callout-abstract, .callout-summary, .callout-tldr { --c: #53c7e0; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3C/svg%3E"); }
+.callout-tip, .callout-hint, .callout-important { --c: #53c7e0; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.150.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z'/%3E%3C/svg%3E"); }
+.callout-success, .callout-check, .callout-done { --c: #5fd3a8; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
+.callout-question, .callout-help, .callout-faq { --c: var(--glow); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E"); }
+.callout-warning, .callout-caution, .callout-attention { --c: #f0a35a; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E"); }
+.callout-failure, .callout-fail, .callout-missing, .callout-danger, .callout-error, .callout-bug { --c: #ff6b6b; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'/%3E%3C/svg%3E"); }
+.callout-example { --c: #b18cff; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E"); }
+.callout-quote, .callout-cite { --c: var(--muted); --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z'/%3E%3Cpath d='M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z'/%3E%3C/svg%3E"); }
 
 /* Article themes, candidates on branch previews (the switcher sets data-theme on <html>).
    A, Ramp (the default): one typeface, size, weight and a rule set the levels apart. */
@@ -456,9 +484,6 @@ details.callout:not([open]) > summary { margin: 0; }
   color: var(--bright);
   background: linear-gradient(transparent 60%, color-mix(in srgb, var(--pink) 45%, transparent) 60%, color-mix(in srgb, var(--pink) 45%, transparent) 92%, transparent 92%);
 }
-[data-theme="c"] .toc { counter-reset: t1; }
-[data-theme="c"] .toc-1 { counter-increment: t1; }
-[data-theme="c"] .toc-1 > a::before { content: counter(t1, decimal-leading-zero); margin-right: 0.6rem; font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--pink); }
 
 /* The preview-only theme picker */
 .theme-switcher {

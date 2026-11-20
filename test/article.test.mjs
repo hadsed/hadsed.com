@@ -23,8 +23,11 @@ test("plain blockquotes stay blockquotes", () => {
   assert.match(md.render("> just a quote\n"), /^<blockquote>/);
 });
 
-test("the table of contents keeps the top two heading levels, relative to the first", () => {
-  const html = '<h2 id="a"><a class="anchor" href="#a" aria-hidden="true">#</a>A &amp; B</h2><h3 id="b">B <em>x</em></h3><h4 id="c">C</h4>';
-  assert.deepEqual(tocFrom(html), [{ id: "a", text: "A & B", depth: 1 }, { id: "b", text: "B x", depth: 2 }]);
+test("the table of contents is an outline of three levels, counted from the first", () => {
+  const html = '<h2 id="a"><a class="anchor" href="#a" aria-hidden="true">#</a>A &amp; B</h2><h3 id="b">B <em>x</em></h3><h4 id="c">C</h4><h5 id="d">D</h5><h2 id="e">E</h2>';
+  assert.deepEqual(tocFrom(html), [
+    { id: "a", text: "A & B", children: [{ id: "b", text: "B x", children: [{ id: "c", text: "C", children: [] }] }] },
+    { id: "e", text: "E", children: [] },
+  ]);
   assert.deepEqual(tocFrom("<p>none</p>"), []);
 });
