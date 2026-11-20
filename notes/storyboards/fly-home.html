@@ -136,7 +136,10 @@ window.__siteHook = (doc) => {
   // The menu hasn't been parsed yet: add Fly the moment it is, before it can paint without it.
   const mo = new MutationObserver(() => { if (doc.querySelector('.menu ul')) { mo.disconnect(); decorateSite(doc); } });
   mo.observe(doc, { childList: true, subtree: true });
-  doc.addEventListener('DOMContentLoaded', () => { mo.disconnect(); decorateSite(doc); }, { once: true });
+  doc.addEventListener('DOMContentLoaded', () => {
+    mo.disconnect(); decorateSite(doc);
+    requestAnimationFrame(() => requestAnimationFrame(() => startSky()));   // the text is on screen
+  }, { once: true });
 };
 site.addEventListener('load', () => {
   styleSite(); decorateSite();   // pages without the hook (and a safety net)
@@ -144,14 +147,29 @@ site.addEventListener('load', () => {
   try { site.contentWindow.addEventListener('keydown', onKey); } catch {}
 });
 {
-  const p = new URLSearchParams(location.search).get('p');
-  site.src = (p && p.startsWith('/') && !p.startsWith('//') ? p : '/') + location.hash;
+  // Which page to show: ?p= after base.njk's redirect, or this URL itself when the site's Pages
+  // Function served this wrapper straight at the page's address (functions/_middleware.js).
+  const q = new URLSearchParams(location.search), p = q.get('p');
+  q.delete('mach20');
+  const own = location.pathname.startsWith('/lab/') ? '/' : location.pathname + (q.size ? `?${q}` : '');
+  site.src = (p && p.startsWith('/') && !p.startsWith('//') ? p : own) + location.hash;
 }
 // The sky loads behind the site and fades up when it has settled next to a live jet (or found none).
+// Text first: it starts only once the page's text has painted (two frames after the framed page's
+// DOMContentLoaded, or its load, or 10 s at the latest), so on a slow connection its few MB never
+// compete with the page people came to read.
+let startSky = () => {};
 {
   const o = new URLSearchParams(location.search).get('mach20');
   if (o && !/(^|\.)hadsed\.com$/.test(location.hostname) && /^https?:\/\/[a-z0-9.:-]+$/i.test(o)) M.origin = o;
-  skyFrame.src = `${M.origin}/play/?embed=1&mode=watch&map=${encodeURIComponent(M.map)}&server=${encodeURIComponent(M.server)}`;
+  let started = false;
+  startSky = () => {
+    if (started) return;
+    started = true;
+    skyFrame.src = `${M.origin}/play/?embed=1&mode=watch&map=${encodeURIComponent(M.map)}&server=${encodeURIComponent(M.server)}`;
+  };
+  site.addEventListener('load', startSky, { once: true });
+  setTimeout(startSky, 10000);
 }
 // Say hello until the game answers (its listener starts once its modules load), then wait for ready.
 const waitSky = setInterval(() => {

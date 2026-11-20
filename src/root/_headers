@@ -6,13 +6,9 @@ https://:project.pages.dev/*
 https://:version.:project.pages.dev/*
   X-Robots-Tag: noindex
 
-# Caching. Pages stay max-age=0 (Cloudflare's default) so a vault edit shows up on the next visit.
-# Fonts never change under the same name, and site.css is linked as /css/site.css?v=<content hash>
-# (base.njk), so both can stay in the browser for a year.
+# Caching. Pages stay max-age=0 (Cloudflare's default) so a vault edit shows up on the next visit;
+# their CSS is inline (base.njk). Fonts never change under the same name: a year in the browser.
 /fonts/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/css/*
   Cache-Control: public, max-age=31536000, immutable
 
 # Images and other media keep their names when edited: a day fresh, then revalidated in the background.

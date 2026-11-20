@@ -1,5 +1,4 @@
 import { basename, dirname } from "node:path";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId, isoDate } from "./lib/content.mjs";
 
@@ -148,11 +147,10 @@ export default function (eleventyConfig) {
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
   eleventyConfig.addGlobalData("buildDate", () => new Date().toISOString().slice(0, 10));
 
-  // Content hashes for files linked with ?v=: their URL changes when they do, so _headers can
-  // let browsers keep them for a year.
-  eleventyConfig.addGlobalData("assetHash", () =>
-    Object.fromEntries(["css/site.css"].map((file) =>
-      [file, createHash("sha256").update(readFileSync(`src/${file}`)).digest("hex").slice(0, 10)]))
+  // The stylesheet goes inline in every page's <head>: text can paint as soon as the HTML lands,
+  // with no second request in its way on a slow connection. Comments and runs of whitespace go.
+  eleventyConfig.addGlobalData("siteCss", () =>
+    readFileSync("src/css/site.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ").replace(/\s*([{};,>])\s*/g, "$1").replace(/:\s+/g, ":").trim()
   );
 
   eleventyConfig.addFilter("isoDate", (value) => (value instanceof Date ? value.toISOString().slice(0, 10) : isoDate(value)));
