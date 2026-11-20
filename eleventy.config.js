@@ -151,9 +151,6 @@ export default function (eleventyConfig) {
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
 
-  // Branch previews only: a switcher between menu layouts, side column or top row (see site.css).
-  eleventyConfig.addGlobalData("themeSwitcher", () => Boolean(process.env.SITE_URL || process.env.LAB));
-
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
 
   eleventyConfig.addFilter("year", (value) =>

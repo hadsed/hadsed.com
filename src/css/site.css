@@ -336,10 +336,12 @@ h1 .status { margin-left: 0.6rem; }
 
 /* A post with sections gets a Contents column on the right. Narrower screens fold it
    into a "Contents" drop-down under the title. */
-:root:has(.reading.has-toc) { --page-width: 80rem; }
+/* Wide enough for menu, article and a 15rem contents column, no more: the page stays centered
+   with the same margin outside the menu as outside the contents. */
+:root:has(.reading.has-toc) { --page-width: 72rem; }
 .reading.has-toc {
   display: grid;
-  grid-template-columns: minmax(0, var(--measure)) minmax(12rem, 17rem);
+  grid-template-columns: minmax(0, var(--measure)) 15rem;
   column-gap: 3.5rem;
   align-items: start;
 }
@@ -455,37 +457,3 @@ details.callout:not([open]) > summary { border-bottom: 0; }
 .prose h3, .prose h4 { font-size: 0.92rem; font-weight: 700; color: var(--bright); margin: 1.5rem 0 0.4rem; }
 .prose :is(h1, h2, h3, h4) + :is(h2, h3, h4) { margin-top: 0.6rem; }
 .prose :is(h1, h2, h3, h4) + :is(.figure, .embed, .callout) { margin-top: 0.75rem; }
-
-/* Mockup on branch previews: the menu as a row across the top on wide screens too, as on phones
-   (data-nav="top" on <html>, set by the preview's layout switcher). */
-@media (min-width: 641px) {
-  :root[data-nav="top"] { --page-width: 64rem; }
-  :root[data-nav="top"]:has(.reading.has-toc) { --page-width: 68rem; }
-  [data-nav="top"] .page { grid-template-columns: minmax(0, 1fr); row-gap: 2.75rem; }
-  [data-nav="top"] .menu {
-    position: static !important; width: auto !important; padding: 0 !important;
-    display: flex !important; flex-direction: row !important; align-items: baseline; gap: 2.5rem;
-  }
-  [data-nav="top"] .site-name + ul { margin-top: 0; }
-  [data-nav="top"] .menu ul.nav { flex: 1 1 auto; display: flex; flex-direction: row !important; align-items: baseline; }
-  [data-nav="top"] .menu .nav-scroll > ul { display: flex; flex-direction: row; gap: 1.5rem; }
-  [data-nav="top"] .menu .nav-gap { width: 0.75rem; height: auto; }
-  [data-nav="top"] .menu li { margin: 0; }
-  [data-nav="top"] .menu .fly-item { margin: 0 0 0 auto !important; align-self: center; }
-  [data-nav="top"] main { grid-column: auto !important; }
-}
-
-/* The preview-only layout picker */
-.preview-switcher {
-  position: fixed; z-index: 10; right: 1rem; bottom: 1rem;
-  display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.5rem;
-  background: rgba(15, 21, 32, 0.92); border: 1px solid color-mix(in srgb, var(--rule) 50%, transparent); border-radius: 4px;
-  font: 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--muted);
-}
-.preview-switcher span { letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.2rem; }
-.preview-switcher button {
-  font: inherit; color: var(--text); background: none; cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--rule) 40%, transparent); border-radius: 3px; padding: 0.3rem 0.45rem;
-}
-.preview-switcher button[aria-pressed="true"] { color: var(--pink); border-color: var(--pink); }
-@media (max-width: 640px) { .preview-switcher { display: none; } }
