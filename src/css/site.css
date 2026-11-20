@@ -86,7 +86,7 @@ footer {
   .menu .nav-scroll > ul.at-end { --fade: 0px; }
   .menu .nav-scroll > ul.scrolled { --fade-l: 1.5rem; }
   .menu .nav-scroll li { flex: none; white-space: nowrap; }
-  .menu .fly-item { flex: none; margin-left: 0.75rem !important; }
+  .menu .fly-item { flex: none; margin-left: 1.5rem !important; }
 }
 
 /* Timeline */
