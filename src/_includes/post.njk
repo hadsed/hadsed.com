@@ -8,7 +8,9 @@ layout: base.njk
   {%- if projectsIn %}
   <p class="appears">Appears in {% for p in projectsIn %}<a href="{{ p.url }}">{{ p.title }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
   {%- endif %}
-  {%- set lead = page.inputPath | leadImage if not hero_image else null %}
+  {#- A first-line image embed is the hero when hero_image is unset, or when it is the same file. #}
+  {%- set lead = page.inputPath | leadImage %}
+  {%- if lead and hero_image and (hero_image | assetUrl) != (lead.src | assetUrl) %}{% set lead = null %}{% endif %}
   {%- if hero_image or lead %}
   <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
   {%- endif %}

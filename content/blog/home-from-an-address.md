@@ -1,10 +1,20 @@
 ---
-title: A house from its address
-date: 2026-11-20
-slug: home-from-an-address
-summary: Rebuilding a real San Francisco house in editable 3D from public data, with agents doing the work and fixed code doing the judging.
+title: Reconstructing a home from its address
+date: 2026-10-28
+summary: Rebuilding a real San Francisco house in editable 3D from public data with agents.
+hero_image: "[[hero-kitchen-edges.gif]]"
+hero_image_alt: Model edges drawn over the kitchen listing photo, from the first build through seven refine rounds
+share_image: "[[hero-kitchen-edges.jpg]]"
+share_image_alt: Model edges over a kitchen listing photo, green where they match the photo and red where they miss
 ---
-![[home-from-an-address/address-to-3d-home-2x-crop.gif|600]]
+![[hero-kitchen-edges.gif|600]]
+
+> [!tldr] TL;DR
+> - I built a San Francisco house as an editable 3D model from public data collected using its address using a modified coding harness powered by Claude Opus and GPT-6 Astra
+> - The public data consists of floor plans, listing photos, aerial images, LiDAR and city records.
+> - Run 1 took 9.5 hours and ~$190. Run 2 reused and optimized run 1's lessons into skills and took 2 hours and ~$83 for about half the work.
+> - The cost of reconstructing every space in the entire house is estimated $1-3k+
+> - We discuss the architecture of the task, how to decompose tasks and data, and look at how ML models and computer vision algorithms make the agent work
 
 I recently worked with a company which ran marketing and sales for remodeling contractors. The main entity of business is a home remodeling project.
 
@@ -13,7 +23,7 @@ There are lots of ways to understand a remodeling project, but probably the most
 You just need a few things to create an editable digital replica of a home:
 - An address
 - An advanced coding agent (GPT-6 Astra or similar)
-- Compute ($50-200 for partial runs, an estimated $1-2.5k+ for a full attempt)
+- Compute ($50-200 for partial runs, an estimated $1-3k+ for a full attempt)
 - Some AI and ML know-how
 
 Most 3D scene reconstruction demos of homes, streets, and cities show feasibility in some sense but don't give clarity on the methodology and costs. I'll show you a design for one use-case and use it to help gauge costs. I do one run to show what the design can lead to "out-of-the-box", and a second run which optimizes a few things from the first. It shows a glimmer of how a specialized design, harness features, and ML models can help drive down time and cost, while also giving some intuition on where we're bottlenecked by VLLM capabilities. This isn't a scientific study, just some practical field notes to give some intuition around technical feasibility and cost structure.
@@ -24,7 +34,7 @@ I ran the agent twice on the address of a San Francisco house I used to live in.
 
 It is worth noting that AI doing new things with public data may create new legitimate privacy issues, so do exercise caution if you plan to leverage this work. My best advice is to put yourself in the shoes of homeowners and ask how your application may impact them in the immediate term as well as in the long run.
 
-The first run was to develop the methodology against an architecture I had in mind (see the Architecture section). For each of the tasks and subagents I tested different methods to review their performance manually, and to try and quantify errors to come up with good task objectives. Once the methods were nailed down I did a full run which took 9.5 hours and a $200 budget cap.
+The first run was to develop the methodology against an architecture I had in mind (see the [[#Architecture|Architecture section]]). For each of the tasks and subagents I tested different methods to review their performance manually, and to try and quantify errors to come up with good task objectives. Once the methods were nailed down I did a full run which took 9.5 hours and a $200 budget cap.
 
 The second run was to distill the lessons from the first run into reusable skills to see if I could reproduce similar results with less cost in less time. This run had a $100 budget cap and took 2 hours, though it did not do the same amount of work (about half of the first run's work, in fact).
 
@@ -36,25 +46,28 @@ This visual shows the difference in work between the two:
 
 Much of the shell of the house was mapped out in both runs, but the second run only focused on the main floor.
 
-See the Costs section for how the work and budget break down further. We don't have ground-truth data since this is a real home. I show performance measures in specific contexts to help with comparing runtime costs, but the ultimate performance measure is 3D model fidelity as judged through photos by a human (me, and I suppose you).
+See the [[#Costs|Costs section]] for how the work and budget break down further. I don't have ground-truth data since this is a real home. I show performance measures in specific contexts to help with comparing runtime costs, but the ultimate performance measure is 3D model fidelity as judged through photos by a human (me, and I suppose you).
+
+![[home-from-an-address/hero/address-to-3d-tour.gif|600]]
+
 # Data
-It's useful to just look at inputs and outputs as a start. We'll see how cross-referencing can help the model triangulate sizes, measurements, positions, etc. in the tasks sections.
+It's useful to just look at inputs and outputs as a start. We'll see how cross-referencing can help the model triangulate sizes, measurements, positions, etc. in the [[#Build|task sections]].
 ## Input
 The following data was all found in the Research phase (see Architecture).
 
-| Input                 | Example                                     | What it tells us                                                  | 653 Arkansas has                                           |
+| Input                 | Example                                     | What it tells us                                                  | This house has                                             |
 | --------------------- | ------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------- |
 | **Floor plans**       | ![[home-from-an-address/plan/input-A.svg]] | Rooms, walls, doors, windows, dimensions, per level               | 3-level dimensioned plan, site plan, assessor map          |
 | **Interior photos**   | ![[home-from-an-address/plan/input-B.svg]] | What each room looks like: cabinets, finishes, ceiling heights    | ~100 listing photos covering every main room               |
 | **Exterior photos**   | ![[home-from-an-address/plan/input-C.svg]] | Facades, front steps, decks, yard                                 | Street View (15 dates), listing exteriors, yard/deck shots |
 | **Aerial photos**     | ![[home-from-an-address/plan/input-D.svg]] | Roof shape, rear and sides, yard layout                           | Satellite, 8 obliques, 9 drone                             |
 | **Measured geometry** | ![[home-from-an-address/plan/input-E.svg]] | True outline and height in meters                                 | City footprint polygon, LiDAR (USGS 3DEP, 2023)            |
-| **Records**           | ![[home-from-an-address/plan/input-F.svg]] | Size, beds/baths, year built, past remodels, listing descriptions | Assessor, permits, 2025 and 2006 listings                  |
+| **Records**           | ![[home-from-an-address/plan/input-F-2.svg]] | Size, beds/baths, year built, past remodels, listing descriptions | Assessor, permits, 2025 and 2006 listings                  |
 
 ## Outputs
 ### Site tree
 ```
-Site: 653 Arkansas St
+Site: < home address >
 ├── Level: Lower
 │   ├── Space: Garage
 │   ├── Space: In-law kitchen
@@ -100,7 +113,7 @@ This task graph is orchestrated by an intelligent model in a coding harness (Cla
 - **Build:** create an initial set of output data using task-specific subagents
 - **Refinement:** use the smartest vision agent to find and correct errors
 
-In the Research stage we simply instruct the orchestrator (Opus in Claude Code) to execute a fairly standard deep research run on the internet to find as much of the input data as possible.
+In the Research stage I simply instruct the orchestrator (Opus in Claude Code) to execute a fairly standard deep research run on the internet to find as much of the input data as possible.
 
 In the Build stage, each task has one or more error metrics to optimize against. Implementation is done by a subagent, and verification by another subagent. Tasks get up to 5 iterations until the orchestrator moves downstream in the task graph.
 
@@ -115,9 +128,9 @@ The orchestrator is the connective tissue across all phases and subagents. I thi
 
 It may seem like the orchestrator is overextended, but the beauty of this approach is that it's extremely flexible and able to learn continuously. With the help of the right data structures and target outputs, it can notice issues anywhere in the system and both correct the output data as well as improve the system itself.
 
-> [!note] Why Astra over Fable?
+> [!note] Why Astra?
 > Understanding the spatial intelligence of various models is challenging. I created a benchmark that judged how well a model could mark the same surface point on a 3D object from a different angle. Astra was the most precise model. Since I haven't written up that benchmark yet, I'll just provide a preview of what it looks like:
-> ![[home-from-an-address/plan/pointing-example-grease-nipple-2.png|Pointing benchmark example]]
+> ![[home-from-an-address/plan/pointing-grease-nipple-all.png|Pointing benchmark example]]
 
 # Design principles
 ## Task decomposition & refinement
@@ -127,13 +140,13 @@ The output data gives a few hints for how this helps. It's easy to build the she
 
 Decomposition lets us turn a very hard problem that has never been solved into small problems that have already been solved by ML and computer vision, sometimes decades ago (e.g., RANSAC plane fitting, closed-form similarity fit, DINO, SAM, and Pi3X).
 
-Decomposition is cheap in time and money, and works most of the time. But the world is not perfectly decomposable. Sometimes you need to treat the full thing holistically. For examples of what refinement can detect that a single task objective would miss, see _What it caught_ in _Refinement_.
+Decomposition is cheap in time and money, and works most of the time. But the world is not perfectly decomposable. Sometimes you need to treat the full thing holistically. For examples of what refinement can detect that a single task objective would miss, see [[#Example errors]] in the [[#Refine|Refine section]].
 ## Site decomposition
 Task decomposition organizes the capabilities we need from the agent. We'll want to do the same thing with the data.
 
 Fundamentally the home is a collection of rooms, doors, spaces (indoor and out), and more. We saw the site tree before:
 ```
-Site: 653 Arkansas St
+Site: < home address >
 ├── Level: Lower
 │   ├── Space: Garage
 │   ├── Space: In-law kitchen
@@ -157,7 +170,7 @@ In theory we could skip the Build phase and fully rely on Refinement. This is fi
 
 If we take a continual learning view, we might push our evaluations and learnings from the Refine stage to the Build phase over some number of full agent runs. In this study I only execute two runs, but even there we can see glimmers of this working (the initial run takes 9.5 hours, but the second run is only 2 hours). The optimization for run 2 was done by an agent. In a loop, you might call this a **self-improving harness**.
 
-There's another aspect of continual learning. In the Refine section we discuss a number of errors as well as the score. The scores are continuously updated to capture things the scorers miss but are detected through other means like visual inspection. I like to call this a **self-improving evaluation**.
+There's another aspect of continual learning. In the [[#Refine|Refine section]] I discuss a number of errors as well as the score. The scores are continuously updated to capture things the scorers miss but are detected through other means like visual inspection. I like to call this a **self-improving evaluation**.
 # Build
 ## Outer shell
 
@@ -215,7 +228,7 @@ Useful error measures:
 
 ![[home-from-an-address/tasks/05-overview.svg|Reconstructing a point cloud and cameras from kitchen photos.]]
 
-As we explained in the 3D scene models section earlier, we can reverse engineer each photo to create a camera and a colored point cloud. The key idea is to think about stereo vs monocular vision: the fact that you have two eyes from slightly different positions allows for 3D reasoning.
+As I explained in the [[#Scene models & photo cameras|3D scene models section]] earlier, we can reverse engineer each photo to create a camera and a colored point cloud. The key idea is to think about stereo vs monocular vision: the fact that you have two eyes from slightly different positions allows for 3D reasoning.
 
 Similarly, we can cross-reference the same point from different photos and match points from their point clouds to create the final scene data.
 
@@ -345,9 +358,9 @@ These were all cases where the scorer could not detect a particular issue. Note 
 
 A similar thing happens with hard failures. These are checks made by code, but some of the drop in failures results from a false alarm which triggers an agent review and a subsequent updating of the failure checking code. The four remaining ones were judged as false alarms, though worth noting that agent effort was spent on fixing issues rather than updating the checking code for those cases. There's a reasonable case here to make for separating evaluation improvements explicitly.
 
-Below we show three visual examples of what happens across refinement iterations in a space from one camera. The first round (v000) is immediately after the Build phase.
+Below I show three visual examples of what happens across refinement iterations in a space from one camera. The first round (v000) is immediately after the Build phase.
 
-![[home-from-an-address/results/10-outer/refine-kitchen-living-bath-4.gif|Kitchen, living room and primary bath, v000 to v007]]
+![[home-from-an-address/results/10-outer/refine-kitchen-living-bath-5.gif|Kitchen, living room and primary bath, v000 to v007]]
 
 As we can see, the errors and scores didn't necessarily improve consistently with what we can tell is a visual improvement or degradation. The trends do agree however, and therefore it's interesting to see (edge) errors across iterations for all photos:
 
@@ -459,7 +472,9 @@ Below I compare the largest costs across the two runs.
 | Align to site, kitchen | $1.60             | $1.95             |
 We can't quantify how much better run 2 was since the amount of work is not the same. The point is to show the impact of a small amount of optimization, and to motivate more effort in improvement via the harness and its tools.
 # Discussion, limitations, and future work
-3D reconstruction from photos and other measurements with vision-augmented LLMs in coding harnesses is clearly feasible. It is also prohibitively expensive--I estimate a full model for each space in this home to the same degree as the kitchen and living room spaces would've costed $1-2.5k+.
+3D reconstruction from photos and other measurements with vision-augmented LLMs in coding harnesses is clearly feasible.
+
+It is also prohibitively expensive. My napkin math estimates for a full model with each space in this home would've costed $1-3k+. The runs spent $40-65 per space, using the kitchen, living room, and primary bath as cost benchmarks, or $0.8–1.2k for the 19 rooms and $2.2–3.4k for all 53 spaces.
 
 I've also shown a little evidence that improvements at the harness level with this design can drive down costs. That evidence isn't quite enough to quantify by how much. Given the heterogeneity of tasks, models, tools, and the data distribution with different spaces and styles across geographies, a quantification would be very expensive at this stage.
 
