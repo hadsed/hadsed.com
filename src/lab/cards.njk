@@ -1,0 +1,120 @@
+---
+layout: base.njk
+title: Card options
+permalink: /lab/cards/
+eleventyExcludeFromCollections: true
+---
+{#- Previews only: three ways to show hero images on project cards and the blog list, with real content. -#}
+<style>
+  .opt { margin: 0 0 4rem; }
+  .opt > h2 { font-size: 1rem; font-weight: 400; color: var(--bright, #fff); margin: 0 0 0.25rem; }
+  .opt > p.how { color: var(--muted); font-size: 0.85rem; margin: 0 0 1.25rem; max-width: 40rem; }
+  .opt .sub { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 2rem 0 0.75rem; }
+
+  /* shared card pieces */
+  .c-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; align-items: start; }
+  .c-card { border: 1px solid var(--rule); border-radius: 3px; margin: 0; overflow: hidden; }
+  .c-body { padding: 0.9rem 1.1rem 1rem; }
+  .c-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+  .c-head h3 { font-size: 1rem; font-weight: 400; margin: 0; }
+  .c-head .status { margin-left: 0; flex: none; }
+  .c-card .summary { margin: 0.3rem 0 0; }
+  .c-card .counts { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.8rem; }
+  .c-card .counts span { white-space: nowrap; }
+  .c-media { display: block; position: relative; overflow: hidden; aspect-ratio: 16 / 9; background: #0f1520; }
+  .c-media img, .c-media .hero-motion { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .c-media .card-hero { position: absolute; inset: 0; }
+  .c-media .hero-anim .hero-motion { opacity: 0; }
+  .c-media .hero-anim.playing .hero-motion { opacity: 1; }
+
+  /* A: band only on cards that have a hero, natural heights */
+  /* B: every card has the same image slot; no hero = a quiet placeholder; equal heights */
+  .opt-b .c-grid { align-items: stretch; }
+  .opt-b .c-ph { position: absolute; inset: 0; display: grid; place-items: center; color: color-mix(in srgb, var(--muted) 55%, transparent);
+    font-family: Petrona, Georgia, serif; font-size: 2.4rem; font-weight: 300;
+    background: repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 12px), #141b28; }
+  /* C: no bands; a small square thumbnail beside the title, natural heights */
+  .opt-c .c-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.9rem; align-items: start; }
+  .opt-c .c-thumb { width: 4.5rem; aspect-ratio: 1; border-radius: 2px; }
+  .opt-c .c-head { display: block; }
+  .opt-c .c-head h3 { display: inline; }
+  .opt-c .c-head .status { margin-left: 0.5rem; }
+
+  /* blog list with a side thumbnail */
+  .b-list { list-style: none; margin: 0; padding: 0; max-width: var(--measure); }
+  .b-list li { display: grid; grid-template-columns: minmax(0, 1fr) 8rem; gap: 1.25rem; align-items: start; margin: 0 0 1.5rem; }
+  .b-list .dates { margin-left: 0.5rem; }
+  .b-list .summary { margin: 0.25rem 0 0; }
+  .b-list .c-media { aspect-ratio: 4 / 3; border-radius: 2px; }
+  @media (max-width: 40rem) { .b-list li { grid-template-columns: minmax(0, 1fr) 5.5rem; gap: 0.9rem; } }
+</style>
+
+{%- macro counts(item) -%}
+<p class="counts">
+  {%- if item.updated %}<span>Last updated {{ item.updated | shortDate }}</span>{% endif %}
+  {%- if item.posts.length %}<span>, {{ item.posts.length }} post{% if item.posts.length != 1 %}s{% endif %}</span>{% endif %}
+  {%- if item.notes.length %}<span>, {{ item.notes.length }} note{% if item.notes.length != 1 %}s{% endif %}</span>{% endif %}
+</p>
+{%- endmacro %}
+{%- macro head(item) -%}
+<div class="c-head"><h3><a href="{{ item.url }}">{{ item.title }}</a></h3>{% if item.status %}<span class="status status-{{ item.status }}">{{ item.status }}</span>{% endif %}</div>
+{%- endmacro %}
+
+<h2 class="label">Card options</h2>
+<p class="meta">Hover a card to play its hero. Real projects and posts; nothing here is on the live site.</p>
+
+<section class="opt opt-a">
+  <h2>A. Image band only where there is a hero</h2>
+  <p class="how">Cards keep their natural height, so a card with a picture is taller and the others stay compact.</p>
+  <div class="c-grid">
+  {%- for item in site.projects %}
+    <article class="c-card panel-like">
+      {%- if item.hero %}<a class="c-media" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{{ item.hero | heroHtml("", true) | safe }}</a>{% endif %}
+      <div class="c-body">{{ head(item) }}<p class="summary">{{ item.summary }}</p>{{ counts(item) }}</div>
+    </article>
+  {%- endfor %}
+  </div>
+</section>
+
+<section class="opt opt-b">
+  <h2>B. Same image slot on every card</h2>
+  <p class="how">Every card has the 16:9 slot. Projects without a hero get a quiet patterned placeholder with their initial until they get one. The row lines up.</p>
+  <div class="c-grid">
+  {%- for item in site.projects %}
+    <article class="c-card">
+      <a class="c-media" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{% if item.hero %}{{ item.hero | heroHtml("", true) | safe }}{% else %}<span class="c-ph">{{ item.title | first }}</span>{% endif %}</a>
+      <div class="c-body">{{ head(item) }}<p class="summary">{{ item.summary }}</p>{{ counts(item) }}</div>
+    </article>
+  {%- endfor %}
+  </div>
+</section>
+
+<section class="opt opt-c">
+  <h2>C. Text cards with a small thumbnail</h2>
+  <p class="how">No bands. A card with a hero gets a small square beside its text; the others are plain. Closest to today's cards.</p>
+  <div class="c-grid">
+  {%- for item in site.projects %}
+    <article class="c-card">
+      <div class="c-body c-row">
+        <div>{{ head(item) }}<p class="summary">{{ item.summary }}</p>{{ counts(item) }}</div>
+        {%- if item.hero %}<a class="c-media c-thumb" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{{ item.hero | heroHtml("", true) | safe }}</a>{% endif %}
+      </div>
+    </article>
+  {%- endfor %}
+  </div>
+</section>
+
+<section class="opt">
+  <h2>Blog list with a side thumbnail</h2>
+  <p class="how">Goes with any of the three. Posts without a hero stay text only.</p>
+  <ul class="b-list">
+  {%- for post in collections.blog %}
+    {%- set hero = site.heroByUrl[post.url] %}
+    <li>
+      <div><a href="{{ post.url }}">{{ post.data.title }}</a><span class="dates">{{ post.date | readableDate }}</span>
+      {%- if post.data.summary %}<p class="summary">{{ post.data.summary }}</p>{% endif %}</div>
+      {%- if hero %}<a class="c-media" href="{{ post.url }}" tabindex="-1" aria-hidden="true">{{ hero | heroHtml("", true) | safe }}</a>{% endif %}
+    </li>
+  {%- endfor %}
+  </ul>
+</section>

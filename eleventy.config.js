@@ -12,6 +12,9 @@ export default function (eleventyConfig) {
     eleventyConfig.ignores.add(path);
   }
 
+  // src/lab/: option pages for branch previews (SITE_URL set). Production builds never include them.
+  if (!(process.env.SITE_URL || process.env.LAB)) eleventyConfig.ignores.add("src/lab/**");
+
   eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/fonts": "fonts", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
 
   // Flight (multiplayer jets) and the home that wraps the site over its live sky ship everywhere,

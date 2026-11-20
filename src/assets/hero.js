@@ -56,7 +56,7 @@
     var c = control(el);
     controls.push(c);
     if (canHover) {
-      var area = el.closest(".panel, .posts > li") || el;
+      var area = el.closest(".panel, .posts > li, .c-card, .b-list > li") || el;
       area.addEventListener("pointerenter", c.play);
       area.addEventListener("pointerleave", c.stop);
       area.addEventListener("focusin", c.play);
