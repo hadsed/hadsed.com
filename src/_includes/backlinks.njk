@@ -1,0 +1,15 @@
+{#- Every page that links here, with the sentence around the link (lib/content.mjs). -#}
+{%- set links = site.backlinks[page.url] %}
+{%- if links.length %}
+<aside class="backlinks">
+  <h2 class="label">Linked from</h2>
+  <ul>
+    {%- for b in links %}
+    <li>
+      <a href="{{ b.url }}">{{ b.title }}</a><span class="where">{% if b.kind == "blog" %}blog · {{ b.date | shortDate }}{% elif b.kind == "projects" %}project{% else %}note{% endif %}</span>
+      {%- if b.context %}<span class="context">{{ b.context | safe }}</span>{% endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+</aside>
+{%- endif %}

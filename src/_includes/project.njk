@@ -1,8 +1,40 @@
 ---
 layout: base.njk
 ---
+{%- set info = site.projectByUrl[page.url] %}
 <article class="prose">
-  <h1>{{ title }}</h1>
-  <p class="meta">{{ year }}{% if link %} · <a href="{{ link }}">{{ link | replace("https://", "") }}</a>{% endif %}</p>
+  <p class="kind"><a href="/projects/">Projects</a></p>
+  <h1>{{ title }}{% if status %} <span class="status status-{{ status }}">{{ status }}</span>{% endif %}</h1>
+  <p class="meta">
+    {%- if info.started %}Started {{ info.started | monthYear }}{% endif %}
+    {%- if info.started and info.updated %}<span class="sep">·</span>{% endif %}
+    {%- if info.updated %}updated {{ info.updated | readableDate }}{% endif %}
+    {%- if link %}<span class="sep">·</span><a href="{{ link }}">{{ link | replace("https://", "") }}</a>{% endif %}
+  </p>
   {{ content | safe }}
 </article>
+{%- if info.posts.length %}
+<section class="section">
+  <h2 class="label">Blog posts</h2>
+  <ol class="timeline">
+    {%- for post in info.posts %}
+    <li class="timeline-entry" style="--i:{{ loop.index0 }}">
+      <span class="orb"></span>
+      <a class="org" href="{{ post.url }}">{{ post.title }}</a>
+      <span class="dates">{{ post.date | shortDate }}</span>
+      {%- if post.summary %}<div class="role">{{ post.summary }}</div>{% endif %}
+    </li>
+    {%- endfor %}
+  </ol>
+</section>
+{%- endif %}
+{%- if info.notes.length %}
+<section class="section">
+  <h2 class="label">Key notes</h2>
+  <ul class="notes-list">
+    {%- for note in info.notes %}
+    <li><a href="{{ note.url }}">{{ note.title }}</a>{% if note.summary %}<span class="summary">{{ note.summary }}</span>{% endif %}</li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endif %}

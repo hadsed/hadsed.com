@@ -61,12 +61,32 @@ footer {
   font-size: 0.8rem;
 }
 
+/* Two groups (About, Experience | Projects, Blog, Notes), split by a gap */
+.menu .nav-scroll { margin: 0; }
+.menu .nav-gap { height: 1.1rem; margin: 0; }
+
 @media (max-width: 640px) {
   .page { grid-template-columns: minmax(0, 1fr); row-gap: 2.25rem; padding: 1.5rem 1rem 0; }
   .menu ul { display: flex; flex-wrap: wrap; gap: 1.25rem; }
   .site-name + ul { margin-top: 0.75rem; }
   .menu li { margin: 0; }
   footer { margin-top: 3rem; }
+  /* One row that scrolls sideways. The home's Fly button sits after the scroller, and the item
+     running into it fades out half-cut, so the row reads as "there's more". */
+  .menu ul.nav { flex-wrap: nowrap; gap: 0; }
+  .menu .nav-gap { display: none; }
+  .menu .nav-scroll { flex: 1 1 auto; min-width: 0; }
+  .menu .nav-scroll > ul {
+    --fade: 2.75rem;
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
+  }
+  .menu .nav-scroll > ul::-webkit-scrollbar { display: none; }
+  .menu .nav-scroll > ul.at-end { --fade: 0px; }
+  .menu .nav-scroll > ul.scrolled { --fade-l: 1.5rem; }
+  .menu .nav-scroll li { flex: none; white-space: nowrap; }
+  .menu .fly-item { flex: none; margin-left: 0.75rem !important; }
 }
 
 /* Timeline */
@@ -243,3 +263,50 @@ h1 { font-size: 1.5rem; font-weight: 400; margin: 0 0 0.15rem; color: var(--acce
 .posts li { margin: 0 0 1.5rem; }
 .posts .dates { margin-left: 0.5rem; }
 .posts .summary { margin: 0.25rem 0 0; }
+
+/* Projects, blog posts and notes */
+.kind { font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.6rem; }
+.prose .kind a, .kind a { color: inherit; text-decoration: none; }
+.kind a:hover { color: var(--accent); }
+.meta .sep { margin: 0 0.4rem; }
+.status {
+  display: inline-block; vertical-align: middle; margin-left: 0.5rem;
+  padding: 0 0.4rem; border: 1px solid var(--rule); border-radius: 3px;
+  color: var(--muted); font-size: 0.68rem; line-height: 1.5; letter-spacing: 0.08em; text-transform: uppercase;
+}
+h1 .status { margin-left: 0.6rem; }
+.status-active { color: var(--glow); border-color: color-mix(in srgb, var(--glow) 60%, transparent); }
+.appears { color: var(--muted); font-size: 0.9rem; margin: -1rem 0 1.75rem; }
+.prose .appears a { color: var(--text); text-underline-offset: 2px; }
+
+/* Headings keep a stable anchor; a # shows on hover, so a section can be linked now and
+   pointed at a broken-out note later. */
+.prose h2, .prose h3, .prose h4 { font-weight: 400; color: var(--accent); margin: 2rem 0 0.6rem; position: relative; }
+.prose h2 { font-size: 1.05rem; }
+.prose h3, .prose h4 { font-size: 0.95rem; }
+.prose .anchor { position: absolute; left: -1.1rem; color: var(--muted); text-decoration: none; opacity: 0; }
+.prose :is(h2, h3, h4):hover .anchor, .prose .anchor:focus { opacity: 1; }
+.prose ul, .prose ol { margin: 0 0 1rem; padding-left: 1.1rem; }
+.prose li { margin: 0 0 0.3rem; }
+.prose img { max-width: 100%; height: auto; border-radius: 3px; }
+.prose code { font-size: 0.9em; }
+.prose pre { background: color-mix(in srgb, #000 25%, transparent); border-radius: 3px; padding: 0.8rem 1rem; overflow-x: auto; font-size: 0.85rem; }
+.prose blockquote { margin: 0 0 1rem; padding-left: 1rem; border-left: 1px solid var(--rule); color: var(--muted); }
+
+/* ![[viz.html]]: a self-contained page in its own frame */
+.embed { margin: 1.25rem 0 1.5rem; }
+.embed-frame { display: block; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--rule); border-radius: 3px; background: #0f1520; }
+.embed figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 0.4rem; }
+
+.section { margin-top: 2.75rem; max-width: var(--measure); }
+.notes-list { list-style: none; margin: 0; padding: 0; }
+.notes-list li { margin: 0 0 0.6rem; }
+.notes-list .summary { display: block; color: var(--muted); font-size: 0.85rem; }
+.panel .counts { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.8rem; }
+
+.backlinks { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid color-mix(in srgb, var(--rule) 40%, transparent); max-width: var(--measure); }
+.backlinks ul { list-style: none; margin: 0; padding: 0; }
+.backlinks li { margin: 0 0 1rem; }
+.backlinks .where { color: var(--muted); font-size: 0.8rem; margin-left: 0.4rem; }
+.backlinks .context { display: block; color: var(--muted); font-size: 0.85rem; margin-top: 0.15rem; }
+.backlinks mark { background: none; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }

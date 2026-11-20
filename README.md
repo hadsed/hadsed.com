@@ -1,6 +1,6 @@
 # hadsed.com
 
-Had Seddiqi's personal site. Four pages (About, Portfolio, Experience, Blog) rendered from markdown by [Eleventy](https://www.11ty.dev/) into plain HTML, deployed to Cloudflare Pages on every push to `main`.
+Had Seddiqi's personal site. About, Experience, Projects, a Blog and Notes, rendered from markdown by [Eleventy](https://www.11ty.dev/) into plain HTML, deployed to Cloudflare Pages on every push to `main`.
 
 ```sh
 npm install
@@ -28,34 +28,56 @@ order: 2
 - Bullets for the Experience page.
 ```
 
-A project, in `content/projects/<slug>.md` (`link` is optional; the body renders at `/portfolio/<slug>/`):
+Projects, blog posts and notes are three layers that link to each other with Obsidian `[[wikilinks]]`. Filenames are free to change in Obsidian: URLs come from front matter, and the deploy fails if a URL that hadsed.com has already published disappears without a redirect (`scripts/check-urls.mjs`).
+
+A blog post, in `content/blog/<anything>.md`, renders at `/blog/<date>-<slug>/` (`slug` defaults to the filename; once published, leave `date` and `slug` alone):
 
 ```md
 ---
-title: Subassembler
-summary: One line shown under the title.
-year: 2026
-order: 1
+title: A 3D home from a street address
+date: 2026-11-19
+slug: home-3d-from-an-address
+summary: One line for the blog index and the project page.
 ---
-The write-up.
+The post. Link a note with [[plan-fit]], or a section of any page with [[home-3d-from-an-address#Fitting the plan]].
 ```
 
-An article, in `content/articles/<slug>.md` (renders at `/blog/<slug>/`):
+A note, in `content/notes/<slug>.md`, renders at `/notes/<slug>/`. One idea each, no date; the page lists every page that links to it ("Linked from"), and "last tended" is the file's last commit:
 
 ```md
 ---
-title: Hello
-date: 2026-10-27
-summary: One line for the blog index.
+title: Fitting a floor plan to the footprint
+summary: One line for the notes index and project pages.
 ---
-The post.
 ```
+
+A project, in `content/projects/<slug>.md`, renders at `/projects/<slug>/`. The body is the living summary. It lists its posts and key notes, so each post shows "Appears in" this project without naming it; "updated" is the newest listed post or the file's last commit. `slug` renames the URL (the old one redirects), and `redirect_from` keeps older names working. `order` places it on the landing page; `link` is optional:
+
+```md
+---
+title: Home 3D
+status: active          # active, paused or done
+summary: One line for the project cards.
+started: 2026-10
+slug: home-3d
+redirect_from: [address-to-3d-home]
+posts:
+  - "[[home-3d-from-an-address]]"
+notes:
+  - "[[plan-fit]]"
+order: 3
+---
+```
+
+To break a note out of a post: link the section first (`[[post#Heading]]`), then move the text into `content/notes/`, point the links at the note, and leave a line in the post. A link to a heading that no longer exists fails the build.
+
+Custom HTML, three ways: raw HTML right in the markdown; a self-contained `.html` file in `content/assets/` embedded with `![[viz.html]]` (or `![[viz.html|caption]]` on its own line), which runs in its own frame inside the page; or `layout: raw` in front matter (or a page written as `.html`), which skips the site template but keeps the URL, project listings and backlinks.
 
 The About page's name, tagline, avatar, links, education, and publications are front matter in `content/about.md`; its body is the blurb.
 
 ## Changing the design
 
-`src/` is the design: one layout (`src/_includes/base.njk`), two partials for the timeline and the project panels, four page templates, and one stylesheet (`src/css/site.css`) whose `:root` block holds every color and spacing value. A design pass changes `src/` and never touches `content/`.
+`src/` is the design: one layout (`src/_includes/base.njk`), page layouts for posts, projects and notes, partials for the timeline, project panels and backlinks, the index pages, and one stylesheet (`src/css/site.css`) whose `:root` block holds every color and spacing value. A design pass changes `src/` and never touches `content/`. `lib/content.mjs` derives URLs, backlinks, "Appears in" and project activity from `content/`.
 
 `notes/` holds the SR-71 intro work in progress and the research behind it. It stays in the repository and is not deployed. The design and plan documents are under `docs/superpowers/`.
 

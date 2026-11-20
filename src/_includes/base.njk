@@ -61,19 +61,44 @@
     {%- if page.url != "/" %}
     <a class="site-name" href="/">Had Seddiqi</a>
     {%- endif %}
-    <ul>
-      {%- set items = [["/", "About"], ["/portfolio/", "Portfolio"], ["/experience/", "Experience"], ["/blog/", "Blog"]] -%}
+    {#- Two groups: who (About, Experience), then what (Projects, Blog, Notes). The items sit in
+        their own list so the home's Fly button (added after it) stays put while, on phones,
+        the row scrolls sideways and fades out half-cut into Fly. -#}
+    <ul class="nav"><li class="nav-scroll"><ul>
+      {%- set items = [["/", "About"], ["/experience/", "Experience"], ["", ""], ["/projects/", "Projects"], ["/blog/", "Blog"], ["/notes/", "Notes"]] -%}
       {%- for item in items -%}
         {%- set href = item[0] -%}
+        {%- if not href -%}
+        <li class="nav-gap" aria-hidden="true"></li>
+        {%- else -%}
         {%- set current = (href == "/" and page.url == "/") or (href != "/" and page.url.startsWith(href)) -%}
         <li><a{% if current %} aria-current="page"{% endif %} href="{{ href }}">{{ item[1] }}</a></li>
+        {%- endif -%}
       {%- endfor -%}
-    </ul>
+    </ul></li></ul>
   </nav>
   <main>
 {{ content | safe }}
   </main>
 </div>
 <footer>© {{ buildYear }} Had Seddiqi</footer>
+<script>(function () {
+  // Phones: the menu row scrolls sideways. Fade its left edge once scrolled, drop the right fade
+  // at the end, and start with the current page's item in view.
+  var ul = document.querySelector('.nav-scroll > ul'); if (!ul) return;
+  function mark() {
+    ul.classList.toggle('scrolled', ul.scrollLeft > 2);
+    ul.classList.toggle('at-end', ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 2);
+  }
+  ul.addEventListener('scroll', mark, { passive: true });
+  addEventListener('load', function () {
+    var cur = ul.querySelector('[aria-current="page"]');
+    if (cur && ul.scrollWidth > ul.clientWidth) {
+      var over = cur.getBoundingClientRect().right - (ul.getBoundingClientRect().right - 48);
+      if (over > 0) ul.scrollLeft += over;
+    }
+    mark();
+  });
+})();</script>
 </body>
 </html>

@@ -1,0 +1,20 @@
+---
+layout: base.njk
+title: Notes
+permalink: /notes/
+---
+<h2 class="label">Notes</h2>
+{#- Small evergreen pages, one idea each. Most recently tended first. -#}
+{%- if site.notes.length %}
+<ul class="posts">
+{%- for note in site.notes %}
+  <li>
+    <a href="{{ note.url }}">{{ note.title }}</a>
+    {%- if note.tended %}<span class="dates">{{ note.tended | shortDate }}</span>{% endif %}
+    {%- if note.summary %}<p class="summary">{{ note.summary }}</p>{% endif %}
+  </li>
+{%- endfor %}
+</ul>
+{%- else %}
+<p class="meta">Nothing here yet.</p>
+{%- endif %}
