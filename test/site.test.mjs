@@ -9,7 +9,7 @@ before(() => { execFileSync("npx", ["@11ty/eleventy", "--quiet"], { stdio: "inhe
 test("landing page carries the shell", () => {
   const html = read("index.html");
   for (const label of ["About", "Experience", "Projects", "Blog", "Notes"]) assert.match(html, new RegExp(`>${label}<`));
-  assert.match(html, /href="\/css\/site\.css"/);
+  assert.match(html, /href="\/css\/site\.css\?v=[0-9a-f]{10}"/);
   assert.match(html, /<title>Had Seddiqi<\/title>/);
   assert.match(html, /<\/main>\s*<\/div>\s*<footer>© \d{4} Had Seddiqi<\/footer>/);
 });
@@ -106,9 +106,41 @@ test("crawlers get robots.txt, a sitemap, a real 404 and a Person schema", () =>
   assert.doesNotMatch(sitemap, /404|robots|sitemap\.xml/);
   assert.match(read("404.html"), /<meta name="robots" content="noindex">/);
   assert.match(read("_headers"), /X-Robots-Tag: noindex/);
-  const ld = JSON.parse(read("index.html").match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
-  assert.equal(ld["@type"], "Person");
+  const ld = JSON.parse(read("index.html").match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])["@graph"]
+    .find((node) => node["@type"] === "Person");
+  assert.equal(ld["@id"], "https://hadsed.com/#person");
   assert.ok(ld.sameAs.includes("https://github.com/hadsed"));
   assert.ok(!ld.sameAs.some((url) => url.startsWith("mailto:")));
   assert.match(read("projects/subassembler/index.html"), /<meta name="description" content="Step-by-step assembly walkthroughs generated from CAD\.">/);
+});
+
+test("every indexable page carries JSON-LD tied to the same person; the sitemap has lastmod", () => {
+  const ld = (p) => JSON.parse(read(p).match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(ld("projects/subassembler/index.html")["@type"], "CreativeWork");
+  assert.equal(ld("projects/subassembler/index.html").author["@id"], "https://hadsed.com/#person");
+  assert.equal(ld("experience/index.html")["@type"], "ProfilePage");
+  assert.equal(ld("blog/index.html")["@type"], "CollectionPage");
+  assert.doesNotMatch(read("404.html"), /ld\+json/);
+  assert.match(read("sitemap.xml"), /<loc>https:\/\/hadsed\.com\/projects\/subassembler\/<\/loc><lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+});
+
+test("agents and feed readers get llms.txt and an Atom feed", () => {
+  const llms = read("llms.txt");
+  assert.match(llms, /^# Had Seddiqi\n\n> /);
+  assert.match(llms, /- \[Subassembler\]\(https:\/\/hadsed\.com\/projects\/subassembler\/\): /);
+  assert.doesNotMatch(llms, /&#|&amp;|<[a-z]/);
+  const feed = read("feed.xml");
+  assert.match(feed, /<feed xmlns="http:\/\/www\.w3\.org\/2005\/Atom">/);
+  assert.match(feed, /<link href="https:\/\/hadsed\.com\/feed\.xml" rel="self"\/>/);
+  assert.match(read("index.html"), /<link rel="alternate" type="application\/atom\+xml" title="Blog" href="\/feed\.xml">/);
+});
+
+test("no page waits on a third-party font host; fonts and hashed CSS cache for a year", () => {
+  for (const p of ["index.html", "projects/index.html", "experience/index.html"]) assert.doesNotMatch(read(p), /fonts\.(googleapis|gstatic)\.com/);
+  assert.match(read("index.html"), /<link rel="preload" href="\/assets\/fonts\/petrona-300-latin\.woff2" as="font" type="font\/woff2" crossorigin>/);
+  assert.doesNotMatch(read("projects/index.html"), /rel="preload"[^>]*font/);
+  assert.ok(existsSync(new URL("../_site/assets/fonts/petrona-300-latin.woff2", import.meta.url)));
+  const headers = read("_headers");
+  assert.match(headers, /\/assets\/fonts\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
+  assert.match(headers, /\/css\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
 });

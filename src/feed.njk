@@ -1,0 +1,28 @@
+---
+permalink: /feed.xml
+eleventyExcludeFromCollections: true
+---
+<?xml version="1.0" encoding="utf-8"?>
+{#- The blog as an Atom feed, full text. Linked from every page's <head> (base.njk). #}
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Had Seddiqi · Blog</title>
+  <subtitle>{{ collections.about[0].data.tagline }}</subtitle>
+  <link href="https://hadsed.com/feed.xml" rel="self"/>
+  <link href="https://hadsed.com/blog/"/>
+  <id>https://hadsed.com/blog/</id>
+  <updated>{% if collections.blog.length %}{{ collections.blog[0].date | isoDate }}{% else %}{{ buildDate }}{% endif %}T00:00:00Z</updated>
+  <author><name>Had Seddiqi</name><uri>https://hadsed.com/</uri></author>
+  {%- for post in collections.blog %}
+  <entry>
+    <title>{{ post.data.title | escape }}</title>
+    <link href="https://hadsed.com{{ post.url }}"/>
+    <id>https://hadsed.com{{ post.url }}</id>
+    <published>{{ post.date | isoDate }}T00:00:00Z</published>
+    <updated>{{ post.date | isoDate }}T00:00:00Z</updated>
+    {%- if post.data.summary %}
+    <summary>{{ post.data.summary | escape }}</summary>
+    {%- endif %}
+    <content type="html">{{ post.templateContent | feedHtml(post.inputPath, post.url) | escape }}</content>
+  </entry>
+  {%- endfor %}
+</feed>

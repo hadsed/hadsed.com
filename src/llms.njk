@@ -1,0 +1,49 @@
+---
+permalink: /llms.txt
+eleventyExcludeFromCollections: true
+---
+{%- set about = collections.about[0].data -%}
+# {{ about.name | safe }}
+
+> {{ about.tagline | safe }}. Personal site of {{ about.name | safe }}: projects, a blog, notes and work history.
+
+{{ collections.about[0].templateContent | striptags(true) | replace("Get in touch", "") | trim | safe }}
+
+Contact: h@hadsed.com
+
+## Pages
+
+- [About](https://hadsed.com/): who Had is, links, publications and featured work
+- [Experience](https://hadsed.com/experience/): every role, with dates and what the work was
+- [Projects](https://hadsed.com/projects/): what Had is building, most recently active first
+- [Blog](https://hadsed.com/blog/): dated posts ([Atom feed](https://hadsed.com/feed.xml))
+- [Notes](https://hadsed.com/notes/): short evergreen pages, one idea each
+
+## Projects
+{% for p in site.projects %}
+- [{{ p.title | safe }}](https://hadsed.com{{ p.url | safe }}){% if p.summary %}: {{ p.summary | safe }}{% endif %}
+{%- endfor %}
+{%- if collections.blog.length %}
+
+## Blog
+{% for post in collections.blog %}
+- [{{ post.data.title | safe }}](https://hadsed.com{{ post.url | safe }}) ({{ post.date | isoDate | safe }}){% if post.data.summary %}: {{ post.data.summary | safe }}{% endif %}
+{%- endfor %}
+{%- endif %}
+{%- if site.notes.length %}
+
+## Notes
+{% for note in site.notes %}
+- [{{ note.title | safe }}](https://hadsed.com{{ note.url | safe }}){% if note.summary %}: {{ note.summary | safe }}{% endif %}
+{%- endfor %}
+{%- endif %}
+
+## Experience
+{% for role in collections.experience %}{% if not role.data.upcoming %}
+- {% if role.data.role %}{{ role.data.role | safe }}, {% endif %}{{ role.data.org | safe }}{% if role.data.subtitle %} ({{ role.data.subtitle | safe }}){% endif %}, {{ role.data.start | safe }} to {{ role.data.end or "present" | safe }}
+{%- endif %}{% endfor %}
+
+## Elsewhere
+{% for link in about.links %}{% if link.url.startsWith("http") %}
+- [{{ link.label | safe }}]({{ link.url | safe }})
+{%- endif %}{% endfor %}
