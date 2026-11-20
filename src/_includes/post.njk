@@ -15,7 +15,7 @@ layout: base.njk
   {%- set lead = page.inputPath | leadImage %}
   {%- if lead and hero_image and (hero_image | assetUrl) != (lead.src | assetUrl) %}{% set lead = null %}{% endif %}
   {%- if hero_image or lead %}
-  <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
+  {{ (hero_image or lead.src) | heroHtml(hero_image_alt or (lead.alt if lead) or '') | safe }}
   {%- endif %}
   {%- if toc.length > 2 %}
   <details class="toc-inline">

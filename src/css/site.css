@@ -306,8 +306,25 @@ h1 .status { margin-left: 0.6rem; }
 .prose th { color: var(--muted); font-weight: 400; }
 .prose td img { max-width: 9rem; }
 
-/* Hero image (hero_image: in front matter) */
+/* Hero image (hero_image: in front matter, or an image on the body's first line). Animated heroes are
+   a still frame with the motion laid over it once it plays (lib/hero.mjs, assets/hero.js). */
 .prose .hero { display: block; width: 100%; height: auto; margin: 0.25rem 0 1.75rem; border-radius: 3px; }
+.prose span.hero { position: relative; overflow: hidden; }
+.prose span.hero img { display: block; width: 100%; height: auto; }
+.hero-anim .hero-motion { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.15s; }
+.hero-anim.playing .hero-motion { opacity: 1; }
+
+/* Heroes on cards: a band across the top of a project panel, a thumbnail beside a post or note. */
+.card-hero-link { display: block; }
+.card-hero { display: block; position: relative; overflow: hidden; border-radius: 2px; background: #0f1520; }
+.card-hero img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.panel .card-hero { aspect-ratio: 16 / 9; margin: -1rem -1.1rem 0.9rem; border-radius: 2px 2px 0 0; }
+.posts li.has-hero { display: flow-root; }
+.posts li.has-hero .card-hero-link { float: right; width: 8.5rem; margin: 0.2rem 0 0.5rem 1.25rem; }
+.posts .card-hero { aspect-ratio: 4 / 3; }
+@media (max-width: 40rem) {
+  .posts li.has-hero .card-hero-link { width: 5.5rem; margin-left: 0.9rem; }
+}
 
 /* ![[viz.html]]: a self-contained page in its own frame */
 .embed { margin: 1.25rem 0 1.5rem; }

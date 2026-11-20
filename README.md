@@ -73,6 +73,8 @@ A hero image, on a project or a blog post: put the file in `content/assets/` and
 
 Or skip the front matter and start the note with the image embed (`![[home-3d.gif]]` on the first line). It shows at the top in Obsidian, and on the site it becomes the hero instead of appearing twice. `hero_image:` wins when both are there; if both name the same file, it shows once.
 
+Heroes also show on cards: across the top of a project's panel (home and Projects), and as a thumbnail beside a post in Blog and on its project's page. An animated hero (GIF or animated WebP) shows its first frame as a still until the pointer is over the card or the image; the motion is an MP4 made at build time (a 4 MB GIF comes out around 300 KB), downloaded in the background once the page has loaded and gone idle, so hovering plays at once (skipped on Save-Data and 2G/3G connections, where it loads on hover). On touch screens it plays while it is mostly on screen, unless the visitor has reduced motion on. The link preview still uses the original file.
+
 To break a note out of a post: link the section first (`[[post#Heading]]`), then move the text into `content/notes/`, point the links at the note, and leave a line in the post. A link to a heading that no longer exists fails the build.
 
 Obsidian callouts render as boxes: `> [!note] Title` with the body on the following `>` lines; `[!tip]`, `[!warning]`, `[!danger]`, `[!example]` and Obsidian's other types get their own color and icon, and `[!note]-` (folded) or `[!note]+` (open) makes one that opens and closes. A blog post with more than two sections gets a table of contents from its headings: an outline column on the right on wide screens, a "Contents" drop-down under the title on narrower ones.

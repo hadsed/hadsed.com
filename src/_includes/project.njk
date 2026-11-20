@@ -13,7 +13,7 @@ layout: base.njk
   {%- set lead = page.inputPath | leadImage %}
   {%- if lead and hero_image and (hero_image | assetUrl) != (lead.src | assetUrl) %}{% set lead = null %}{% endif %}
   {%- if hero_image or lead %}
-  <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
+  {{ (hero_image or lead.src) | heroHtml(hero_image_alt or (lead.alt if lead) or '') | safe }}
   {%- endif %}
   {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
@@ -22,7 +22,8 @@ layout: base.njk
   <h2 class="label">Blog posts</h2>
   <ul class="posts">
     {%- for post in info.posts %}
-    <li>
+    <li{% if post.hero %} class="has-hero"{% endif %}>
+      {%- if post.hero %}<a class="card-hero-link" href="{{ post.url }}" tabindex="-1" aria-hidden="true">{{ post.hero | heroHtml("", true) | safe }}</a>{% endif %}
       <a href="{{ post.url }}">{{ post.title }}</a>
       <span class="dates">{{ post.date | readableDate }}</span>
       {%- if post.summary %}<p class="summary">{{ post.summary }}</p>{% endif %}

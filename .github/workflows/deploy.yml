@@ -22,6 +22,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Animated hero images ship as small MP4s made at build time (lib/hero.mjs); without ffmpeg
+      # they fall back to larger animated WebPs.
+      - name: ffmpeg for hero images
+        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
       # Previews point og:image at their own pages.dev alias (Cloudflare's slug:
       # lowercase, non-alphanumerics to dashes, 28 chars) so a link preview can be
       # tested before the image is live on hadsed.com.
