@@ -182,9 +182,14 @@ export default function (eleventyConfig) {
   );
   // Dates arrive as Date objects (front matter) or YYYY-MM-DD strings (the content model).
   const asDate = (value) => (value instanceof Date ? value : new Date(`${String(value).slice(0, 10)}T00:00:00Z`));
-  eleventyConfig.addFilter("readableDate", (date) =>
-    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(asDate(date))
-  );
+  // "October 28th, 2026" (and "Oct 28th, 2026" for the short form).
+  const ordinal = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+  const usDate = (date, month) => {
+    const d = asDate(date);
+    const name = new Intl.DateTimeFormat("en-US", { month, timeZone: "UTC" }).format(d);
+    return `${name} ${ordinal(d.getUTCDate())}, ${d.getUTCFullYear()}`;
+  };
+  eleventyConfig.addFilter("readableDate", (date) => usDate(date, "long"));
   // A hero or share image in front matter (hero_image / share_image: hero.jpg, or "[[hero.jpg]]" as Obsidian
   // writes it) is a file in content/assets. A name that isn't there fails the build rather than shipping a broken image.
   eleventyConfig.addFilter("assetUrl", (value) => {
@@ -210,9 +215,7 @@ export default function (eleventyConfig) {
     const m = String(value).match(/^(\d{4})-(\d{2})/);
     return m ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(+m[1], +m[2] - 1, 1))) : String(value);
   });
-  eleventyConfig.addFilter("shortDate", (date) =>
-    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(asDate(date))
-  );
+  eleventyConfig.addFilter("shortDate", (date) => usDate(date, "short"));
 
   const byOrder = (tag) => (api) =>
     api.getFilteredByTag(tag).sort((a, b) => a.data.order - b.data.order);

@@ -1,5 +1,5 @@
 ---
-title: Reconstructing a home from its address
+title: 3D reconstruction of a home from its address
 date: 2026-10-28
 summary: Rebuilding a real San Francisco house in editable 3D from public data with agents.
 hero_image: "[[hero-kitchen-edges.gif]]"
