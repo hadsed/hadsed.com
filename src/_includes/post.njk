@@ -3,7 +3,6 @@ layout: base.njk
 ---
 {%- set projectsIn = site.appearsIn[page.url] %}
 <article class="prose">
-  <p class="kind"><a href="/blog/">Blog</a></p>
   <h1>{{ title }}</h1>
   <p class="meta">{{ page.date | readableDate }}</p>
   {%- if projectsIn %}

@@ -3,13 +3,11 @@ layout: base.njk
 ---
 {%- set info = site.projectByUrl[page.url] %}
 <article class="prose">
-  <p class="kind"><a href="/projects/">Projects</a></p>
   <h1>{{ title }}{% if status %} <span class="status status-{{ status }}">{{ status }}</span>{% endif %}</h1>
   <p class="meta">
     {%- if info.started %}Started {{ info.started | monthYear }}{% endif %}
-    {%- if info.started and info.updated %}<span class="sep">·</span>{% endif %}
-    {%- if info.updated %}updated {{ info.updated | readableDate }}{% endif %}
-    {%- if link %}<span class="sep">·</span><a href="{{ link }}">{{ link | replace("https://", "") }}</a>{% endif %}
+    {%- if info.started and info.updated %}, last updated {{ info.updated | readableDate }}{% elif info.updated %}Last updated {{ info.updated | readableDate }}{% endif %}
+    {%- if link %}<br><a href="{{ link }}">{{ link | replace("https://", "") }}</a>{% endif %}
   </p>
   {%- if image %}
   <img class="hero" src="{{ image | assetUrl }}" alt="{{ image_alt or '' }}">
@@ -19,16 +17,15 @@ layout: base.njk
 {%- if info.posts.length %}
 <section class="section">
   <h2 class="label">Blog posts</h2>
-  <ol class="timeline">
+  <ul class="posts">
     {%- for post in info.posts %}
-    <li class="timeline-entry" style="--i:{{ loop.index0 }}">
-      <span class="orb"></span>
-      <a class="org" href="{{ post.url }}">{{ post.title }}</a>
-      <span class="dates">{{ post.date | shortDate }}</span>
-      {%- if post.summary %}<div class="role">{{ post.summary }}</div>{% endif %}
+    <li>
+      <a href="{{ post.url }}">{{ post.title }}</a>
+      <span class="dates">{{ post.date | readableDate }}</span>
+      {%- if post.summary %}<p class="summary">{{ post.summary }}</p>{% endif %}
     </li>
     {%- endfor %}
-  </ol>
+  </ul>
 </section>
 {%- endif %}
 {%- if info.notes.length %}

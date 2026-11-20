@@ -87,11 +87,12 @@ test("project page lists its posts and key notes; the index shows status and cou
   const html = read("projects/fixture-house/index.html");
   assert.match(html, /<h1>Fixture House <span class="status status-active">active<\/span><\/h1>/);
   assert.match(html, /Started October 2026/);
-  assert.match(html, /updated 19 November 2026/);
-  assert.match(html, /Blog posts[\s\S]*href="\/blog\/2026-11-19-first-post\/">A first post<[\s\S]*19 Nov 2026/);
+  assert.match(html, /Started October 2026, last updated 19 November 2026/);
+  assert.match(html, /Blog posts[\s\S]*href="\/blog\/2026-11-19-first-post\/">A first post<[\s\S]*19 November 2026/);
   assert.match(html, /Key notes[\s\S]*href="\/notes\/zz-fixture-plan-fit\/">Fitting a plan</);
+  assert.doesNotMatch(html, /class="(orb|kind)"|<p class="meta">[^<]*·/);
   const index = read("projects/index.html");
-  assert.match(index, /Fixture House[\s\S]*?Updated 19 Nov 2026 · 1 post · 1 note/);
+  assert.match(index, /Fixture House[\s\S]*?Last updated 19 Nov 2026, 1 post, 1 note/);
   assert.match(index, /aria-current="page" href="\/projects\/"/);
 });
 
