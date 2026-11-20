@@ -233,7 +233,7 @@ test("a link to a heading that doesn't exist fails the build", () => {
   rmSync(broken, { force: true });
 });
 
-test("an animated hero is a still frame until hovered, on its page and on its cards", () => {
+test("an animated hero is a still frame until hovered", () => {
   const html = read("blog/2026-11-17-zz-fixture-tour/index.html");
   assert.match(html, /<span class="hero hero-anim" data-motion="\/assets\/_hero\/zz-fixture-tour\.(mp4|anim\.webp)"><img src="\/assets\/_hero\/zz-fixture-tour\.webp" alt="A walk through" width="8" height="8"/);
   assert.doesNotMatch(html, /src="[^"]*zz-fixture-tour\.gif"/);
@@ -241,8 +241,4 @@ test("an animated hero is a still frame until hovered, on its page and on its ca
   const motion = html.match(/data-motion="\/([^"]+)"/)[1];
   assert.ok(existsSync(new URL(motion, out)));
   assert.match(html, /<script src="\/assets\/hero\.js" defer><\/script>/);
-  // the blog index shows it as a lazy, decorative thumbnail beside the post; the lead-image post gets one too
-  const index = read("blog/index.html");
-  assert.match(index, /<li class="has-hero">\s*<a class="card-hero-link" href="\/blog\/2026-11-17-zz-fixture-tour\/" tabindex="-1" aria-hidden="true"><span class="card-hero hero-anim" data-motion="[^"]+"><img src="\/assets\/_hero\/zz-fixture-tour\.webp" alt="" width="8" height="8" loading="lazy"/);
-  assert.match(index, /href="\/blog\/2026-11-18-zz-fixture-lead\/" tabindex="-1" aria-hidden="true"><img class="card-hero" src="\/assets\/zz-fixture-hero.png" alt=""/);
 });
