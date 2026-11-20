@@ -27,15 +27,22 @@
   <meta property="og:title" content="{{ pageTitle }}">
   <meta property="og:description" content="{{ pageDescription }}">
   <meta property="og:url" content="https://hadsed.com{{ page.url }}">
-  {#- An article can name its own 1200x630 preview in assets/ (share_image, share_image_alt); every other page uses og.jpg. #}
+  {#- Link preview: share_image (a 1200x630 file in assets/, alt from share_image_alt or the title), else the
+      page's hero (heroSrc, set where hero images are rendered), else og.jpg. #}
   {%- if share_image %}
   <meta property="og:image" content="{{ siteUrl }}{{ share_image | shareImagePath }}">
-  {%- else %}
-  <meta property="og:image" content="{{ siteUrl }}/assets/og.jpg">
-  {%- endif %}
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="{{ (share_image_alt or title) if share_image else 'Had Seddiqi, hadsed.com' }}">
+  <meta property="og:image:alt" content="{{ share_image_alt or title }}">
+  {%- elif heroSrc %}
+  <meta property="og:image" content="{{ siteUrl }}{{ heroSrc | shareImagePath }}">
+  <meta property="og:image:alt" content="Had Seddiqi, hadsed.com">
+  {%- else %}
+  <meta property="og:image" content="{{ siteUrl }}/assets/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Had Seddiqi, hadsed.com">
+  {%- endif %}
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
