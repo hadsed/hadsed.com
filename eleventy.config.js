@@ -137,7 +137,7 @@ export default function (eleventyConfig) {
         if (!hit) throw new Error(`Unresolved wikilink ${match} in ${where}`);
         let href = hit.url;
         if (heading) {
-          const id = slugify(heading);
+          const id = slugify(heading.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
           if (hit.headings && hit.kind !== "experience" && !hit.headings.has(id)) {
             throw new Error(`Wikilink ${match} in ${where}: ${hit.url} has no heading "${heading.trim()}"`);
           }

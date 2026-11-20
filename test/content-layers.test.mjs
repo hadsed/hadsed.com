@@ -68,6 +68,15 @@ date: 2026-11-18
 
 Body text.
 `,
+  "content/blog/zz-fixture-same.md": `---
+title: Same hero twice
+date: 2026-11-17
+hero_image: "[[zz-fixture-hero.png]]"
+---
+![[zz-fixture-hero.png|600]]
+
+Body.
+`,
   "content/assets/zz-fixture-hero.png": "png",
   "content/assets/zz-fixture-viewer.html": `<!doctype html><title>Viewer</title><script>const a = {{ b }};</script>`,
 };
@@ -131,6 +140,11 @@ test("an image embed on a note's first line becomes the hero and is not repeated
   assert.doesNotMatch(html, /<figure class="figure">/);
   assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/zz-fixture-hero.png">/);
   assert.match(html, /<p>Body text\.<\/p>/);
+});
+
+test("a first-line image that is also hero_image shows once", () => {
+  const html = read("blog/2026-11-17-zz-fixture-same/index.html");
+  assert.equal((html.match(/<img[^>]*zz-fixture-hero\.png/g) || []).length, 1);
 });
 
 test("wikilinks reach headings on other pages and on the same page", () => {
