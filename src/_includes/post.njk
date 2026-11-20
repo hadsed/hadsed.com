@@ -2,11 +2,14 @@
 layout: base.njk
 ---
 {%- set projectsIn = site.appearsIn[page.url] %}
+{%- set toc = content | toc %}
+<div class="reading{% if toc.length > 2 %} has-toc{% endif %}">
+<div class="reading-main">
 <article class="prose">
   <h1>{{ title }}</h1>
   <p class="meta">{{ page.date | readableDate }}</p>
   {%- if projectsIn %}
-  <p class="appears">Appears in {% for p in projectsIn %}<a href="{{ p.url }}">{{ p.title }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  <p class="appears"><span class="appears-label">Appears in</span> {% for p in projectsIn %}<a href="{{ p.url }}">{{ p.title }}</a>{% if not loop.last %} {% endif %}{% endfor %}</p>
   {%- endif %}
   {#- A first-line image embed is the hero when hero_image is unset, or when it is the same file. #}
   {%- set lead = page.inputPath | leadImage %}
@@ -14,6 +17,20 @@ layout: base.njk
   {%- if hero_image or lead %}
   <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
   {%- endif %}
+  {%- if toc.length > 2 %}
+  <details class="toc-inline">
+    <summary>Contents</summary>
+    {% include "toc.njk" %}
+  </details>
+  {%- endif %}
   {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
 {% include "backlinks.njk" %}
+</div>
+{%- if toc.length > 2 %}
+<aside class="toc-side" aria-label="Contents">
+  <p class="label">Contents</p>
+  {% include "toc.njk" %}
+</aside>
+{%- endif %}
+</div>

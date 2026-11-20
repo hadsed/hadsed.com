@@ -120,3 +120,10 @@ test("the menu is the same on every page, apart from which item is current", () 
     assert.equal(nav(p), home, p);
   }
 });
+
+test("a long post gets a side table of contents and its callouts render", () => {
+  const html = read("blog/2026-10-28-home-from-an-address/index.html");
+  assert.match(html, /<aside class="toc-side"[\s\S]*?<a href="#experimental-setup">Experimental setup<\/a>/);
+  assert.match(html, /<div class="callout callout-note">\s*<p class="callout-title">Why Astra\?<\/p>/);
+  assert.doesNotMatch(html, /\[!note\]/);
+});
