@@ -1,6 +1,7 @@
 import { basename, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
+import { markdownCallouts, tocFrom } from "./lib/article.mjs";
 
 export default function (eleventyConfig) {
   // content/articles is the blog's old folder (now content/blog); a copy left in the vault stays unbuilt.
@@ -101,6 +102,10 @@ export default function (eleventyConfig) {
     });
   });
 
+  // Obsidian callouts (> [!note] Title) and the reading pages' table of contents (lib/article.mjs).
+  eleventyConfig.amendLibrary("md", markdownCallouts);
+  eleventyConfig.addFilter("toc", tocFrom);
+
   // Obsidian links: [[page]], [[page|text]], [[page#Heading]], [[#Heading]] (this page).
   // Embeds: ![[image.png]] becomes an image; ![[viz.html]], a self-contained page from content/assets,
   // runs in its own frame inside the page (its CSS and JS can't touch the site's).
@@ -145,6 +150,9 @@ export default function (eleventyConfig) {
   // Absolute URLs for link previews. Branch previews set SITE_URL to their own
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
+
+  // Branch previews only: a switcher between the article theme candidates (see site.css).
+  eleventyConfig.addGlobalData("themeSwitcher", () => Boolean(process.env.SITE_URL || process.env.LAB));
 
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
 

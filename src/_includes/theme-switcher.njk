@@ -1,0 +1,24 @@
+{#- Branch previews only: try the article theme candidates on a real post. ?theme=a|b|c picks one. -#}
+<script>(function () {
+  var pick = new URLSearchParams(location.search).get('theme');
+  try { pick = pick || localStorage.getItem('article-theme'); } catch (e) {}
+  document.documentElement.dataset.theme = /^[abc]$/.test(pick || '') ? pick : 'a';
+})();</script>
+<div class="theme-switcher" role="group" aria-label="Article theme (preview only)">
+  <span>Theme</span>
+  {%- for t in [["a", "Ramp"], ["b", "Serif"], ["c", "Marked"]] %}
+  <button type="button" data-pick="{{ t[0] }}">{{ t[0] | upper }} · {{ t[1] }}</button>
+  {%- endfor %}
+</div>
+<script>(function () {
+  var root = document.documentElement, box = document.currentScript.previousElementSibling;
+  function sync() { box.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.pick === root.dataset.theme); }); }
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    root.dataset.theme = b.dataset.pick;
+    try { localStorage.setItem('article-theme', b.dataset.pick); } catch (err) {}
+    var u = new URL(location.href); u.searchParams.set('theme', b.dataset.pick); history.replaceState(null, '', u);
+    sync();
+  });
+  sync();
+})();</script>

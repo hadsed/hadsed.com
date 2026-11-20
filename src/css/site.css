@@ -324,3 +324,153 @@ h1 .status { margin-left: 0.6rem; }
 .backlinks .where { color: var(--muted); font-size: 0.8rem; margin-left: 0.4rem; }
 .backlinks .context { display: block; color: var(--muted); font-size: 0.85rem; margin-top: 0.15rem; }
 .backlinks mark { background: none; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---------- Reading pages: table of contents, callouts, article themes ---------- */
+
+:root {
+  --pink: #ff5fa8;
+  --bright: #f4f6f8;
+}
+
+/* A post with sections gets a Contents column on the right. Narrower screens fold it
+   into a "Contents" drop-down under the title. */
+.page:has(.reading.has-toc) { max-width: 80rem; }
+.reading.has-toc {
+  display: grid;
+  grid-template-columns: minmax(0, var(--measure)) minmax(11rem, 15rem);
+  column-gap: 3.5rem;
+  align-items: start;
+}
+.reading-main { min-width: 0; }
+.toc-side {
+  position: sticky; top: 2rem;
+  max-height: calc(100vh - 4rem); overflow-y: auto; scrollbar-width: thin;
+  padding: 0.25rem 0 1rem; font-size: 0.8rem;
+}
+.toc-side .label { margin-bottom: 0.75rem; }
+.toc-inline { display: none; }
+.toc, .toc ol { list-style: none; margin: 0; padding: 0; }
+.toc li { margin: 0; }
+.toc-1 { margin-bottom: 0.4rem; }
+.toc a {
+  display: block; padding: 0.15rem 0 0.15rem 0.7rem; margin-left: -1px;
+  border-left: 1px solid color-mix(in srgb, var(--rule) 30%, transparent);
+  color: var(--muted); line-height: 1.4; text-decoration: none;
+}
+.toc-1 > a { color: var(--text); }
+.toc-2 a { padding-left: 1.4rem; font-size: 0.95em; }
+.toc a:hover { color: var(--bright); text-decoration: none; }
+.toc a[aria-current] { color: var(--pink); border-left-color: var(--pink); }
+/* The side list shows the subsections of the section being read. */
+.toc-side .toc-1 > ol { display: none; }
+.toc-side .toc-1.open > ol { display: block; }
+
+@media (max-width: 1000px) {
+  .reading.has-toc { display: block; }
+  .toc-side { display: none; }
+  .toc-inline {
+    display: block; margin: 0 0 2rem; padding: 0.6rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--rule) 40%, transparent); border-radius: 3px; font-size: 0.85rem;
+  }
+  .toc-inline summary { cursor: pointer; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.75rem; }
+  .toc-inline[open] summary { margin-bottom: 0.6rem; }
+  .prose .toc-inline a { text-decoration: none; }
+}
+
+/* Emphasis and links: hot pink on every theme. */
+.prose a { color: var(--pink); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--pink) 45%, transparent); text-underline-offset: 3px; }
+.prose a:hover { text-decoration-color: var(--pink); }
+.prose strong { color: var(--pink); font-weight: 700; }
+.prose em { color: var(--pink); }
+.prose .kind a, .prose .appears a { color: var(--text); }
+.prose .appears a { text-decoration-color: color-mix(in srgb, var(--text) 40%, transparent); }
+
+/* Obsidian callouts: > [!note] Title. The color follows the type. */
+.callout {
+  --c: var(--pink);
+  margin: 1.5rem 0; padding: 0.8rem 1.1rem;
+  border-left: 2px solid var(--c); border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--c) 7%, rgba(15, 21, 32, 0.6));
+  color: var(--text);
+}
+.callout > :last-child { margin-bottom: 0; }
+.callout-title { margin: 0 0 0.45rem; color: var(--c); font-weight: 700; }
+.callout-title:last-child { margin: 0; }
+.callout img { display: block; margin: 0.5rem 0 0; }
+details.callout > summary { cursor: pointer; }
+details.callout:not([open]) > summary { margin: 0; }
+.callout :is(strong, em, a) { color: var(--bright); }
+.callout a { text-decoration-color: color-mix(in srgb, var(--bright) 40%, transparent); }
+.callout-tip, .callout-hint, .callout-success, .callout-check, .callout-done { --c: #5fd3a8; }
+.callout-question, .callout-help, .callout-faq, .callout-todo { --c: var(--glow); }
+.callout-warning, .callout-caution, .callout-attention { --c: #f0a35a; }
+.callout-danger, .callout-error, .callout-bug, .callout-failure, .callout-fail, .callout-missing { --c: #ff6b6b; }
+.callout-example { --c: #b18cff; }
+.callout-quote, .callout-cite { --c: var(--muted); }
+
+/* Article themes, candidates on branch previews (the switcher sets data-theme on <html>).
+   A, Ramp (the default): one typeface, size, weight and a rule set the levels apart. */
+.reading .prose > h1:not([id]) { font-size: 1.9rem; line-height: 1.2; color: var(--bright); margin-bottom: 0.4rem; }
+.prose h1[id] {
+  font-size: 1.45rem; line-height: 1.3; color: var(--bright);
+  margin: 3.25rem 0 1rem; padding-top: 1.4rem;
+  border-top: 1px solid color-mix(in srgb, var(--rule) 30%, transparent);
+}
+.prose h1[id] .anchor { top: 1.4rem; }
+.prose h2 { font-size: 1.1rem; font-weight: 700; color: var(--bright); margin: 2.25rem 0 0.6rem; }
+.prose h3, .prose h4 {
+  font-size: 0.75rem; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); margin: 1.75rem 0 0.5rem;
+}
+
+/* B, Serif: sections and subsections in Petrona, the name's serif; pink stays on emphasis and links. */
+[data-theme="b"] .reading .prose > h1:not([id]) { font-family: Petrona, Georgia, serif; font-weight: 300; font-size: 2.6rem; line-height: 1.1; letter-spacing: -0.015em; }
+[data-theme="b"] .prose h1[id] {
+  font-family: Petrona, Georgia, serif; font-weight: 400; font-size: 1.9rem; line-height: 1.15; letter-spacing: -0.01em;
+  border-top: 0; padding-top: 0; margin-top: 3.5rem;
+}
+[data-theme="b"] .prose h1[id] .anchor { top: auto; }
+[data-theme="b"] .prose h2 { font-family: Petrona, Georgia, serif; font-weight: 400; font-style: italic; font-size: 1.4rem; line-height: 1.2; color: var(--accent); }
+[data-theme="b"] .prose h3, [data-theme="b"] .prose h4 {
+  font-size: 0.92rem; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--bright);
+}
+
+/* C, Marked: numbered sections with pink numerals; bold reads as a highlighter stroke. */
+[data-theme="c"] .prose { counter-reset: s1; }
+[data-theme="c"] .prose h1[id] { counter-increment: s1; counter-reset: s2; border-top: 0; padding-top: 0; font-size: 1.4rem; }
+[data-theme="c"] .prose h1[id] .anchor { top: auto; }
+[data-theme="c"] .prose h1[id]::before {
+  content: counter(s1, decimal-leading-zero); display: block; margin-bottom: 0.3rem;
+  font: 600 0.78rem/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; color: var(--pink);
+}
+[data-theme="c"] .prose h2 { counter-increment: s2; font-weight: 400; font-size: 1.1rem; }
+[data-theme="c"] .prose h2::before {
+  content: counter(s1) "." counter(s2); display: inline-block; min-width: 2.6rem;
+  font: 600 0.78rem/1 ui-monospace, Menlo, Consolas, monospace; color: var(--pink); vertical-align: 0.12em;
+}
+[data-theme="c"] .prose h3, [data-theme="c"] .prose h4 {
+  font-size: 0.95rem; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text);
+  padding-left: 2.6rem;
+}
+[data-theme="c"] .prose strong {
+  color: var(--bright);
+  background: linear-gradient(transparent 60%, color-mix(in srgb, var(--pink) 45%, transparent) 60%, color-mix(in srgb, var(--pink) 45%, transparent) 92%, transparent 92%);
+}
+[data-theme="c"] .toc { counter-reset: t1; }
+[data-theme="c"] .toc-1 { counter-increment: t1; }
+[data-theme="c"] .toc-1 > a::before { content: counter(t1, decimal-leading-zero); margin-right: 0.6rem; font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--pink); }
+
+/* The preview-only theme picker */
+.theme-switcher {
+  position: fixed; z-index: 10; right: 1rem; bottom: 1rem;
+  display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.5rem;
+  background: rgba(15, 21, 32, 0.92); border: 1px solid color-mix(in srgb, var(--rule) 50%, transparent); border-radius: 4px;
+  font: 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--muted);
+}
+.theme-switcher span { letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.2rem; }
+.theme-switcher button {
+  font: inherit; color: var(--text); background: none; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--rule) 40%, transparent); border-radius: 3px; padding: 0.3rem 0.45rem;
+}
+.theme-switcher button[aria-pressed="true"] { color: var(--pink); border-color: var(--pink); }
+@media (max-width: 640px) { .theme-switcher span { display: none; } .theme-switcher { left: 1rem; right: 1rem; justify-content: center; } }

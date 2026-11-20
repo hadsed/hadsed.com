@@ -2,6 +2,10 @@
 layout: base.njk
 ---
 {%- set projectsIn = site.appearsIn[page.url] %}
+{%- set toc = content | toc %}
+{%- if themeSwitcher %}{% include "theme-switcher.njk" %}{% endif %}
+<div class="reading{% if toc.length > 2 %} has-toc{% endif %}">
+<div class="reading-main">
 <article class="prose">
   <p class="kind"><a href="/blog/">Blog</a></p>
   <h1>{{ title }}</h1>
@@ -12,6 +16,20 @@ layout: base.njk
   {%- if image %}
   <img class="hero" src="{{ image | assetUrl }}" alt="{{ image_alt or '' }}">
   {%- endif %}
+  {%- if toc.length > 2 %}
+  <details class="toc-inline">
+    <summary>Contents</summary>
+    {% include "toc.njk" %}
+  </details>
+  {%- endif %}
   {{ content | safe }}
 </article>
 {% include "backlinks.njk" %}
+</div>
+{%- if toc.length > 2 %}
+<aside class="toc-side" aria-label="Contents">
+  <p class="label">Contents</p>
+  {% include "toc.njk" %}
+</aside>
+{%- endif %}
+</div>
