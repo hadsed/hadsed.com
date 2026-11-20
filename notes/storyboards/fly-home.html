@@ -56,6 +56,7 @@ addEventListener('message', (e) => {
   // Esc, or Back to site at the top left of the game's flight HUD (Mach 20 draws it when framed).
   if (e.data.t === 'key' && e.data.key === 'Escape') leave();
 });
+const FIRST_URL = location.pathname + location.search + location.hash;   // where this wrapper was served
 const siteDoc = () => { try { return site.contentDocument; } catch { return null; } };
 let state = 'site';   // site | flying
 
@@ -107,7 +108,10 @@ function decorateSite(doc = siteDoc()) {
   // top-level comes straight back here (base.njk), so a reload lands on the same page.
   try {
     const l = doc.location, p = l.pathname;
-    if (p && !p.startsWith('/lab/')) history.replaceState(null, '', p + l.search + l.hash);
+    // A page the Pages Function built into this wrapper's first response is about:srcdoc, and
+    // its address is the one this wrapper was served at.
+    if (l.href === 'about:srcdoc') history.replaceState(null, '', FIRST_URL);
+    else if (p && !p.startsWith('/lab/')) history.replaceState(null, '', p + l.search + l.hash);
     if (doc.title) document.title = doc.title;
   } catch {}
 }
@@ -152,7 +156,12 @@ site.addEventListener('load', () => {
   const q = new URLSearchParams(location.search), p = q.get('p');
   q.delete('mach20');
   const own = location.pathname.startsWith('/lab/') ? '/' : location.pathname + (q.size ? `?${q}` : '');
-  site.src = (p && p.startsWith('/') && !p.startsWith('//') ? p : own) + location.hash;
+  // The Pages Function may have put the page itself in the frame already (srcdoc, painted with no
+  // second request): setting src would only load it again.
+  if (site.hasAttribute('srcdoc') && location.hash) site.addEventListener('load', () => {
+    try { site.contentDocument.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView(); } catch {}
+  }, { once: true });
+  if (!site.hasAttribute('srcdoc')) site.src = (p && p.startsWith('/') && !p.startsWith('//') ? p : own) + location.hash;
 }
 // The sky loads behind the site and fades up when it has settled next to a live jet (or found none).
 // Text first: it starts only once the page's text has painted (two frames after the framed page's
