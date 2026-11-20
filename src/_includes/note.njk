@@ -3,7 +3,6 @@ layout: base.njk
 ---
 {%- set tended = site.tended[page.url] %}
 <article class="prose">
-  <p class="kind"><a href="/notes/">Notes</a></p>
   <h1>{{ title }}</h1>
   {%- if tended %}<p class="meta">Last tended {{ tended | readableDate }}</p>{% endif %}
   {{ content | safe }}

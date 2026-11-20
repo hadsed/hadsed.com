@@ -69,7 +69,13 @@ order: 3
 ---
 ```
 
+A hero image, on a project or a blog post: put the file in `content/assets/` and name it in front matter as `hero_image: home-3d.jpg` (Obsidian's `"[[home-3d.jpg]]"` works too), with an optional `hero_image_alt`. It sits under the title and becomes the page's link-preview image. A name that isn't in `content/assets/` fails the build.
+
+Or skip the front matter and start the note with the image embed (`![[home-3d.gif]]` on the first line). It shows at the top in Obsidian, and on the site it becomes the hero instead of appearing twice. `hero_image:` wins when both are there; if both name the same file, it shows once.
+
 To break a note out of a post: link the section first (`[[post#Heading]]`), then move the text into `content/notes/`, point the links at the note, and leave a line in the post. A link to a heading that no longer exists fails the build.
+
+Obsidian callouts render as boxes: `> [!note] Title` with the body on the following `>` lines; `[!tip]`, `[!warning]`, `[!danger]`, `[!example]` and Obsidian's other types get their own color and icon, and `[!note]-` (folded) or `[!note]+` (open) makes one that opens and closes. A blog post with more than two sections gets a table of contents from its headings: an outline column on the right on wide screens, a "Contents" drop-down under the title on narrower ones.
 
 Custom HTML, three ways: raw HTML right in the markdown; a self-contained `.html` file in `content/assets/` embedded with `![[viz.html]]` (or `![[viz.html|caption]]` on its own line), which runs in its own frame inside the page; or `layout: raw` in front matter (or a page written as `.html`), which skips the site template but keeps the URL, project listings and backlinks.
 

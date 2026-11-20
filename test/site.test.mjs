@@ -49,7 +49,6 @@ test("landing page shows about, timeline, and projects", () => {
   assert.match(html, /<svg[\s\S]*?mailto:h@hadsed.com|mailto:h@hadsed.com[\s\S]*?<svg/);
   assert.match(html, /Intelligent Robotics Group/);
   assert.match(html, /class="about-head">\s*<img class="avatar"[\s\S]*?<h1>Had Seddiqi<\/h1>/);
-  assert.doesNotMatch(html, /class="site-name"/);
   assert.doesNotMatch(html, /class="link"/);
   assert.doesNotMatch(html, /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/);
 });
@@ -166,4 +165,20 @@ test("the Pages Function serves the sky wrapper at a page's own URL, never to cr
   assert.equal(await run("/lab/home/"), "page");
   const routes = JSON.parse(read("_routes.json"));
   for (const p of ["/assets/*", "/fonts/*", "/lab/*"]) assert.ok(routes.exclude.includes(p), p);
+});
+
+test("the menu is the same on every page, apart from which item is current", () => {
+  const nav = (p) => read(p).match(/<nav class="menu">[\s\S]*?<\/nav>/)[0].replace(/ aria-current="page"/g, "");
+  const home = nav("index.html");
+  assert.match(home, /class="site-name"/);
+  for (const p of ["experience/index.html", "projects/index.html", "blog/index.html", "notes/index.html", "projects/subassembler/index.html", "404.html"]) {
+    assert.equal(nav(p), home, p);
+  }
+});
+
+test("a long post gets a side table of contents and its callouts render", () => {
+  const html = read("blog/2026-10-28-home-from-an-address/index.html");
+  assert.match(html, /<aside class="toc-side"[\s\S]*?<a href="#experimental-setup">Experimental setup<\/a>/);
+  assert.match(html, /<div class="callout callout-note">\s*<p class="callout-title">Why Astra\?<\/p>/);
+  assert.doesNotMatch(html, /\[!note\]/);
 });

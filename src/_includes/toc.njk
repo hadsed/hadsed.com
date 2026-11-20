@@ -1,0 +1,42 @@
+{#- Table of contents from the post's own headings (lib/article.mjs tocFrom), laid out like
+    Obsidian's outline: three levels, guide lines, and a chevron to fold a section. -#}
+{%- macro tocList(items) -%}
+<ol>
+  {%- for h in items %}
+  <li{% if h.children.length %} class="has-kids"{% endif %}>
+    {%- if h.children.length %}<button type="button" class="toc-fold" aria-expanded="true" aria-label="Fold {{ h.text }}"></button>{% endif -%}
+    <a href="#{{ h.id }}">{{ h.text }}</a>
+    {%- if h.children.length %}{{ tocList(h.children) }}{% endif %}
+  </li>
+  {%- endfor %}
+</ol>
+{%- endmacro -%}
+<div class="toc">{{ tocList(toc) }}</div>
+<script>(function () {
+  var box = document.currentScript.previousElementSibling;
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('.toc-fold'); if (!b) return;
+    b.setAttribute('aria-expanded', b.getAttribute('aria-expanded') !== 'true');
+  });
+  // The side list marks the heading being read.
+  var side = box.closest('.toc-side'); if (!side) return;
+  var links = [].slice.call(side.querySelectorAll('a[href^="#"]'));
+  var heads = links.map(function (a) { return document.getElementById(decodeURIComponent(a.hash.slice(1))); });
+  var current = null;
+  function mark() {
+    var line = innerHeight * 0.25, at = -1;
+    for (var i = 0; i < heads.length; i++) { if (heads[i] && heads[i].getBoundingClientRect().top <= line) at = i; }
+    var a = links[at] || null;
+    if (a === current) return;
+    if (current) current.removeAttribute('aria-current');
+    current = a;
+    if (a) {
+      a.setAttribute('aria-current', 'location');
+      var r = a.getBoundingClientRect(), s = side.getBoundingClientRect();
+      if (r.top < s.top + 40 || r.bottom > s.bottom - 40) side.scrollTop += r.top - s.top - s.height / 3;
+    }
+  }
+  addEventListener('scroll', mark, { passive: true });
+  addEventListener('load', mark);
+  mark();
+})();</script>
