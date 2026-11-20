@@ -8,9 +8,10 @@ layout: base.njk
   {%- if projectsIn %}
   <p class="appears">Appears in {% for p in projectsIn %}<a href="{{ p.url }}">{{ p.title }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
   {%- endif %}
-  {%- if image %}
-  <img class="hero" src="{{ image | assetUrl }}" alt="{{ image_alt or '' }}">
+  {%- set lead = page.inputPath | leadImage if not hero_image else null %}
+  {%- if hero_image or lead %}
+  <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
   {%- endif %}
-  {{ content | safe }}
+  {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
 {% include "backlinks.njk" %}

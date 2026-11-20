@@ -9,10 +9,11 @@ layout: base.njk
     {%- if info.started and info.updated %}, last updated {{ info.updated | readableDate }}{% elif info.updated %}Last updated {{ info.updated | readableDate }}{% endif %}
     {%- if link %}<br><a href="{{ link }}">{{ link | replace("https://", "") }}</a>{% endif %}
   </p>
-  {%- if image %}
-  <img class="hero" src="{{ image | assetUrl }}" alt="{{ image_alt or '' }}">
+  {%- set lead = page.inputPath | leadImage if not hero_image else null %}
+  {%- if hero_image or lead %}
+  <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
   {%- endif %}
-  {{ content | safe }}
+  {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
 {%- if info.posts.length %}
 <section class="section">

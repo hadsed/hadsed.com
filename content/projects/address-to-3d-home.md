@@ -5,7 +5,7 @@ year: 2026
 order: 3
 status: active
 started: 2026-10
-image: "[[home-from-an-address/address-to-3d-home-2x-crop.gif]]"
+hero_image: "[[home-from-an-address/address-to-3d-home-2x-crop.gif]]"
 posts:
   - "[[home-from-an-address]]"
 ---

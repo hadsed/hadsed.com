@@ -304,7 +304,7 @@ h1 .status { margin-left: 0.6rem; }
 .prose th { color: var(--muted); font-weight: 400; }
 .prose td img { max-width: 9rem; }
 
-/* Hero image (image: in front matter) */
+/* Hero image (hero_image: in front matter) */
 .prose .hero { display: block; width: 100%; height: auto; margin: 0.25rem 0 1.75rem; border-radius: 3px; }
 
 /* ![[viz.html]]: a self-contained page in its own frame */
