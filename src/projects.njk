@@ -8,6 +8,7 @@ permalink: /projects/
 <section class="panels">
 {%- for item in site.projects %}
   <article class="panel">
+    {%- if item.hero %}<a class="card-hero-link" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{{ item.hero | heroHtml("", true) | safe }}</a>{% endif %}
     <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
     {%- if item.status %}<span class="status status-{{ item.status }}">{{ item.status }}</span>{% endif %}
     <p class="summary">{{ item.summary }}</p>

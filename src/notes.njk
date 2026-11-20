@@ -8,7 +8,8 @@ permalink: /notes/
 {%- if site.notes.length %}
 <ul class="posts">
 {%- for note in site.notes %}
-  <li>
+  <li{% if note.hero %} class="has-hero"{% endif %}>
+    {%- if note.hero %}<a class="card-hero-link" href="{{ note.url }}" tabindex="-1" aria-hidden="true">{{ note.hero | heroHtml("", true) | safe }}</a>{% endif %}
     <a href="{{ note.url }}">{{ note.title }}</a>
     {%- if note.tended %}<span class="dates">{{ note.tended | shortDate }}</span>{% endif %}
     {%- if note.summary %}<p class="summary">{{ note.summary }}</p>{% endif %}

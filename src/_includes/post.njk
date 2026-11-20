@@ -10,7 +10,7 @@ layout: base.njk
   {%- endif %}
   {%- set lead = page.inputPath | leadImage if not hero_image else null %}
   {%- if hero_image or lead %}
-  <img class="hero" src="{{ (hero_image or lead.src) | assetUrl }}" alt="{{ hero_image_alt or (lead.alt if lead) or '' }}">
+  {{ (hero_image or lead.src) | heroHtml(hero_image_alt or (lead.alt if lead) or '') | safe }}
   {%- endif %}
   {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>

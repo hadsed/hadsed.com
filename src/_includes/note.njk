@@ -5,6 +5,9 @@ layout: base.njk
 <article class="prose">
   <h1>{{ title }}</h1>
   {%- if tended %}<p class="meta">Last tended {{ tended | readableDate }}</p>{% endif %}
+  {%- if hero_image %}
+  {{ hero_image | heroHtml(hero_image_alt) | safe }}
+  {%- endif %}
   {{ content | safe }}
 </article>
 {% include "backlinks.njk" %}

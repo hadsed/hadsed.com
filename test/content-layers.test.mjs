@@ -69,6 +69,17 @@ date: 2026-11-18
 Body text.
 `,
   "content/assets/zz-fixture-hero.png": "png",
+  "content/blog/zz-fixture-tour.md": `---
+title: Tour post
+date: 2026-11-17
+hero_image: "[[zz-fixture-tour.gif]]"
+hero_image_alt: A walk through
+---
+
+Body text.
+`,
+  // a two-frame 8x8 GIF
+  "content/assets/zz-fixture-tour.gif": Buffer.from("R0lGODlhCAAIAIAAAExpcQAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQFCgAAACwAAAAACAAIAAACB4yPqcvtXQAAIfkEBQoAAAAsAAAAAAgACACATGlx////AgeMj6nL7V0AADs=", "base64"),
   "content/assets/zz-fixture-viewer.html": `<!doctype html><title>Viewer</title><script>const a = {{ b }};</script>`,
 };
 const broken = new URL("content/notes/zz-fixture-broken.md", root);
@@ -119,14 +130,14 @@ test("a post shows the projects it appears in, heading anchors, and an HTML embe
 
 test("a hero image from front matter leads the page and becomes its link preview", () => {
   const html = read("blog/2026-11-19-first-post/index.html");
-  assert.match(html, /<img class="hero" src="\/assets\/zz-fixture-hero.png" alt="A house">/);
+  assert.match(html, /<img class="hero" src="\/assets\/zz-fixture-hero.png" alt="A house"[^>]*>/);
   assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/zz-fixture-hero.png">/);
   assert.doesNotMatch(read("projects/fixture-house/index.html"), /class="hero"/);
 });
 
 test("an image embed on a note's first line becomes the hero and is not repeated", () => {
   const html = read("blog/2026-11-18-zz-fixture-lead/index.html");
-  assert.match(html, /<img class="hero" src="\/assets\/zz-fixture-hero.png" alt="The house at dusk">/);
+  assert.match(html, /<img class="hero" src="\/assets\/zz-fixture-hero.png" alt="The house at dusk"[^>]*>/);
   assert.equal((html.match(/zz-fixture-hero\.png" alt/g) || []).length, 1);
   assert.doesNotMatch(html, /<figure class="figure">/);
   assert.match(html, /<meta property="og:image" content="https:\/\/[^"]+\/assets\/zz-fixture-hero.png">/);
@@ -168,4 +179,18 @@ test("a link to a heading that doesn't exist fails the build", () => {
   writeFileSync(broken, `---\ntitle: Broken\n---\n[[first-post#No such heading]]\n`);
   assert.throws(build, /no heading "No such heading"/);
   rmSync(broken, { force: true });
+});
+
+test("an animated hero is a still frame until hovered, on its page and on its cards", () => {
+  const html = read("blog/2026-11-17-zz-fixture-tour/index.html");
+  assert.match(html, /<span class="hero hero-anim" data-motion="\/assets\/_hero\/zz-fixture-tour\.(mp4|anim\.webp)"><img src="\/assets\/_hero\/zz-fixture-tour\.webp" alt="A walk through" width="8" height="8"/);
+  assert.doesNotMatch(html, /src="[^"]*zz-fixture-tour\.gif"/);
+  assert.ok(existsSync(new URL("assets/_hero/zz-fixture-tour.webp", out)));
+  const motion = html.match(/data-motion="\/([^"]+)"/)[1];
+  assert.ok(existsSync(new URL(motion, out)));
+  assert.match(html, /<script src="\/assets\/hero\.js" defer><\/script>/);
+  // the blog index shows it as a lazy, decorative thumbnail beside the post; the lead-image post gets one too
+  const index = read("blog/index.html");
+  assert.match(index, /<li class="has-hero">\s*<a class="card-hero-link" href="\/blog\/2026-11-17-zz-fixture-tour\/" tabindex="-1" aria-hidden="true"><span class="card-hero hero-anim" data-motion="[^"]+"><img src="\/assets\/_hero\/zz-fixture-tour\.webp" alt="" width="8" height="8" loading="lazy"/);
+  assert.match(index, /href="\/blog\/2026-11-18-zz-fixture-lead\/" tabindex="-1" aria-hidden="true"><img class="card-hero" src="\/assets\/zz-fixture-hero.png" alt=""/);
 });

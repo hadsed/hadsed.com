@@ -2,6 +2,7 @@ import { basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
+import { prepareHeroes, heroHtml } from "./lib/hero.mjs";
 
 export default function (eleventyConfig) {
   // content/articles is the blog's old folder (now content/blog); a copy left in the vault stays unbuilt.
@@ -76,7 +77,14 @@ export default function (eleventyConfig) {
   // Projects, blog posts and notes: URLs, backlinks, "Appears in", project activity (lib/content.mjs).
   // Rebuilt on every build so a change anywhere shows up everywhere it is referenced.
   let model = buildModel();
-  eleventyConfig.on("eleventy.before", () => { model = buildModel(); });
+  // Hero images (lib/hero.mjs): sizes read and animated ones turned into a still + motion up front,
+  // so templates can render them synchronously.
+  eleventyConfig.on("eleventy.before", async ({ directories, dir }) => {
+    model = buildModel();
+    await prepareHeroes(Object.values(model.heroByUrl), (directories?.output || dir.output).replace(/\/$/, ""));
+  });
+  // {{ image | heroHtml(image_alt) }} on a page; {{ item.hero | heroHtml("", true) }} on a card in a list.
+  eleventyConfig.addFilter("heroHtml", (value, alt = "", card = false) => heroHtml(value, { alt, card, className: card ? "card-hero" : "hero" }));
   eleventyConfig.addGlobalData("site", () => model);
   // Folder data (content/<kind>/<kind>.json) sets permalink: "{{ page.inputPath | contentUrl(slug, date) }}".
   eleventyConfig.addFilter("contentUrl", (inputPath, slug, date) => {
