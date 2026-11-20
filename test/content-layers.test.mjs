@@ -57,10 +57,29 @@ layout: raw
 ---
 <!doctype html><title>Raw</title><canvas id="c"></canvas> Links to [[zz-fixture-plan-fit]].
 `,
+  "content/blog/zz-fixture-share.md": `---
+title: A post with its own preview
+date: 2026-11-18
+slug: share
+og_image: hero kitchen-edges.jpg
+og_image_alt: Kitchen edges traced over a floor plan
+---
+Body.
+`,
+  "content/blog/zz-fixture-share-no-alt.md": `---
+title: Preview without alt text
+date: 2026-11-17
+slug: share-no-alt
+og_image: hero-kitchen-edges.jpg
+---
+Body.
+`,
   "content/assets/zz-fixture-viewer.html": `<!doctype html><title>Viewer</title><script>const a = {{ b }};</script>`,
 };
 const broken = new URL("content/notes/zz-fixture-broken.md", root);
-const build = () => execFileSync("npx", ["@11ty/eleventy", "--quiet", "--output=_site-layers"], { stdio: "pipe" });
+// Built as a preview deploy would be (.github/workflows/deploy.yml sets SITE_URL to the branch alias).
+const preview = "https://fixture-branch.hadsed-com.pages.dev";
+const build = () => execFileSync("npx", ["@11ty/eleventy", "--quiet", "--output=_site-layers"], { stdio: "pipe", env: { ...process.env, SITE_URL: preview } });
 
 before(() => {
   for (const [path, body] of Object.entries(fixtures)) writeFileSync(new URL(path, root), body);
@@ -102,6 +121,23 @@ test("a post shows the projects it appears in, heading anchors, and an HTML embe
   // the embed is copied as a file, untouched by the template engine
   assert.equal(read("assets/zz-fixture-viewer.html"), fixtures["content/assets/zz-fixture-viewer.html"]);
   assert.match(read("blog/index.html"), /href="\/blog\/2026-11-19-first-post\/">A first post</);
+});
+
+test("an article's og_image sets its link preview; one without it keeps og.jpg", () => {
+  const tags = (p) => {
+    const html = read(p);
+    const meta = (prop) => html.match(new RegExp(`<meta property="og:${prop}" content="([^"]*)">`))?.[1];
+    return { image: meta("image"), width: meta("image:width"), height: meta("image:height"), alt: meta("image:alt") };
+  };
+  assert.deepEqual(tags("blog/2026-11-18-share/index.html"), {
+    image: `${preview}/assets/hero%20kitchen-edges.jpg`, width: "1200", height: "630", alt: "Kitchen edges traced over a floor plan",
+  });
+  assert.deepEqual(tags("blog/2026-11-17-share-no-alt/index.html"), {
+    image: `${preview}/assets/hero-kitchen-edges.jpg`, width: "1200", height: "630", alt: "Preview without alt text",
+  });
+  const fallback = { image: `${preview}/assets/og.jpg`, width: "1200", height: "630", alt: "Had Seddiqi, hadsed.com" };
+  assert.deepEqual(tags("blog/2026-11-19-first-post/index.html"), fallback);
+  assert.deepEqual(tags("index.html"), fallback);
 });
 
 test("wikilinks reach headings on other pages and on the same page", () => {
