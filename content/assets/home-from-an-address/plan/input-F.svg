@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 314" width="440" height="314"><style>
+  svg { --fg:#1c1f23; --muted:#6b7178; --line:#cfd3d8; --soft:#f2f3f1; --accent:#1f6fbf; --amber:#c27c0e; --red:#c0392b; }
+  /* light only; a dark theme would just redefine these variables */
+  .t { font: 600 40px system-ui, -apple-system, "Helvetica Neue", sans-serif; fill: var(--fg); }
+  .h { font: 600 26px system-ui, -apple-system, "Helvetica Neue", sans-serif; fill: var(--fg); }
+  .m { font: 18px ui-monospace, "SF Mono", Menlo, monospace; fill: var(--fg); }
+  .ms { font: 16px ui-monospace, "SF Mono", Menlo, monospace; fill: var(--muted); }
+  .frame { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .ln { fill: none; stroke: var(--fg); }
+  .arrow { stroke: var(--muted); stroke-width: 2; fill: none; }
+</style>
+<defs><marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" style="fill:var(--muted)"/></marker>
+<marker id="aa" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" style="fill:var(--amber)"/></marker></defs><rect class="frame" x="1" y="1" width="438" height="312" rx="8"/><text class="m" x="28" y="70" style="font-size:24px"><tspan style="fill:var(--accent)">assessor</tspan></text><text class="m" x="158" y="70" style="font-size:24px">1914 · 2,692 sqft</text><text class="m" x="28" y="118" style="font-size:24px"><tspan style="fill:var(--accent)">listing</tspan></text><text class="m" x="158" y="118" style="font-size:24px">3 bd / 2.5 ba</text><text class="m" x="28" y="166" style="font-size:24px"><tspan style="fill:var(--accent)">permit</tspan></text><text class="m" x="158" y="166" style="font-size:24px">1989 addition</text><text class="m" x="28" y="214" style="font-size:24px"><tspan style="fill:var(--accent)">sale</tspan></text><text class="m" x="158" y="214" style="font-size:24px">2025 · $3.9M</text><text class="m" x="28" y="262" style="font-size:24px"><tspan style="fill:var(--accent)">lot</tspan></text><text class="m" x="158" y="262" style="font-size:24px">25 × 100 ft</text></svg>

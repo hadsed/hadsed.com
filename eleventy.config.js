@@ -94,11 +94,9 @@ export default function (eleventyConfig) {
         const inline = tokens[i + 1];
         const id = uniqueId(slugify(inline.content), seen);
         tokens[i].attrSet("id", id);
-        if (tokens[i].tag !== "h1") {
-          const open = new state.Token("html_inline", "", 0);
-          open.content = `<a class="anchor" href="#${id}" aria-hidden="true">#</a>`;
-          inline.children.unshift(open);
-        }
+        const open = new state.Token("html_inline", "", 0);
+        open.content = `<a class="anchor" href="#${id}" aria-hidden="true">#</a>`;
+        inline.children.unshift(open);
       }
     });
   });
@@ -107,17 +105,28 @@ export default function (eleventyConfig) {
   // Embeds: ![[image.png]] becomes an image; ![[viz.html]], a self-contained page from content/assets,
   // runs in its own frame inside the page (its CSS and JS can't touch the site's).
   const embedFrame = (file) =>
-    `<iframe class="embed-frame" src="/assets/${file}" title="${file.replace(/\.html$/, "")}" loading="lazy" allow="fullscreen; xr-spatial-tracking"></iframe>`;
+    `<iframe class="embed-frame" src="/assets/${encodeURI(file)}" title="${file.replace(/\.html$/, "")}" loading="lazy" allow="fullscreen; xr-spatial-tracking"></iframe>`;
+  // ![[pic.png|600]] sets a width, as in Obsidian; any other text after the | is the alt text,
+  // and an image on its own line shows that text as a caption.
+  const embedImage = (file, alias) => {
+    const width = alias && /^\d+(x\d+)?$/.test(alias.trim()) ? alias.trim().split("x")[0] : null;
+    const alt = alias && !width ? alias.trim() : "";
+    return `<img src="/assets/${encodeURI(file)}" alt="${alt}"${width ? ` width="${width}"` : ""} loading="lazy">`;
+  };
   eleventyConfig.addTransform("wikilinks", function (content) {
     if (!(this.page.outputPath || "").endsWith(".html")) return content;
     const where = this.page.inputPath;
     const self = model.byUrl.get(this.page.url);
     return content
-      .replace(/<p>\s*!\[\[([^\]|]+\.html)(?:\|([^\]]+))?\]\]\s*<\/p>/g, (m, file, caption) =>
-        `<figure class="embed">${embedFrame(file.trim())}${caption ? `<figcaption>${caption.trim()}</figcaption>` : ""}</figure>`)
+      .replace(/<p>\s*!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*<\/p>/g, (m, file, alias) => {
+        file = file.trim();
+        if (file.endsWith(".html")) return `<figure class="embed">${embedFrame(file)}${alias ? `<figcaption>${alias.trim()}</figcaption>` : ""}</figure>`;
+        const caption = alias && !/^\d+(x\d+)?$/.test(alias.trim()) ? `<figcaption>${alias.trim()}</figcaption>` : "";
+        return `<figure class="figure">${embedImage(file, alias)}${caption}</figure>`;
+      })
       .replace(/(!?)\[\[([^\]|#]*)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g, (match, embed, name, heading, alias) => {
         name = name.trim();
-        if (embed) return name.endsWith(".html") ? embedFrame(name) : `<img src="/assets/${name}" alt="${alias ? alias.trim() : ""}">`;
+        if (embed) return name.endsWith(".html") ? embedFrame(name) : embedImage(name, alias);
         const hit = name ? model.targets.get(name) : self;
         if (!hit) throw new Error(`Unresolved wikilink ${match} in ${where}`);
         let href = hit.url;
@@ -166,7 +175,7 @@ export default function (eleventyConfig) {
   // in content/assets. A name that isn't there fails the build rather than shipping a broken image.
   eleventyConfig.addFilter("assetUrl", (value) => {
     if (!value) return "";
-    const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^.*\//, "");
+    const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");
     if (!existsSync(`content/assets/${name}`) && !existsSync(`src/assets/${name}`)) throw new Error(`image: ${value} is not in content/assets`);
     return `/assets/${encodeURI(name)}`;
   });

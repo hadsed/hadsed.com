@@ -3,6 +3,11 @@ title: Address to 3D home
 summary: A 3D model of a house from its street address.
 year: 2026
 order: 3
+status: active
+started: 2026-10
+image: "[[home-from-an-address/address-to-3d-home-2x-crop.gif]]"
+posts:
+  - "[[home-from-an-address]]"
 ---
 <!-- Placeholder. Rewrite freely. -->
 

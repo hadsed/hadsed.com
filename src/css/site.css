@@ -285,13 +285,24 @@ h1 .status { margin-left: 0.6rem; }
 .prose h2 { font-size: 1.05rem; }
 .prose h3, .prose h4 { font-size: 0.95rem; }
 .prose .anchor { position: absolute; left: -1.1rem; color: var(--muted); text-decoration: none; opacity: 0; }
-.prose :is(h2, h3, h4):hover .anchor, .prose .anchor:focus { opacity: 1; }
+.prose :is(h1, h2, h3, h4):hover .anchor, .prose .anchor:focus { opacity: 1; }
 .prose ul, .prose ol { margin: 0 0 1rem; padding-left: 1.1rem; }
 .prose li { margin: 0 0 0.3rem; }
 .prose img { max-width: 100%; height: auto; border-radius: 3px; }
 .prose code { font-size: 0.9em; }
 .prose pre { background: color-mix(in srgb, #000 25%, transparent); border-radius: 3px; padding: 0.8rem 1rem; overflow-x: auto; font-size: 0.85rem; }
 .prose blockquote { margin: 0 0 1rem; padding-left: 1rem; border-left: 1px solid var(--rule); color: var(--muted); }
+
+/* Section headings inside a post (the title is the only h1 without an id) */
+.prose h1[id] { font-size: 1.2rem; margin: 2.5rem 0 0.75rem; position: relative; }
+.prose h1[id]:hover .anchor { opacity: 1; }
+.prose .figure { margin: 1.25rem 0 1.5rem; }
+.prose .figure img { display: block; margin: 0 auto; }
+.prose .figure figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 0.4rem; text-align: center; }
+.prose table { border-collapse: collapse; width: 100%; margin: 0 0 1.25rem; font-size: 0.85rem; display: block; overflow-x: auto; }
+.prose th, .prose td { text-align: left; vertical-align: top; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid color-mix(in srgb, var(--rule) 30%, transparent); }
+.prose th { color: var(--muted); font-weight: 400; }
+.prose td img { max-width: 9rem; }
 
 /* Hero image (image: in front matter) */
 .prose .hero { display: block; width: 100%; height: auto; margin: 0.25rem 0 1.75rem; border-radius: 3px; }
