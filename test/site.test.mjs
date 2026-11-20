@@ -1,21 +1,21 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 
 const read = (p) => readFileSync(new URL(`../_site/${p}`, import.meta.url), "utf8");
 before(() => { execFileSync("npx", ["@11ty/eleventy", "--quiet"], { stdio: "inherit" }); });
 
 test("landing page carries the shell", () => {
   const html = read("index.html");
-  for (const label of ["About", "Portfolio", "Experience", "Blog"]) assert.match(html, new RegExp(`>${label}<`));
+  for (const label of ["About", "Experience", "Projects", "Blog", "Notes"]) assert.match(html, new RegExp(`>${label}<`));
   assert.match(html, /href="\/css\/site\.css"/);
   assert.match(html, /<title>Had Seddiqi<\/title>/);
   assert.match(html, /<\/main>\s*<\/div>\s*<footer>© \d{4} Had Seddiqi<\/footer>/);
 });
 
-test("notes and plans are not published", () => {
-  assert.equal(existsSync(new URL("../_site/notes", import.meta.url)), false);
+test("the repo's notes/ and plans/ folders are not published (/notes/ is the site's notes section)", () => {
+  assert.deepEqual(readdirSync(new URL("../_site/notes", import.meta.url)).filter((f) => f !== "index.html" && !existsSync(new URL(`../content/notes/${f}.md`, import.meta.url))), []);
   assert.equal(existsSync(new URL("../_site/plans", import.meta.url)), false);
 });
 
@@ -53,9 +53,18 @@ test("landing page shows about, timeline, and projects", () => {
   assert.doesNotMatch(html, /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/);
 });
 
-test("portfolio page and project pages", () => {
-  assert.equal((read("portfolio/index.html").match(/class="panel"/g) || []).length, 3);
-  assert.match(read("portfolio/subassembler/index.html"), /<h1>Subassembler<\/h1>/);
+test("projects page and project pages; portfolio redirects there", () => {
+  assert.equal((read("projects/index.html").match(/class="panel"/g) || []).length, 3);
+  assert.match(read("projects/subassembler/index.html"), /<h1>Subassembler<\/h1>/);
+  assert.equal(existsSync(new URL("../_site/portfolio", import.meta.url)), false);
+  assert.match(read("_redirects"), /^\/portfolio\/\* \/projects\/:splat 301$/m);
+});
+
+test("menu: About and Experience, a gap, then Projects, Blog and Notes", () => {
+  const nav = read("projects/index.html").match(/<ul class="nav">[\s\S]*?<\/ul><\/li><\/ul>/)[0];
+  const labels = [...nav.matchAll(/>([A-Z][a-z]+)<\/a>/g)].map((m) => m[1]);
+  assert.deepEqual(labels, ["About", "Experience", "Projects", "Blog", "Notes"]);
+  assert.match(nav, /Experience<\/a><\/li><li class="nav-gap" aria-hidden="true"><\/li><li><a aria-current="page" href="\/projects\/">/);
 });
 
 test("experience page renders bodies as lists", () => {
@@ -65,9 +74,10 @@ test("experience page renders bodies as lists", () => {
   assert.match(html, /Planetary Lake Lander/);
 });
 
-test("blog index and post", () => {
-  assert.match(read("blog/index.html"), /href="\/blog\/hello\/"/);
-  assert.match(read("blog/hello/index.html"), /27 October 2026/);
+test("blog and notes indexes exist; the placeholder post redirects", () => {
+  assert.match(read("blog/index.html"), /<h2 class="label">Blog<\/h2>/);
+  assert.match(read("notes/index.html"), /<h2 class="label">Notes<\/h2>/);
+  assert.match(read("_redirects"), /^\/blog\/hello\/ \/blog\/ 301$/m);
 });
 
 test("current page is marked in the menu", () => {
@@ -92,7 +102,7 @@ test("crawlers get robots.txt, a sitemap, a real 404 and a Person schema", () =>
   assert.match(read("robots.txt"), /^Sitemap: https:\/\/hadsed\.com\/sitemap\.xml$/m);
   const sitemap = read("sitemap.xml");
   assert.match(sitemap, /<loc>https:\/\/hadsed\.com\/<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/hadsed\.com\/portfolio\/subassembler\/<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/hadsed\.com\/projects\/subassembler\/<\/loc>/);
   assert.doesNotMatch(sitemap, /404|robots|sitemap\.xml/);
   assert.match(read("404.html"), /<meta name="robots" content="noindex">/);
   assert.match(read("_headers"), /X-Robots-Tag: noindex/);
@@ -100,5 +110,5 @@ test("crawlers get robots.txt, a sitemap, a real 404 and a Person schema", () =>
   assert.equal(ld["@type"], "Person");
   assert.ok(ld.sameAs.includes("https://github.com/hadsed"));
   assert.ok(!ld.sameAs.some((url) => url.startsWith("mailto:")));
-  assert.match(read("portfolio/subassembler/index.html"), /<meta name="description" content="Step-by-step assembly walkthroughs generated from CAD\.">/);
+  assert.match(read("projects/subassembler/index.html"), /<meta name="description" content="Step-by-step assembly walkthroughs generated from CAD\.">/);
 });

@@ -1,0 +1,21 @@
+---
+layout: base.njk
+title: Projects
+permalink: /projects/
+---
+<h2 class="label">Projects</h2>
+{#- Most recently active first: the newest listed blog post, or the project page's last edit. -#}
+<section class="panels">
+{%- for item in site.projects %}
+  <article class="panel">
+    <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
+    {%- if item.status %}<span class="status status-{{ item.status }}">{{ item.status }}</span>{% endif %}
+    <p class="summary">{{ item.summary }}</p>
+    <p class="counts">
+      {%- if item.updated %}Updated {{ item.updated | shortDate }}{% endif %}
+      {%- if item.posts.length %} · {{ item.posts.length }} post{% if item.posts.length != 1 %}s{% endif %}{% endif %}
+      {%- if item.notes.length %} · {{ item.notes.length }} note{% if item.notes.length != 1 %}s{% endif %}{% endif %}
+    </p>
+  </article>
+{%- endfor %}
+</section>

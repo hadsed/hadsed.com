@@ -1,33 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
-import matter from "gray-matter";
-
-// Obsidian-style [[wikilinks]] resolve against content/ by file slug:
-// projects -> /portfolio/<slug>/, articles -> /blog/<slug>/, experience -> /experience/#<slug>.
-// ![[file.png]] embeds become images served from content/assets.
-// Role files carry their start date as a prefix (2017-06-ontra.md) so they
-// sort chronologically in Obsidian; the site addresses the role by the rest.
-const roleSlug = (slug) => slug.replace(/^\d{4}(-\d{2})?-/, "");
-
-function wikilinkTargets() {
-  const targets = new Map();
-  const scan = (dir, url, label, key = (s) => s) => {
-    for (const file of readdirSync(`content/${dir}`)) {
-      if (!file.endsWith(".md")) continue;
-      const slug = file.slice(0, -3);
-      const { data } = matter(readFileSync(`content/${dir}/${file}`, "utf8"));
-      const target = { url: url(key(slug)), text: data[label] || key(slug) };
-      targets.set(slug, target);   // [[2017-06-ontra]], what Obsidian autocompletes
-      targets.set(key(slug), target); // [[ontra]]
-    }
-  };
-  scan("projects", (s) => `/portfolio/${s}/`, "title");
-  scan("articles", (s) => `/blog/${s}/`, "title");
-  scan("experience", (s) => `/experience/#${s}`, "org", roleSlug);
-  return targets;
-}
+import { basename, dirname } from "node:path";
+import { buildModel, urlFor, roleSlug, slugify, uniqueId } from "./lib/content.mjs";
 
 export default function (eleventyConfig) {
-  for (const path of ["flight/**", "notes/**", "plans/**", "docs/**", "scripts/**", "test/**", ".superpowers/**", ".claude/**", "README.md"]) {
+  // content/articles is the blog's old folder (now content/blog); a copy left in the vault stays unbuilt.
+  // content/assets holds images and self-contained .html embeds: copied as files, never templates.
+  for (const path of ["flight/**", "notes/**", "plans/**", "docs/**", "scripts/**", "test/**", "lib/**", ".superpowers/**", ".claude/**", "README.md", "content/articles/**", "content/assets/**"]) {
     eleventyConfig.ignores.add(path);
   }
 
@@ -88,24 +65,71 @@ export default function (eleventyConfig) {
     });
   }
 
-  // Branch previews carry mockups of the projects / blog / notes pages (src/mockups, index at /lab/content/).
-  if (!(process.env.SITE_URL || process.env.LAB)) eleventyConfig.ignores.add("src/mockups/**");
-
   // Branch previews (SITE_URL set) carry the SR-71 model shootout at /lab/sr71-models/.
   // Production builds never include it.
   if (process.env.SITE_URL || process.env.LAB) {
     eleventyConfig.addPassthroughCopy({ "notes/lab/sr71-models": "lab/sr71-models" });
   }
 
-  const targets = wikilinkTargets();
+  // Projects, blog posts and notes: URLs, backlinks, "Appears in", project activity (lib/content.mjs).
+  // Rebuilt on every build so a change anywhere shows up everywhere it is referenced.
+  let model = buildModel();
+  eleventyConfig.on("eleventy.before", () => { model = buildModel(); });
+  eleventyConfig.addGlobalData("site", () => model);
+  // Folder data (content/<kind>/<kind>.json) sets permalink: "{{ page.inputPath | contentUrl(slug, date) }}".
+  eleventyConfig.addFilter("contentUrl", (inputPath, slug, date) => {
+    const kind = basename(dirname(inputPath));
+    return urlFor(kind, basename(inputPath).replace(/\.(md|html)$/, ""), { slug, date });
+  });
+
+  // Headings get stable ids from their text (the same ids [[page#Heading]] links resolve to)
+  // and a # link to themselves, so any section can be linked before it becomes its own note.
+  eleventyConfig.amendLibrary("md", (md) => {
+    md.core.ruler.push("heading_ids", (state) => {
+      const seen = new Map();
+      const tokens = state.tokens;
+      for (let i = 0; i < tokens.length; i++) {
+        if (tokens[i].type !== "heading_open") continue;
+        const inline = tokens[i + 1];
+        const id = uniqueId(slugify(inline.content), seen);
+        tokens[i].attrSet("id", id);
+        if (tokens[i].tag !== "h1") {
+          const open = new state.Token("html_inline", "", 0);
+          open.content = `<a class="anchor" href="#${id}" aria-hidden="true">#</a>`;
+          inline.children.unshift(open);
+        }
+      }
+    });
+  });
+
+  // Obsidian links: [[page]], [[page|text]], [[page#Heading]], [[#Heading]] (this page).
+  // Embeds: ![[image.png]] becomes an image; ![[viz.html]], a self-contained page from content/assets,
+  // runs in its own frame inside the page (its CSS and JS can't touch the site's).
+  const embedFrame = (file) =>
+    `<iframe class="embed-frame" src="/assets/${file}" title="${file.replace(/\.html$/, "")}" loading="lazy" allow="fullscreen; xr-spatial-tracking"></iframe>`;
   eleventyConfig.addTransform("wikilinks", function (content) {
     if (!(this.page.outputPath || "").endsWith(".html")) return content;
-    return content.replace(/(!?)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, embed, target, alias) => {
-      if (embed) return `<img src="/assets/${target.trim()}" alt="">`;
-      const hit = targets.get(target.trim());
-      if (!hit) throw new Error(`Unresolved wikilink ${match} in ${this.page.inputPath}`);
-      return `<a href="${hit.url}">${alias ? alias.trim() : hit.text}</a>`;
-    });
+    const where = this.page.inputPath;
+    const self = model.byUrl.get(this.page.url);
+    return content
+      .replace(/<p>\s*!\[\[([^\]|]+\.html)(?:\|([^\]]+))?\]\]\s*<\/p>/g, (m, file, caption) =>
+        `<figure class="embed">${embedFrame(file.trim())}${caption ? `<figcaption>${caption.trim()}</figcaption>` : ""}</figure>`)
+      .replace(/(!?)\[\[([^\]|#]*)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g, (match, embed, name, heading, alias) => {
+        name = name.trim();
+        if (embed) return name.endsWith(".html") ? embedFrame(name) : `<img src="/assets/${name}" alt="${alias ? alias.trim() : ""}">`;
+        const hit = name ? model.targets.get(name) : self;
+        if (!hit) throw new Error(`Unresolved wikilink ${match} in ${where}`);
+        let href = hit.url;
+        if (heading) {
+          const id = slugify(heading);
+          if (hit.headings && hit.kind !== "experience" && !hit.headings.has(id)) {
+            throw new Error(`Wikilink ${match} in ${where}: ${hit.url} has no heading "${heading.trim()}"`);
+          }
+          href = `${name ? hit.url : ""}#${id}`;
+        }
+        const text = alias ? alias.trim() : heading && !name ? heading.trim() : hit.title;
+        return `<a href="${href}">${text}</a>`;
+      });
   });
 
   // Absolute URLs for link previews. Branch previews set SITE_URL to their own
@@ -132,15 +156,29 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("profileUrls", (links = []) =>
     links.map((link) => link.url).filter((url) => url.startsWith("http"))
   );
+  // Dates arrive as Date objects (front matter) or YYYY-MM-DD strings (the content model).
+  const asDate = (value) => (value instanceof Date ? value : new Date(`${String(value).slice(0, 10)}T00:00:00Z`));
   eleventyConfig.addFilter("readableDate", (date) =>
-    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(date)
+    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(asDate(date))
+  );
+  // "2026-10" -> "October 2026"; a bare year stays as is.
+  eleventyConfig.addFilter("monthYear", (value) => {
+    const m = String(value).match(/^(\d{4})-(\d{2})/);
+    return m ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(+m[1], +m[2] - 1, 1))) : String(value);
+  });
+  eleventyConfig.addFilter("shortDate", (date) =>
+    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(asDate(date))
   );
 
   const byOrder = (tag) => (api) =>
     api.getFilteredByTag(tag).sort((a, b) => a.data.order - b.data.order);
   eleventyConfig.addCollection("experience", byOrder("experience"));
   eleventyConfig.addCollection("featured", (api) => byOrder("experience")(api).filter((item) => item.data.featured));
-  eleventyConfig.addCollection("projects", byOrder("projects"));
+  // Landing page panels keep their hand-set order; projects without one go last.
+  eleventyConfig.addCollection("projects", (api) =>
+    api.getFilteredByTag("projects").sort((a, b) => (a.data.order ?? 999) - (b.data.order ?? 999))
+  );
+  eleventyConfig.addCollection("blog", (api) => api.getFilteredByTag("blog").sort((a, b) => b.date - a.date));
 
   return {
     dir: { input: ".", includes: "src/_includes", output: "_site" },

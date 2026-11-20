@@ -1,0 +1,1 @@
+{ "tags": ["blog"], "layout": "post.njk", "permalink": "{{ page.inputPath | contentUrl(slug, date) }}" }

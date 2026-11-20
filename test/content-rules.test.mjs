@@ -1,5 +1,5 @@
 // Builds into _site-test with two fixtures added: an unfeatured role whose
-// dates are unquoted YAML dates, a stray copy of the articles folder under
+// dates are unquoted YAML dates, a stray copy of the blog folder under
 // .claude/ (where the desktop app keeps worktrees), and an article that uses
 // Obsidian wikilinks and image embeds.
 import { test, before, after } from "node:test";
@@ -9,8 +9,8 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs"
 
 const root = new URL("../", import.meta.url);
 const fixtureRole = new URL("content/experience/zz-fixture-unfeatured.md", root);
-const fixtureArticle = new URL("content/articles/zz-fixture-links.md", root);
-const brokenArticle = new URL("content/articles/zz-fixture-broken.md", root);
+const fixtureArticle = new URL("content/blog/zz-fixture-links.md", root);
+const brokenArticle = new URL("content/blog/zz-fixture-broken.md", root);
 const strayDir = new URL(".claude/fixture-worktree/", root);
 const out = new URL("_site-test/", root);
 const read = (p) => readFileSync(new URL(p, out), "utf8");
@@ -32,12 +32,12 @@ title: Links fixture
 date: 2026-01-02
 summary: Uses wikilinks.
 ---
-See [[subassembler]] and [[ontra|the Ontra years]] and [[2017-06-ontra]] and [[hello]].
+See [[subassembler]] and [[ontra|the Ontra years]] and [[2017-06-ontra]] and [[zz-fixture-links]].
 
 ![[diagram.png]]
 `);
   mkdirSync(new URL("content/", strayDir), { recursive: true });
-  cpSync(new URL("content/articles/", root), new URL("content/articles/", strayDir), { recursive: true });
+  cpSync(new URL("content/blog/", root), new URL("content/blog/", strayDir), { recursive: true });
   execFileSync("npx", ["@11ty/eleventy", "--quiet", "--output=_site-test"], { stdio: "inherit" });
 });
 
@@ -59,12 +59,12 @@ test("unquoted YAML dates still render as years", () => {
   assert.match(read("experience/index.html"), /class="dates">2001 – 2002</);
 });
 
-test("wikilinks resolve to project, experience, and article pages; embeds become images", () => {
-  const html = read("blog/zz-fixture-links/index.html");
-  assert.match(html, /<a href="\/portfolio\/subassembler\/">Subassembler<\/a>/);
+test("wikilinks resolve to project, experience, and blog pages; embeds become images", () => {
+  const html = read("blog/2026-01-02-zz-fixture-links/index.html");
+  assert.match(html, /<a href="\/projects\/subassembler\/">Subassembler<\/a>/);
   assert.match(html, /<a href="\/experience\/#ontra">the Ontra years<\/a>/);
   assert.match(html, /<a href="\/experience\/#ontra">Ontra<\/a>/);
-  assert.match(html, /<a href="\/blog\/hello\/">Hello<\/a>/);
+  assert.match(html, /<a href="\/blog\/2026-01-02-zz-fixture-links\/">Links fixture<\/a>/);
   assert.match(html, /<img src="\/assets\/diagram.png" alt="">/);
   assert.doesNotMatch(html, /\[\[/);
   assert.match(read("experience/index.html"), /id="ontra"/);

@@ -38,13 +38,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:wght@300&display=swap">
   <link rel="stylesheet" href="/css/site.css">
-  {%- if mockNav %}
-  <script>(function () {
-    var v = 'b';
-    try { v = new URLSearchParams(location.search).get('nav') || localStorage.getItem('mock-nav') || v; localStorage.setItem('mock-nav', v); } catch (e) {}
-    document.documentElement.setAttribute('data-nav', v);
-  })();</script>
-  {%- endif %}
   {%- if page.url == "/" %}
   {%- set about = collections.about[0].data %}
   <script type="application/ld+json">
@@ -68,45 +61,44 @@
     {%- if page.url != "/" %}
     <a class="site-name" href="/">Had Seddiqi</a>
     {%- endif %}
-    {%- if mockNav %}
-    {#- Mockups only: three sidebar options in one inner list (Fly lands after it, outside the part that scrolls on phones);
-        <html data-nav> picks which items and group headings show. -#}
-    <ul class="mock-nav"><li class="nav-scroll"><ul>
-      {%- set items = [
-        ["a b c", "", "/", "About"], ["a", "", "/projects/", "Projects"], ["a", "", "/blog/", "Blog"], ["a", "", "/notes/", "Notes"], ["a", "", "/experience/", "Experience"],
-        ["b c", "", "/experience/", "Experience"],
-        ["b", "gap", "", ""], ["c", "head", "", "Work"],
-        ["b c", "", "/projects/", "Projects"],
-        ["c", "head", "", "Writing"],
-        ["b c", "", "/blog/", "Blog"], ["b c", "", "/notes/", "Notes"]
-      ] -%}
+    {#- Two groups: who (About, Experience), then what (Projects, Blog, Notes). The items sit in
+        their own list so the home's Fly button (added after it) stays put while, on phones,
+        the row scrolls sideways and fades out half-cut into Fly. -#}
+    <ul class="nav"><li class="nav-scroll"><ul>
+      {%- set items = [["/", "About"], ["/experience/", "Experience"], ["", ""], ["/projects/", "Projects"], ["/blog/", "Blog"], ["/notes/", "Notes"]] -%}
       {%- for item in items -%}
-        {%- set href = item[2] -%}
-        {%- if item[1] == "gap" -%}
-        <li class="nav-gap" data-v="{{ item[0] }}" aria-hidden="true"></li>
-        {%- elif item[1] == "head" -%}
-        <li class="nav-head" data-v="{{ item[0] }}">{{ item[3] }}</li>
+        {%- set href = item[0] -%}
+        {%- if not href -%}
+        <li class="nav-gap" aria-hidden="true"></li>
         {%- else -%}
         {%- set current = (href == "/" and page.url == "/") or (href != "/" and page.url.startsWith(href)) -%}
-        <li data-v="{{ item[0] }}"><a{% if current %} aria-current="page"{% endif %} href="{{ href }}">{{ item[3] }}</a></li>
+        <li><a{% if current %} aria-current="page"{% endif %} href="{{ href }}">{{ item[1] }}</a></li>
         {%- endif -%}
       {%- endfor -%}
     </ul></li></ul>
-    {%- else %}
-    <ul>
-      {%- set items = [["/", "About"], ["/portfolio/", "Portfolio"], ["/experience/", "Experience"], ["/blog/", "Blog"]] -%}
-      {%- for item in items -%}
-        {%- set href = item[0] -%}
-        {%- set current = (href == "/" and page.url == "/") or (href != "/" and page.url.startsWith(href)) -%}
-        <li><a{% if current %} aria-current="page"{% endif %} href="{{ href }}">{{ item[1] }}</a></li>
-      {%- endfor -%}
-    </ul>
-    {%- endif %}
   </nav>
   <main>
 {{ content | safe }}
   </main>
 </div>
 <footer>© {{ buildYear }} Had Seddiqi</footer>
+<script>(function () {
+  // Phones: the menu row scrolls sideways. Fade its left edge once scrolled, drop the right fade
+  // at the end, and start with the current page's item in view.
+  var ul = document.querySelector('.nav-scroll > ul'); if (!ul) return;
+  function mark() {
+    ul.classList.toggle('scrolled', ul.scrollLeft > 2);
+    ul.classList.toggle('at-end', ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 2);
+  }
+  ul.addEventListener('scroll', mark, { passive: true });
+  addEventListener('load', function () {
+    var cur = ul.querySelector('[aria-current="page"]');
+    if (cur && ul.scrollWidth > ul.clientWidth) {
+      var over = cur.getBoundingClientRect().right - (ul.getBoundingClientRect().right - 48);
+      if (over > 0) ul.scrollLeft += over;
+    }
+    mark();
+  });
+})();</script>
 </body>
 </html>
