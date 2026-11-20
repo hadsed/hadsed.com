@@ -50,7 +50,7 @@ a:hover { text-decoration: underline; }
 .menu ul { list-style: none; margin: 0; padding: 0; }
 .site-name + ul { margin-top: 1.5rem; }
 .menu li { margin: 0 0 0.35rem; }
-.menu a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+.menu a[aria-current="page"] { color: var(--glow); font-weight: 700; }
 .site-name { color: var(--accent); }
 
 main { min-width: 0; }
@@ -394,8 +394,7 @@ h1 .status { margin-left: 0.6rem; }
 .prose a:hover { text-decoration-color: var(--pink); }
 .prose strong { color: var(--pink); font-weight: 700; }
 .prose em { color: var(--pink); }
-.prose .kind a, .prose .appears a { color: var(--text); }
-.prose .appears a { text-decoration-color: color-mix(in srgb, var(--text) 40%, transparent); }
+.prose .kind a { color: var(--text); }
 
 /* Obsidian callouts: > [!note] Title. A box like Obsidian's: a tinted title bar with the type's
    icon, a dashed seam, then the body. Color and icon follow the type. */
@@ -457,3 +456,44 @@ details.callout:not([open]) > summary { border-bottom: 0; }
 .prose h3, .prose h4 { font-size: 0.92rem; font-weight: 700; color: var(--bright); margin: 1.5rem 0 0.4rem; }
 .prose :is(h1, h2, h3, h4) + :is(h2, h3, h4) { margin-top: 0.6rem; }
 .prose :is(h1, h2, h3, h4) + :is(.figure, .embed, .callout) { margin-top: 0.75rem; }
+
+/* Posts: a small date, and "Appears in" as a reference box. Branch previews try three boxes
+   (data-appears on <html>, set by the preview switcher); production shows 1. */
+.reading .meta { font-size: 0.8rem; letter-spacing: 0.02em; margin: 0 0 1.25rem; }
+.reading .appears {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem;
+  margin: 0 0 1.75rem; padding: 0.7rem 0.95rem; font-size: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--rule) 45%, transparent); border-radius: 4px;
+  background: rgba(15, 21, 32, 0.45);
+}
+.appears-label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.reading .prose .appears a { color: var(--bright); text-decoration: none; }
+.reading .prose .appears a:hover { color: var(--glow); }
+
+/* 2: gold rule on the left, faint gold wash */
+[data-appears="2"] .reading .appears {
+  border: 0; border-left: 2px solid var(--glow); border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--glow) 8%, rgba(15, 21, 32, 0.5));
+}
+[data-appears="2"] .appears-label { color: var(--glow); }
+
+/* 3: a compact chip, sized to its content, like the site's link buttons */
+[data-appears="3"] .reading .appears {
+  display: inline-flex; padding: 0.3rem 0.7rem; border-radius: 999px; font-size: 0.8rem;
+  border-color: color-mix(in srgb, var(--glow) 55%, transparent); background: none;
+}
+[data-appears="3"] .appears-label { font-size: 0.65rem; }
+
+.preview-switcher {
+  position: fixed; z-index: 10; right: 1rem; bottom: 1rem;
+  display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.5rem;
+  background: rgba(15, 21, 32, 0.92); border: 1px solid color-mix(in srgb, var(--rule) 50%, transparent); border-radius: 4px;
+  font: 11px/1 ui-monospace, Menlo, Consolas, monospace; color: var(--muted);
+}
+.preview-switcher span { letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.2rem; }
+.preview-switcher button {
+  font: inherit; color: var(--text); background: none; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--rule) 40%, transparent); border-radius: 3px; padding: 0.3rem 0.45rem;
+}
+.preview-switcher button[aria-pressed="true"] { color: var(--pink); border-color: var(--pink); }
+

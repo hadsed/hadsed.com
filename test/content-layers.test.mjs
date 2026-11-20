@@ -107,7 +107,7 @@ test("project page lists its posts and key notes; the index shows status and cou
 
 test("a post shows the projects it appears in, heading anchors, and an HTML embed", () => {
   const html = read("blog/2026-11-19-first-post/index.html");
-  assert.match(html, /Appears in <a href="\/projects\/fixture-house\/">Fixture House<\/a>/);
+  assert.match(html, /<span class="appears-label">Appears in<\/span> <a href="\/projects\/fixture-house\/">Fixture House<\/a>/);
   assert.match(html, /<h2 id="fitting-the-plan"><a class="anchor" href="#fitting-the-plan"/);
   assert.match(html, /<h2 id="fitting-the-plan-2">/);
   assert.match(html, /<figure class="embed"><iframe class="embed-frame" src="\/assets\/zz-fixture-viewer.html"[^>]*><\/iframe><figcaption>A viewer<\/figcaption><\/figure>/);

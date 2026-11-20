@@ -152,6 +152,9 @@ export default function (eleventyConfig) {
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
 
+  // Branch previews only: a switcher between design candidates (see post.njk).
+  eleventyConfig.addGlobalData("previewSwitcher", () => Boolean(process.env.SITE_URL || process.env.LAB));
+
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
 
   eleventyConfig.addFilter("year", (value) =>
