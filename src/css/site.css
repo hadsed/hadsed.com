@@ -333,7 +333,13 @@ h1 .status { margin-left: 0.6rem; }
 .prose .figure { margin: 1.25rem 0 1.5rem; }
 .prose .figure img { display: block; margin: 0 auto; }
 .prose .figure figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 0.4rem; text-align: center; }
-.prose table { border-collapse: collapse; width: 100%; margin: 0 0 1.25rem; font-size: 0.85rem; display: block; overflow-x: auto; }
+/* Tables sit in a box like the callouts: mostly solid, with a little of the backdrop showing through. */
+.prose table {
+  border-collapse: collapse; width: 100%; margin: 1.5rem 0; font-size: 0.85rem; display: block; overflow-x: auto;
+  padding: 0.35rem 1rem; border: 1px solid color-mix(in srgb, var(--rule) 45%, transparent); border-radius: 6px;
+  background: rgba(15, 21, 32, 0.88); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.prose tr:last-child > td { border-bottom: 0; }
 .prose th, .prose td { text-align: left; vertical-align: top; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid color-mix(in srgb, var(--rule) 30%, transparent); }
 .prose th { color: var(--muted); font-weight: 400; }
 .prose td img { max-width: 9rem; }
@@ -451,7 +457,7 @@ h1 .status { margin-left: 0.6rem; }
   --c: #6ea8ff; --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
   margin: 1.75rem 0; padding: 0;
   border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); border-radius: 6px;
-  background: color-mix(in srgb, var(--c) 5%, rgba(15, 21, 32, 0.75));
+  background: color-mix(in srgb, var(--c) 5%, rgba(15, 21, 32, 0.9));
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   color: var(--text); overflow: hidden;
 }
