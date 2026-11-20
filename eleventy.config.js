@@ -177,12 +177,12 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("readableDate", (date) =>
     new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(asDate(date))
   );
-  // A hero image in front matter (hero_image: hero.jpg, or "[[hero.jpg]]" as Obsidian writes it) is a file
-  // in content/assets. A name that isn't there fails the build rather than shipping a broken image.
+  // A hero or share image in front matter (hero_image / share_image: hero.jpg, or "[[hero.jpg]]" as Obsidian
+  // writes it) is a file in content/assets. A name that isn't there fails the build rather than shipping a broken image.
   eleventyConfig.addFilter("assetUrl", (value) => {
     if (!value) return "";
     const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");
-    if (!existsSync(`content/assets/${name}`) && !existsSync(`src/assets/${name}`)) throw new Error(`hero_image: ${value} is not in content/assets`);
+    if (!existsSync(`content/assets/${name}`) && !existsSync(`src/assets/${name}`)) throw new Error(`${value} is not in content/assets`);
     return `/assets/${encodeURI(name)}`;
   });
   // With no hero_image in front matter, an image embed on the first line of a post or project is the
