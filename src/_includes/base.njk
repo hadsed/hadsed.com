@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-hero-motion="{{ heroMotion }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -41,7 +41,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="{{ share_image_alt or title }}">
   {%- elif heroSrc %}
-  <meta property="og:image" content="{{ siteUrl }}{{ heroSrc | assetUrl }}">
+  <meta property="og:image" content="{{ siteUrl }}{{ heroSrc | assetUrl and heroSrc | heroShareUrl }}">
   <meta property="og:image:alt" content="Had Seddiqi, hadsed.com">
   {%- else %}
   <meta property="og:image" content="{{ siteUrl }}/assets/og.jpg">
@@ -126,6 +126,58 @@
     mark();
   });
 })();</script>
-<script src="/assets/hero.js" defer></script>
+<script src="{{ '/assets/hero.js' | busted }}" defer></script>
+{%- if analytics.on %}
+{#- PostHog (lib/analytics.mjs): pageviews, time on page, clicks, scroll, heatmaps, replay. Text first:
+    nothing loads until this page has finished loading and the browser is idle, so it never competes
+    with the words. Through /ingest on this site (functions/ingest), not posthog.com. #}
+<script>(function () {
+  if (/lighthouse|pagespeed|gtmetrix/i.test(navigator.userAgent) || /^(localhost|127\.)/.test(location.hostname)) return;
+  // Framed by the home's sky wrapper, the first page is about:srcdoc: report the address it stands at.
+  var src = location.href === 'about:srcdoc', top_;
+  try { top_ = src ? parent.location : null; } catch (e) {}
+  var origin = (window.origin && window.origin !== 'null') ? window.origin : (top_ ? top_.origin : 'https://hadsed.com');
+  // Europe (EU and UK law want consent for stored ids): this tab only, nothing kept between visits.
+  var tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+  var eu = /^Europe\/|^Atlantic\/(Canary|Madeira|Azores|Faroe|Reykjavik)/.test(tz);
+  function start() {
+    var s = document.createElement('script');
+    s.src = origin + '/ingest/static/array.js'; s.async = true; s.crossOrigin = 'anonymous';
+    s.onload = function () {
+      var ph = window.posthog; if (!ph || !ph.init) return;
+      ph.init({{ analytics.key | dump | safe }}, {
+        api_host: origin + '/ingest', ui_host: {{ analytics.ui | dump | safe }},
+        person_profiles: 'always',
+        opt_out_useragent_filter: true,   // keep headless browsers and agents too, tagged $browser_type: bot
+        disable_surveys: true,
+        persistence: eu ? 'sessionStorage' : 'localStorage+cookie',
+        capture_pageview: true, capture_pageleave: true,
+        autocapture: true, enable_heatmaps: true, capture_dead_clicks: true,
+        session_recording: { maskAllInputs: true, recordCrossOriginIframes: false },
+        before_send: function (ev) {
+          if (src && top_ && ev && ev.properties) {
+            ev.properties.$current_url = top_.href; ev.properties.$pathname = top_.pathname; ev.properties.$host = top_.host;
+            if (!ev.properties.$referrer || ev.properties.$referrer === '$direct' || ev.properties.$referrer === top_.href || /^about:/.test(ev.properties.$referrer)) {
+              var r = ''; try { r = parent.document.referrer; } catch (e) {}
+              ev.properties.$referrer = r || '$direct';
+              ev.properties.$referring_domain = r ? r.split('/')[2] : '$direct';
+            }
+          }
+          return ev;
+        },
+        loaded: function (p) {
+          p.register({ site: 'hadsed.com', in_sky: !!(window.frameElement && frameElement.id === 'site'),
+            webdriver: !!navigator.webdriver, eu_mode: eu, time_zone: tz });
+          var landing = ''; try { landing = src ? parent.document.referrer : document.referrer; } catch (e) {}
+          p.register_once({ landing_referrer: landing || '$direct', landing_page: src && top_ ? top_.pathname : location.pathname });
+        }
+      });
+    };
+    document.head.appendChild(s);
+  }
+  function idle() { (window.requestIdleCallback || function (f) { setTimeout(f, 1500); })(start, { timeout: 4000 }); }
+  if (document.readyState === 'complete') idle(); else addEventListener('load', idle, { once: true });
+})();</script>
+{%- endif %}
 </body>
 </html>

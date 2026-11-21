@@ -1,13 +1,17 @@
-{#- Consumes: projects (sorted project items) -#}
-<section class="panels">
+{#- Project cards as a mosaic: each card at its natural height, a picture band where the project
+    has a hero, packed left to right (newest first) by assets/mosaic.js. On phones: phone = "swipe"
+    puts them in a sideways strip (About page), "two" keeps a two-column mosaic (Projects page).
+    Consumes: projects (site.projects items), phone. -#}
+<section class="panels mosaic phone-{{ phone or 'two' }}">
 {%- for item in projects %}
-  <article class="panel">
-    <h3><a href="{{ item.url }}">{{ item.data.title }}</a></h3>
-    <span class="year">{{ item.data.year }}</span>
-    <p class="summary">{{ item.data.summary }}</p>
-    {%- if item.data.link %}
-    <a class="link" href="{{ item.data.link }}">{{ item.data.link | replace("https://", "") }}</a>
-    {%- endif %}
+  <article class="panel" data-hero-area>
+    {%- if item.hero %}<a class="pic" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{{ item.hero | heroHtml("", true) | safe }}</a>{% endif %}
+    <div class="body">
+      {%- if item.started %}<p class="t-meta">{{ item.started | monthYear }}</p>{% endif %}
+      <h3 class="t-title"><a href="{{ item.url }}">{{ item.title }}</a></h3>
+      <p class="t-sum">{{ item.summary }}</p>
+    </div>
   </article>
 {%- endfor %}
 </section>
+<script src="{{ '/assets/mosaic.js' | busted }}" defer></script>

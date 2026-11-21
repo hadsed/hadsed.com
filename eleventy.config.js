@@ -1,9 +1,11 @@
 import { basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId, isoDate } from "./lib/content.mjs";
 import { markdownCallouts, tocFrom } from "./lib/article.mjs";
-import { prepareHeroes, heroHtml } from "./lib/hero.mjs";
+import { prepareHeroes, heroHtml, heroShareUrl } from "./lib/hero.mjs";
+import { POSTHOG, analyticsOn, posthogHosts } from "./lib/analytics.mjs";
 
 export default function (eleventyConfig) {
   // content/articles is the blog's old folder (now content/blog); a copy left in the vault stays unbuilt.
@@ -88,6 +90,10 @@ export default function (eleventyConfig) {
     await prepareHeroes(Object.values(model.heroByUrl), (directories?.output || dir.output).replace(/\/$/, ""));
   });
   // {{ image | heroHtml(image_alt) }} on a page; {{ item.hero | heroHtml("", true) }} on a card in a list.
+  eleventyConfig.addFilter("heroShareUrl", heroShareUrl);
+  // Animated heroes: "auto" plays them while on screen, "hover" only while their card is hovered
+  // (assets/hero.js). Either way the still paints first and the motion loads after.
+  eleventyConfig.addGlobalData("heroMotion", "auto");
   eleventyConfig.addFilter("heroHtml", (value, alt = "", card = false) => heroHtml(value, { alt, card, className: card ? "card-hero" : "hero" }));
   eleventyConfig.addGlobalData("site", () => model);
   // Folder data (content/<kind>/<kind>.json) sets permalink: "{{ page.inputPath | contentUrl(slug, date) }}".
@@ -169,6 +175,8 @@ export default function (eleventyConfig) {
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
 
+  // PostHog (lib/analytics.mjs). Off until the project key is set; base.njk renders nothing then.
+  eleventyConfig.addGlobalData("analytics", () => ({ on: analyticsOn(), key: POSTHOG.key, ui: posthogHosts().ui }));
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
   eleventyConfig.addGlobalData("buildDate", () => new Date().toISOString().slice(0, 10));
 
@@ -243,6 +251,12 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("readableDate", (date) => usDate(date, "long"));
   // A hero or share image in front matter (hero_image / share_image: hero.jpg, or "[[hero.jpg]]" as Obsidian
   // writes it) is a file in content/assets. A name that isn't there fails the build rather than shipping a broken image.
+  // Our own scripts are cached at the edge for a day; a content hash in the URL makes a new deploy
+  // fetch the new file at once instead of pairing fresh HTML with yesterday's script.
+  eleventyConfig.addFilter("busted", (path) => {
+    const file = `src${path}`;
+    return existsSync(file) ? `${path}?v=${createHash("md5").update(readFileSync(file)).digest("hex").slice(0, 8)}` : path;
+  });
   eleventyConfig.addFilter("assetUrl", (value) => {
     if (!value) return "";
     const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");
