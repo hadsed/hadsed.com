@@ -320,6 +320,8 @@ h1 .status { margin-left: 0.6rem; }
 .prose h3, .prose h4 { font-size: 0.95rem; }
 .prose .anchor { position: absolute; left: -1.1rem; color: var(--muted); text-decoration: none; opacity: 0; }
 .prose :is(h1, h2, h3, h4):hover .anchor, .prose .anchor:focus { opacity: 1; }
+/* A contents or #link jump leaves a little room above the heading instead of pinning it to the top edge. */
+.prose :is(h1, h2, h3, h4)[id] { scroll-margin-top: 1.5rem; }
 .prose ul, .prose ol { margin: 0 0 1rem; padding-left: 1.1rem; }
 .prose li { margin: 0 0 0.3rem; }
 .prose img { max-width: 100%; height: auto; border-radius: 3px; }

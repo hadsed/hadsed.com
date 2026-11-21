@@ -25,6 +25,8 @@
   var current = null;
   function mark() {
     var line = innerHeight * 0.25, at = -1;
+    // At the very bottom a short last section never reaches the line: mark the last heading in view.
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) line = innerHeight;
     for (var i = 0; i < heads.length; i++) { if (heads[i] && heads[i].getBoundingClientRect().top <= line) at = i; }
     var a = links[at] || null;
     if (a === current) return;
