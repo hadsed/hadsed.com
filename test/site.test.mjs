@@ -83,7 +83,7 @@ test("blog and notes indexes exist; the placeholder post redirects", () => {
 test("current page is marked in the menu", () => {
   assert.match(read("blog/index.html"), /aria-current="page" href="\/blog\/"/);
   assert.doesNotMatch(read("blog/index.html"), /aria-current="page" href="\/"/);
-  assert.match(read("blog/index.html"), /class="site-name"/);
+  assert.doesNotMatch(read("blog/index.html"), /class="site-name"/);
 });
 
 test("pages carry link-preview tags and icons", () => {
@@ -170,7 +170,7 @@ test("the Pages Function serves the sky wrapper at a page's own URL, never to cr
 test("the menu is the same on every page, apart from which item is current", () => {
   const nav = (p) => read(p).match(/<nav class="menu">[\s\S]*?<\/nav>/)[0].replace(/ aria-current="page"/g, "");
   const home = nav("index.html");
-  assert.match(home, /class="site-name"/);
+  assert.doesNotMatch(home, /class="site-name"/);
   for (const p of ["experience/index.html", "projects/index.html", "blog/index.html", "notes/index.html", "projects/subassembler/index.html", "404.html"]) {
     assert.equal(nav(p), home, p);
   }

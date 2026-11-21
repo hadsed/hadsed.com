@@ -80,10 +80,8 @@ a:hover { text-decoration: underline; }
 
 /* Left menu */
 .menu ul { list-style: none; margin: 0; padding: 0; }
-.site-name + ul { margin-top: 1.5rem; }
 .menu li { margin: 0 0 0.35rem; }
 .menu a[aria-current="page"] { color: var(--glow); font-weight: 700; }
-.site-name { color: var(--accent); }
 
 main { min-width: 0; }
 
@@ -102,7 +100,6 @@ footer {
 @media (max-width: 640px) {
   .page { grid-template-columns: minmax(0, 1fr); row-gap: 2.25rem; padding: 1.5rem 1rem 0; }
   .menu ul { display: flex; flex-wrap: wrap; gap: 1.25rem; }
-  .site-name + ul { margin-top: 0.75rem; }
   .menu li { margin: 0; }
   footer { margin-top: 3rem; }
   /* One row that scrolls sideways. The home's Fly button sits after the scroller, and the item
