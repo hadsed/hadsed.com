@@ -49,7 +49,8 @@
 
 * { box-sizing: border-box; }
 
-html { background: var(--bg); }
+/* Phones in landscape: stop the browser enlarging text (iOS Safari text autosizing), which also stuck after rotating back. */
+html { background: var(--bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 body {
   margin: 0;

@@ -20,7 +20,7 @@
 <style>
   :root { --bg: #1c2433; --muted: #8a919c; --glow: #e4c56f; --sky: #0f1520;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   /* 100% rather than 100vh: on iPad Safari 100vh is the height with the toolbars hidden, which
      pushes the pinned Fly under the visible edge. */
   iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }

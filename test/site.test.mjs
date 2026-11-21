@@ -189,3 +189,7 @@ test("links to other sites open in a new tab; own links don't", () => {
   assert.match(html, /<a class="button" href="https:\/\/linkedin\.com\/in\/hadsed" target="_blank" rel="noopener">/);
   assert.doesNotMatch(html, /<a [^>]*href="\/[^"]*"[^>]*target=/);
 });
+
+test("phones keep the same text size in landscape", () => {
+  assert.match(read("index.html"), /html ?\{[^}]*-webkit-text-size-adjust: ?100%;[^}]*text-size-adjust: ?100%/);
+});
