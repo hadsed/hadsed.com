@@ -276,6 +276,10 @@ export default function (eleventyConfig) {
   eleventyConfig.addCollection("projects", (api) =>
     api.getFilteredByTag("projects").sort((a, b) => (a.data.order ?? 999) - (b.data.order ?? 999))
   );
+  // About page: the projects named in about.md's selected_projects, in that order; all of them if none are.
+  eleventyConfig.addFilter("selectedProjects", (items) =>
+    model.selectedProjects ? model.selectedProjects.map((url) => items.find((item) => item.url === url)).filter(Boolean) : items
+  );
   eleventyConfig.addCollection("blog", (api) => api.getFilteredByTag("blog").sort((a, b) => b.date - a.date));
 
   return {

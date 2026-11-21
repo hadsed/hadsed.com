@@ -115,12 +115,18 @@ const broken = new URL("content/notes/zz-fixture-broken.md", root);
 const preview = "https://fixture-branch.hadsed-com.pages.dev";
 const build = () => execFileSync("npx", ["@11ty/eleventy", "--quiet", "--output=_site-layers"], { stdio: "pipe", env: { ...process.env, SITE_URL: preview } });
 
+// The About page's Selected Projects come from about.md; the build here picks only the fixture project.
+const aboutFile = new URL("content/about.md", root);
+const about = readFileSync(aboutFile, "utf8");
+
 before(() => {
   for (const [path, body] of Object.entries(fixtures)) writeFileSync(new URL(path, root), body);
+  writeFileSync(aboutFile, about.replace(/^---\n/, '---\nselected_projects: ["[[zz-fixture-house]]"]\n'));
   build();
 });
 
 after(() => {
+  writeFileSync(aboutFile, about);
   for (const path of Object.keys(fixtures)) rmSync(new URL(path, root), { force: true });
   rmSync(broken, { force: true });
   rmSync(out, { recursive: true, force: true });
@@ -241,4 +247,14 @@ test("an animated hero is a still frame until hovered", () => {
   const motion = html.match(/data-motion="\/([^"]+)"/)[1];
   assert.ok(existsSync(new URL(motion, out)));
   assert.match(html, /<script src="\/assets\/hero\.js" defer><\/script>/);
+});
+
+test("the About page shows only the projects about.md selects, under Selected Projects", () => {
+  const home = read("index.html");
+  const section = home.slice(home.indexOf('class="projects"'));
+  assert.match(section, /<h2 class="label">Selected Projects<\/h2>/);
+  assert.equal((section.match(/<article class="panel">/g) || []).length, 1);
+  assert.match(section, /href="\/projects\/fixture-house\/">Fixture House</);
+  // the Projects page still lists every project
+  assert.ok((read("projects/index.html").match(/<article class="panel">/g) || []).length > 1);
 });
