@@ -139,7 +139,7 @@ test("URLs come from front matter: dated blog slug, project and note slugs", () 
   assert.ok(!existsSync(new URL("content", out)));
 });
 
-test("project page lists its posts and key notes; the index shows status and counts", () => {
+test("project page lists its posts and key notes; the index card shows title and summary only", () => {
   const html = read("projects/fixture-house/index.html");
   assert.match(html, /<h1>Fixture House <span class="status status-active">active<\/span><\/h1>/);
   assert.match(html, /Started October 2026/);
@@ -148,7 +148,8 @@ test("project page lists its posts and key notes; the index shows status and cou
   assert.match(html, /Key notes[\s\S]*href="\/notes\/zz-fixture-plan-fit\/">Fitting a plan</);
   assert.doesNotMatch(html, /class="(orb|kind)"|<p class="meta">[^<]*·/);
   const index = read("projects/index.html");
-  assert.match(index, /Fixture House[\s\S]*?Last updated Nov 19th, 2026, 1 post, 1 note/);
+  assert.match(index, /<h3 class="t-title"><a href="\/projects\/fixture-house\/">Fixture House<\/a><\/h3>\s*<p class="t-sum">A house from an address\.<\/p>/);
+  assert.doesNotMatch(index.slice(index.indexOf('class="panels')), /Last updated|class="status|\d post/);
   assert.match(index, /aria-current="page" href="\/projects\/"/);
 });
 
@@ -253,8 +254,8 @@ test("the About page shows only the projects about.md selects, under Selected Pr
   const home = read("index.html");
   const section = home.slice(home.indexOf('class="projects"'));
   assert.match(section, /<h2 class="label">Selected Projects<\/h2>/);
-  assert.equal((section.match(/<article class="panel">/g) || []).length, 1);
+  assert.equal((section.match(/<article class="panel"/g) || []).length, 1);
   assert.match(section, /href="\/projects\/fixture-house\/">Fixture House</);
   // the Projects page still lists every project
-  assert.ok((read("projects/index.html").match(/<article class="panel">/g) || []).length > 1);
+  assert.ok((read("projects/index.html").match(/<article class="panel"/g) || []).length > 1);
 });

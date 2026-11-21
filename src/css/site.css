@@ -201,16 +201,38 @@ footer {
   }
 }
 
-/* Project panels: bordered rectangles in an ordered grid */
-.panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; }
-.panel { border: 1px solid var(--rule); border-radius: 3px; padding: 1rem 1.1rem; margin: 0; }
-.panel h3 { font-size: 1rem; font-weight: 400; margin: 0; display: inline; }
-.panel .year { color: var(--muted); font-size: 0.85rem; margin-left: 0.5rem; }
-.panel .summary { margin: 0.25rem 0 0; }
-.panel .link { display: inline-block; margin-top: 0.25rem; color: var(--muted); font-size: 0.85rem; }
+/* Project cards: a mosaic (_includes/panels.njk, assets/mosaic.js). Serif title, muted summary,
+   a picture band where the project has a hero. */
+.panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; align-items: start; }
+.panels.packed { grid-auto-rows: 4px; row-gap: 0; }
+.panels.packed .panel { margin-bottom: 1rem; }
+.panel { margin: 0; border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent); border-radius: 3px; overflow: hidden; background: rgba(15, 21, 32, 0.35); transition: border-color 0.15s; }
+.panel:hover { border-color: var(--glow); }
+.panel .pic { display: block; position: relative; overflow: hidden; aspect-ratio: 16 / 9; background: #0f1520; }
+.panel .pic .card-hero, .panel .pic img, .panel .pic .hero-motion { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.panel .body { padding: 0.95rem 1.1rem 1.1rem; }
+.t-meta { color: color-mix(in srgb, var(--muted) 75%, transparent); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 0.4rem; font-variant-numeric: tabular-nums; }
+.t-title { font-family: Petrona, Georgia, serif; font-weight: 400; font-size: 1.3rem; line-height: 1.2; color: var(--bright, #f4f6f8); margin: 0; }
+.t-title a { color: inherit; text-decoration: none; }
+.t-title a:hover { color: var(--glow); }
+.t-sum { color: var(--muted); font-size: 0.88rem; line-height: 1.5; margin: 0.35rem 0 0; }
 
-@media (max-width: 640px) {
-  .panels { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 40rem) {
+  /* Projects page: two narrow columns, summaries cut at three lines */
+  .panels.phone-two { grid-template-columns: 1fr 1fr; column-gap: 0.6rem; }
+  .panels.phone-two .panel { margin-bottom: 0.6rem; }
+  .panels.phone-two .pic { aspect-ratio: 4 / 3; }
+  .panels.phone-two .body { padding: 0.65rem 0.7rem 0.8rem; }
+  .panels.phone-two .t-title { font-size: 1.05rem; }
+  .panels.phone-two .t-meta { font-size: 0.62rem; margin-bottom: 0.25rem; }
+  .panels.phone-two .t-sum { font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  /* About page: a sideways strip running to both screen edges, with the page's gutter kept as
+     room on the left; the next card peeks in at the right. */
+  .panels.phone-swipe { display: flex; align-items: stretch; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory;
+    margin: 0 -16px; padding: 0 16px 0.25rem; scroll-padding: 0 16px; scrollbar-width: none; }
+  .panels.phone-swipe::-webkit-scrollbar { display: none; }
+  .panels.phone-swipe .panel { flex: 0 0 78%; scroll-snap-align: start; margin: 0; }
+  .panels.phone-swipe .pic { aspect-ratio: 16 / 10; }
 }
 
 /* Landing page */
@@ -356,20 +378,10 @@ h1 .status { margin-left: 0.6rem; }
 .prose .hero { display: block; width: 100%; height: auto; margin: 0.25rem 0 1.75rem; border-radius: 3px; }
 .prose span.hero { position: relative; overflow: hidden; }
 .prose span.hero img { display: block; width: 100%; height: auto; }
+/* A tall or square hero is cropped to a band at most 24rem high, so it never fills the screen. */
+.prose img.hero, .prose span.hero img { max-height: 24rem; object-fit: cover; }
 .hero-anim .hero-motion { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.15s; }
 .hero-anim.playing .hero-motion { opacity: 1; }
-
-/* Heroes on cards: a band across the top of a project panel, a thumbnail beside a post or note. */
-.card-hero-link { display: block; }
-.card-hero { display: block; position: relative; overflow: hidden; border-radius: 2px; background: #0f1520; }
-.card-hero img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.panel .card-hero { aspect-ratio: 16 / 9; margin: -1rem -1.1rem 0.9rem; border-radius: 2px 2px 0 0; }
-.posts li.has-hero { display: flow-root; }
-.posts li.has-hero .card-hero-link { float: right; width: 8.5rem; margin: 0.2rem 0 0.5rem 1.25rem; }
-.posts .card-hero { aspect-ratio: 4 / 3; }
-@media (max-width: 40rem) {
-  .posts li.has-hero .card-hero-link { width: 5.5rem; margin-left: 0.9rem; }
-}
 
 /* ![[viz.html]]: a self-contained page in its own frame */
 .embed { margin: 1.25rem 0 1.5rem; }
@@ -380,7 +392,6 @@ h1 .status { margin-left: 0.6rem; }
 .notes-list { list-style: none; margin: 0; padding: 0; }
 .notes-list li { margin: 0 0 0.6rem; }
 .notes-list .summary { display: block; color: var(--muted); font-size: 0.85rem; }
-.panel .counts { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.8rem; }
 
 .backlinks { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid color-mix(in srgb, var(--rule) 40%, transparent); max-width: var(--measure); }
 .backlinks ul { list-style: none; margin: 0; padding: 0; }

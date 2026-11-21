@@ -33,6 +33,37 @@ eleventyExcludeFromCollections: true
   .grid .body { padding: 0.95rem 1.1rem 1.1rem; }
   .grid .t-title { font-size: 1.3rem; }
   .opt-b .grid { align-items: stretch; }
+  /* Mosaic: a grid with tiny rows; each card spans as many as its height needs (set by the script
+     below), and the next card lands in the first free spot, so order stays left to right. */
+  .mosaic { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); grid-auto-rows: 4px; column-gap: 1rem; align-items: start; }
+  .mosaic .card { margin-bottom: 1rem; border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent); border-radius: 3px; overflow: hidden; background: rgba(15, 21, 32, 0.35); transition: border-color 0.15s; }
+  .mosaic .card:hover { border-color: var(--glow); }
+  .mosaic .pic { aspect-ratio: 16 / 9; border-radius: 0; }
+  .mosaic .body { padding: 0.95rem 1.1rem 1.1rem; }
+  .mosaic .t-title { font-size: 1.3rem; }
+  /* Phones, three ways (?phone=rows|two|swipe, rows by default). */
+  @media (max-width: 40rem) {
+    /* rows: title and summary, small picture on the right */
+    .mosaic.p-rows { display: block; border-top: 1px solid color-mix(in srgb, var(--rule) 35%, transparent); }
+    .mosaic.p-rows .card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: start; margin: 0; padding: 1rem 0; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--rule) 35%, transparent); border-radius: 0; background: none; }
+    .mosaic.p-rows .pic { grid-column: 2; grid-row: 1; width: 5.5rem; aspect-ratio: 4 / 3; border-radius: 2px; }
+    .mosaic.p-rows .body { grid-column: 1; grid-row: 1; padding: 0; }
+    .mosaic.p-rows .t-title { font-size: 1.2rem; }
+    /* two: the mosaic kept, two narrow columns of compact cards */
+    .mosaic.p-two { grid-template-columns: 1fr 1fr; column-gap: 0.6rem; }
+    .mosaic.p-two .card { margin-bottom: 0.6rem; }
+    .mosaic.p-two .pic { aspect-ratio: 4 / 3; }
+    .mosaic.p-two .body { padding: 0.65rem 0.7rem 0.8rem; }
+    .mosaic.p-two .t-title { font-size: 1.05rem; }
+    .mosaic.p-two .t-sum { font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .mosaic.p-two .t-meta { font-size: 0.62rem; margin-bottom: 0.25rem; }
+    /* swipe: full cards in a sideways strip, the next one peeking in at the right */
+    .mosaic.p-swipe { display: flex; align-items: stretch; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
+    .mosaic.p-swipe::-webkit-scrollbar { display: none; }
+    .mosaic.p-swipe .card { flex: 0 0 78%; scroll-snap-align: start; margin: 0; grid-row-end: auto !important; display: flex; flex-direction: column; }
+    .mosaic.p-swipe .pic { aspect-ratio: 16 / 10; }
+    .mosaic.p-swipe .card:not(:has(.pic)) .body { padding-top: 1.4rem; }
+  }
   .ph { position: absolute; inset: 0; display: grid; place-items: center; font-family: Petrona, Georgia, serif; font-weight: 300; font-size: 2.6rem;
     color: color-mix(in srgb, var(--muted) 45%, transparent);
     background: repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 12px), #141b28; }
@@ -94,7 +125,29 @@ eleventyExcludeFromCollections: true
 
 <h2 class="label">Project layouts</h2>
 <p class="meta">Real projects and posts. Hover anything with a picture to play it. Nothing here is on the live site.</p>
-<nav class="jump"><a href="#a">A. Band grid</a><a href="#b">B. Slot grid</a><a href="#c">C. Index</a><a href="#d">D. Feature + list</a><a href="#e">E. Timeline</a><a href="#blog">Blog rows</a></nav>
+<nav class="jump"><a href="#m">A · Mosaic</a><a href="#a">A. Band grid</a><a href="#b">B. Slot grid</a><a href="#c">C. Index</a><a href="#d">D. Feature + list</a><a href="#e">E. Timeline</a><a href="#blog">Blog rows</a></nav>
+
+<section class="opt opt-m" id="m">
+  <p class="opt-label">A · Mosaic</p>
+  <p class="opt-how">Option A with each card at its natural height and the next card tucked up under the shortest one, so there are no gaps. Reading order stays left to right, newest first. Three columns on a wide screen, two on a tablet. On a phone: rows by default; add ?phone=two for a two-column mosaic or ?phone=swipe for cards you swipe sideways.</p>
+  <div class="mosaic p-rows">
+  {%- for item in site.projects %}
+    <article class="card" data-hero-area>
+      {%- if item.hero %}{{ pic(item) }}{% endif %}
+      <div class="body"><p class="t-meta">{{ meta(item) }}</p><h3 class="t-title"><a href="{{ item.url }}">{{ item.title }}</a></h3><p class="t-sum">{{ item.summary }}</p></div>
+    </article>
+  {%- endfor %}
+  </div>
+  <p class="opt-how" style="margin-top:2.5rem">The same mosaic with nine cards (your three projects repeated, as samples) to show how it packs once there are more of them.</p>
+  <div class="mosaic p-rows">
+  {%- for n in range(0, 3) %}{% for item in site.projects %}
+    <article class="card" data-hero-area>
+      {%- if item.hero and (loop.index + n) % 2 %}{{ pic(item) }}{% elif (loop.index0 + n) % 3 == 0 %}<a class="pic" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{{ site.projects[0].hero | heroHtml("", true) | safe }}</a>{% endif %}
+      <div class="body"><p class="t-meta">{{ meta(item) }}</p><h3 class="t-title"><a href="{{ item.url }}">{{ item.title }}</a></h3><p class="t-sum">{{ item.summary }}</p></div>
+    </article>
+  {%- endfor %}{% endfor %}
+  </div>
+</section>
 
 <section class="opt opt-a" id="a">
   <p class="opt-label">A · Grid, picture band where there is one</p>
@@ -181,3 +234,20 @@ eleventyExcludeFromCollections: true
   {%- endfor %}
   </ul>
 </section>
+
+<script>
+  // Mosaic packing: each card spans ceil(height / 4px) rows. Re-run on resize and once fonts load.
+  (function () {
+    var mode = (location.search.match(/phone=(rows|two|swipe)/) || [])[1];
+    if (mode) document.querySelectorAll(".mosaic").forEach(function (m) { m.className = "mosaic p-" + mode; });
+    function pack() {
+      document.querySelectorAll(".mosaic > .card").forEach(function (c) {
+        c.style.gridRowEnd = "span " + Math.ceil((c.getBoundingClientRect().height + 16) / 4);
+      });
+    }
+    pack();
+    addEventListener("resize", pack);
+    if (document.fonts) document.fonts.ready.then(pack);
+    addEventListener("load", pack);
+  })();
+</script>
