@@ -29,6 +29,6 @@ permalink: /
 <section class="projects">
   <h2 class="label">Selected Projects</h2>
   {#- Chosen and ordered by selected_projects in about.md; every project when it's empty. #}
-  {% set projects = collections.projects | selectedProjects %}
+  {% set projects = site.projects | selectedProjects %}{% set phone = "swipe" %}
   {% include "panels.njk" %}
 </section>
