@@ -140,6 +140,11 @@ footer {
 .timeline-entry > * { grid-column: 1; }
 .timeline-entry .dates { grid-column: 2; grid-row: 1; }
 .timeline-entry:last-child { margin-bottom: 0; }
+/* Phones: the date sits right after the name, so the role and bullets get the full width. */
+@media (max-width: 640px) {
+  .timeline-entry { display: block; }
+  .timeline-entry .dates { margin-left: 0.6rem; font-size: 0.8rem; }
+}
 .orb {
   position: absolute;
   left: calc(-1.25rem - 4px);
