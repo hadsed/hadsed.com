@@ -1,3 +1,5 @@
+import { sendEdgeEvent } from "../lib/analytics.mjs";
+
 // Serves the home's live-sky wrapper (/lab/home/, from notes/storyboards/fly-home.html) straight
 // at a page's own URL when a person's browser navigates to it, with the page itself already in
 // the wrapper's site frame (srcdoc). One response, one round trip, and the text paints: no
@@ -11,7 +13,20 @@
 // base.njk's pattern, plus crawlers whose names lack "bot" (Search Console's URL inspection, AI agents).
 const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|lighthouse|google|inspection|chatgpt|perplexity|claude|anthropic/i;
 
-export async function onRequest({ request, next, env }) {
+// Every request that reaches the function is also logged (lib/analytics.mjs), after the response
+// is on its way: waitUntil, so the visitor never waits for it. That includes robots.txt, the
+// sitemap, the feed and llms.txt (_routes.json sends them here), which is mostly what agents read.
+export async function onRequest(ctx) {
+  const { request } = ctx;
+  const response = await serve(ctx);
+  if (!new URL(request.url).pathname.startsWith("/ingest/")) {
+    const sent = sendEdgeEvent(request, response, { served_wrapper: response.headers.has("X-Served-Wrapper") });
+    if (ctx.waitUntil) ctx.waitUntil(sent);
+  }
+  return response;
+}
+
+async function serve({ request, next, env }) {
   const url = new URL(request.url);
   if (request.method !== 'GET' || request.headers.get('Sec-Fetch-Dest') !== 'document' ||
       BOTS.test(request.headers.get('User-Agent') || '') || url.pathname.startsWith('/lab/')) {
@@ -29,6 +44,7 @@ export async function onRequest({ request, next, env }) {
   headers.set('Cache-Control', 'private, no-cache');   // what this URL returns depends on who asks
   headers.append('Vary', 'Sec-Fetch-Dest, User-Agent');
   headers.delete('Content-Length'); headers.delete('ETag');
+  headers.set('X-Served-Wrapper', '1');   // for the request log: this visit got the live sky
   // The wrapper is noindex at /lab/home/. Here it stands at the page's address, so if a crawler
   // ever slips past the checks above it must not mark the page noindex: drop that, point canonical
   // at the page.

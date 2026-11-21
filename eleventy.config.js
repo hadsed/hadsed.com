@@ -4,6 +4,7 @@ import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId, isoDate } from "./lib/content.mjs";
 import { markdownCallouts, tocFrom } from "./lib/article.mjs";
 import { prepareHeroes, heroHtml, heroShareUrl } from "./lib/hero.mjs";
+import { POSTHOG, analyticsOn, posthogHosts } from "./lib/analytics.mjs";
 
 export default function (eleventyConfig) {
   // content/articles is the blog's old folder (now content/blog); a copy left in the vault stays unbuilt.
@@ -173,6 +174,8 @@ export default function (eleventyConfig) {
   // pages.dev alias so the share image resolves before it reaches production.
   eleventyConfig.addGlobalData("siteUrl", () => (process.env.SITE_URL || "https://hadsed.com").replace(/\/$/, ""));
 
+  // PostHog (lib/analytics.mjs). Off until the project key is set; base.njk renders nothing then.
+  eleventyConfig.addGlobalData("analytics", () => ({ on: analyticsOn(), key: POSTHOG.key, ui: posthogHosts().ui }));
   eleventyConfig.addGlobalData("buildYear", () => new Date().getFullYear());
   eleventyConfig.addGlobalData("buildDate", () => new Date().toISOString().slice(0, 10));
 
