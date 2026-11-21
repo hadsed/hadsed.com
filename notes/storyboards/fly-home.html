@@ -23,6 +23,12 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   /* 100% rather than 100vh: on iPad Safari 100vh is the height with the toolbars hidden, which
      pushes the pinned Fly under the visible edge. */
+  /* Touch screens: the wrapper itself scrolls by a hair, so iPhone's tap-the-status-bar-to-scroll-to-top
+     reaches it (iOS only does that for the top page, never a frame). Script below passes it on to the site. */
+  @media (pointer: coarse) {
+    html, body { height: auto; overflow: visible; }
+    body::after { content: ""; display: block; height: calc(100vh + 2px); }
+  }
   iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
   /* The sky fades in once it has drawn the ground; the site is readable on navy before that. */
   /* Never quite invisible: Chrome runs a cross-origin frame that is fully transparent, or fully
@@ -320,6 +326,21 @@ function leave() {
 }
 function onKey(e) { if (e.key === 'Escape') leave(); }
 addEventListener('keydown', onKey);
+// Tap the status bar to go to the top (iPhone). The page sits 1px down; iOS scrolls it to 0 on that tap
+// and we scroll the site to its top, then step back to 1px. Any other drift is quietly reset.
+if (matchMedia('(pointer: coarse)').matches) {
+  const park = () => { if (scrollY !== 1) scrollTo(0, 1); };
+  let settle = 0;
+  addEventListener('scroll', () => {
+    clearTimeout(settle);
+    if (scrollY <= 0 && state === 'site') {
+      try { site.contentWindow.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }); } catch {}
+    }
+    settle = setTimeout(park, 250);
+  }, { passive: true });
+  addEventListener('load', park);
+  park();
+}
 </script>
 </body>
 </html>
