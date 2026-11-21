@@ -41,14 +41,28 @@ eleventyExcludeFromCollections: true
   .mosaic .pic { aspect-ratio: 16 / 9; border-radius: 0; }
   .mosaic .body { padding: 0.95rem 1.1rem 1.1rem; }
   .mosaic .t-title { font-size: 1.3rem; }
-  /* Phones: no mosaic, just rows. Title and summary on the left, a small picture on the right. */
+  /* Phones, three ways (?phone=rows|two|swipe, rows by default). */
   @media (max-width: 40rem) {
-    .mosaic { display: block; border-top: 1px solid color-mix(in srgb, var(--rule) 35%, transparent); }
-    .mosaic .card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: start; margin: 0; padding: 1rem 0; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--rule) 35%, transparent); border-radius: 0; background: none; }
-    .mosaic .card:hover { border-color: color-mix(in srgb, var(--rule) 35%, transparent); }
-    .mosaic .pic { grid-column: 2; grid-row: 1; width: 5.5rem; aspect-ratio: 4 / 3; border-radius: 2px; }
-    .mosaic .body { grid-column: 1; grid-row: 1; padding: 0; }
-    .mosaic .t-title { font-size: 1.2rem; }
+    /* rows: title and summary, small picture on the right */
+    .mosaic.p-rows { display: block; border-top: 1px solid color-mix(in srgb, var(--rule) 35%, transparent); }
+    .mosaic.p-rows .card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: start; margin: 0; padding: 1rem 0; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--rule) 35%, transparent); border-radius: 0; background: none; }
+    .mosaic.p-rows .pic { grid-column: 2; grid-row: 1; width: 5.5rem; aspect-ratio: 4 / 3; border-radius: 2px; }
+    .mosaic.p-rows .body { grid-column: 1; grid-row: 1; padding: 0; }
+    .mosaic.p-rows .t-title { font-size: 1.2rem; }
+    /* two: the mosaic kept, two narrow columns of compact cards */
+    .mosaic.p-two { grid-template-columns: 1fr 1fr; column-gap: 0.6rem; }
+    .mosaic.p-two .card { margin-bottom: 0.6rem; }
+    .mosaic.p-two .pic { aspect-ratio: 4 / 3; }
+    .mosaic.p-two .body { padding: 0.65rem 0.7rem 0.8rem; }
+    .mosaic.p-two .t-title { font-size: 1.05rem; }
+    .mosaic.p-two .t-sum { font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .mosaic.p-two .t-meta { font-size: 0.62rem; margin-bottom: 0.25rem; }
+    /* swipe: full cards in a sideways strip, the next one peeking in at the right */
+    .mosaic.p-swipe { display: flex; align-items: stretch; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
+    .mosaic.p-swipe::-webkit-scrollbar { display: none; }
+    .mosaic.p-swipe .card { flex: 0 0 78%; scroll-snap-align: start; margin: 0; grid-row-end: auto !important; display: flex; flex-direction: column; }
+    .mosaic.p-swipe .pic { aspect-ratio: 16 / 10; }
+    .mosaic.p-swipe .card:not(:has(.pic)) .body { padding-top: 1.4rem; }
   }
   .ph { position: absolute; inset: 0; display: grid; place-items: center; font-family: Petrona, Georgia, serif; font-weight: 300; font-size: 2.6rem;
     color: color-mix(in srgb, var(--muted) 45%, transparent);
@@ -115,8 +129,8 @@ eleventyExcludeFromCollections: true
 
 <section class="opt opt-m" id="m">
   <p class="opt-label">A · Mosaic</p>
-  <p class="opt-how">Option A with each card at its natural height and the next card tucked up under the shortest one, so there are no gaps. Reading order stays left to right, newest first. Three columns on a wide screen, two on a tablet. On a phone it turns into rows: title and summary, with a small picture on the right.</p>
-  <div class="mosaic">
+  <p class="opt-how">Option A with each card at its natural height and the next card tucked up under the shortest one, so there are no gaps. Reading order stays left to right, newest first. Three columns on a wide screen, two on a tablet. On a phone: rows by default; add ?phone=two for a two-column mosaic or ?phone=swipe for cards you swipe sideways.</p>
+  <div class="mosaic p-rows">
   {%- for item in site.projects %}
     <article class="card" data-hero-area>
       {%- if item.hero %}{{ pic(item) }}{% endif %}
@@ -125,7 +139,7 @@ eleventyExcludeFromCollections: true
   {%- endfor %}
   </div>
   <p class="opt-how" style="margin-top:2.5rem">The same mosaic with nine cards (your three projects repeated, as samples) to show how it packs once there are more of them.</p>
-  <div class="mosaic">
+  <div class="mosaic p-rows">
   {%- for n in range(0, 3) %}{% for item in site.projects %}
     <article class="card" data-hero-area>
       {%- if item.hero and (loop.index + n) % 2 %}{{ pic(item) }}{% elif (loop.index0 + n) % 3 == 0 %}<a class="pic" href="{{ item.url }}" tabindex="-1" aria-hidden="true">{{ site.projects[0].hero | heroHtml("", true) | safe }}</a>{% endif %}
@@ -224,6 +238,8 @@ eleventyExcludeFromCollections: true
 <script>
   // Mosaic packing: each card spans ceil(height / 4px) rows. Re-run on resize and once fonts load.
   (function () {
+    var mode = (location.search.match(/phone=(rows|two|swipe)/) || [])[1];
+    if (mode) document.querySelectorAll(".mosaic").forEach(function (m) { m.className = "mosaic p-" + mode; });
     function pack() {
       document.querySelectorAll(".mosaic > .card").forEach(function (c) {
         c.style.gridRowEnd = "span " + Math.ceil((c.getBoundingClientRect().height + 16) / 4);
