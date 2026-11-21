@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId, isoDate } from "./lib/content.mjs";
 import { markdownCallouts, tocFrom } from "./lib/article.mjs";
-import { prepareHeroes, heroHtml } from "./lib/hero.mjs";
+import { prepareHeroes, heroHtml, heroShareUrl } from "./lib/hero.mjs";
 
 export default function (eleventyConfig) {
   // content/articles is the blog's old folder (now content/blog); a copy left in the vault stays unbuilt.
@@ -88,6 +88,7 @@ export default function (eleventyConfig) {
     await prepareHeroes(Object.values(model.heroByUrl), (directories?.output || dir.output).replace(/\/$/, ""));
   });
   // {{ image | heroHtml(image_alt) }} on a page; {{ item.hero | heroHtml("", true) }} on a card in a list.
+  eleventyConfig.addFilter("heroShareUrl", heroShareUrl);
   eleventyConfig.addFilter("heroHtml", (value, alt = "", card = false) => heroHtml(value, { alt, card, className: card ? "card-hero" : "hero" }));
   eleventyConfig.addGlobalData("site", () => model);
   // Folder data (content/<kind>/<kind>.json) sets permalink: "{{ page.inputPath | contentUrl(slug, date) }}".

@@ -41,7 +41,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="{{ share_image_alt or title }}">
   {%- elif heroSrc %}
-  <meta property="og:image" content="{{ siteUrl }}{{ heroSrc | assetUrl }}">
+  <meta property="og:image" content="{{ siteUrl }}{{ heroSrc | assetUrl and heroSrc | heroShareUrl }}">
   <meta property="og:image:alt" content="Had Seddiqi, hadsed.com">
   {%- else %}
   <meta property="og:image" content="{{ siteUrl }}/assets/og.jpg">
