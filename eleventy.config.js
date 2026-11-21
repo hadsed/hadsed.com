@@ -1,5 +1,6 @@
 import { basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import matter from "gray-matter";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId, isoDate } from "./lib/content.mjs";
 import { markdownCallouts, tocFrom } from "./lib/article.mjs";
@@ -250,6 +251,12 @@ export default function (eleventyConfig) {
   eleventyConfig.addFilter("readableDate", (date) => usDate(date, "long"));
   // A hero or share image in front matter (hero_image / share_image: hero.jpg, or "[[hero.jpg]]" as Obsidian
   // writes it) is a file in content/assets. A name that isn't there fails the build rather than shipping a broken image.
+  // Our own scripts are cached at the edge for a day; a content hash in the URL makes a new deploy
+  // fetch the new file at once instead of pairing fresh HTML with yesterday's script.
+  eleventyConfig.addFilter("busted", (path) => {
+    const file = `src${path}`;
+    return existsSync(file) ? `${path}?v=${createHash("md5").update(readFileSync(file)).digest("hex").slice(0, 8)}` : path;
+  });
   eleventyConfig.addFilter("assetUrl", (value) => {
     if (!value) return "";
     const name = String(value).trim().replace(/^!?\[\[/, "").replace(/(\|[^\]]*)?\]\]$/, "").replace(/^\/?(assets\/)?/, "");

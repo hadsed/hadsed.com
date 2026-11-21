@@ -111,7 +111,7 @@
     mark();
   });
 })();</script>
-<script src="/assets/hero.js" defer></script>
+<script src="{{ '/assets/hero.js' | busted }}" defer></script>
 {%- if analytics.on %}
 {#- PostHog (lib/analytics.mjs): pageviews, time on page, clicks, scroll, heatmaps, replay. Text first:
     nothing loads until this page has finished loading and the browser is idle, so it never competes

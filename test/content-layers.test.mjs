@@ -247,7 +247,7 @@ test("an animated hero is a still frame until hovered", () => {
   assert.ok(existsSync(new URL("assets/_hero/zz-fixture-tour.webp", out)));
   const motion = html.match(/data-motion="\/([^"]+)"/)[1];
   assert.ok(existsSync(new URL(motion, out)));
-  assert.match(html, /<script src="\/assets\/hero\.js" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/hero\.js\?v=[0-9a-f]{8}" defer><\/script>/);
 });
 
 test("the About page shows only the projects about.md selects, under Selected Projects", () => {
