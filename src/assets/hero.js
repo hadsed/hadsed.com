@@ -1,8 +1,5 @@
-// Animated heroes (lib/hero.mjs): a still frame until hovered, then the motion. The motion downloads
-// in the background once the page has loaded and gone idle, so hovering plays at once; it waits for a
-// hover instead on Save-Data or 2G/3G-class connections.
-// A card in a list plays when the pointer is anywhere on it. Touch screens have no hover, so there a
-// hero plays while it is mostly on screen, unless the visitor asked for reduced motion.
+// Animated heroes (lib/hero.mjs): the page paints a still first frame; the motion (an MP4) loads once
+// the page has loaded and gone idle, then plays on screen ("auto") or on hover ("hover"), see below.
 (function () {
   var heroes = document.querySelectorAll(".hero-anim[data-motion]");
   if (!heroes.length) return;
@@ -46,34 +43,42 @@
     };
   }
 
-  var seen = canHover || reduced || !("IntersectionObserver" in window) ? null :
+  // One switch (heroMotion in eleventy.config.js, on <html data-hero-motion>): "auto" plays every
+  // hero while it is on screen; "hover" keeps the still until the card or image is hovered.
+  // Either way the still paints first and the motion loads after the page is idle. Reduced motion,
+  // Save-Data and 2G/3G-class connections never autoplay; there, hovering still plays.
+  var net = navigator.connection || {};
+  var light = !!net.saveData || /(^|-)(2g|3g)$/.test(net.effectiveType || "");
+  var auto = document.documentElement.dataset.heroMotion !== "hover" && !reduced && !light;
+  var onScreen = !("IntersectionObserver" in window) ? null :
     new IntersectionObserver(function (entries) {
       entries.forEach(function (e) { e.target.__hero[e.isIntersecting ? "play" : "stop"](); });
-    }, { threshold: 0.6 });
+    }, { threshold: auto ? 0.25 : 0.6 });
 
   var controls = [];
   heroes.forEach(function (el) {
     var c = control(el);
     controls.push(c);
-    if (canHover) {
+    el.__hero = c;
+    if (canHover && !auto) {
+      // Hover anywhere on the card (or the image itself, on its own page) plays it.
       var area = el.closest("[data-hero-area], .panel, .posts > li") || el;
       area.addEventListener("pointerenter", c.play);
       area.addEventListener("pointerleave", c.stop);
       area.addEventListener("focusin", c.play);
       area.addEventListener("focusout", function (e) { if (!area.contains(e.relatedTarget)) c.stop(); });
-    } else if (seen) {
-      el.__hero = c;
-      seen.observe(el);
     }
   });
 
-  // Background preload, after the page's own load and an idle moment, so nothing competes with text.
-  var net = navigator.connection || {};
-  if (net.saveData || /(^|-)(2g|3g)$/.test(net.effectiveType || "")) return;
-  function preloadAll() {
+  if (light) return;
+  function start() {
     var idle = window.requestIdleCallback || function (f) { setTimeout(f, 200); };
-    idle(function () { controls.forEach(function (c) { c.preload(); }); }, { timeout: 3000 });
+    idle(function () {
+      controls.forEach(function (c) { c.preload(); });
+      // Autoplay (or, on touch screens in hover mode, play while mostly on screen).
+      if (onScreen && (auto || (!canHover && !reduced))) heroes.forEach(function (el) { onScreen.observe(el); });
+    }, { timeout: 3000 });
   }
-  if (document.readyState === "complete") preloadAll();
-  else addEventListener("load", preloadAll, { once: true });
+  if (document.readyState === "complete") start();
+  else addEventListener("load", start, { once: true });
 })();

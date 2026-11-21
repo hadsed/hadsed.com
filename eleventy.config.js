@@ -89,6 +89,9 @@ export default function (eleventyConfig) {
   });
   // {{ image | heroHtml(image_alt) }} on a page; {{ item.hero | heroHtml("", true) }} on a card in a list.
   eleventyConfig.addFilter("heroShareUrl", heroShareUrl);
+  // Animated heroes: "auto" plays them while on screen, "hover" only while their card is hovered
+  // (assets/hero.js). Either way the still paints first and the motion loads after.
+  eleventyConfig.addGlobalData("heroMotion", "auto");
   eleventyConfig.addFilter("heroHtml", (value, alt = "", card = false) => heroHtml(value, { alt, card, className: card ? "card-hero" : "hero" }));
   eleventyConfig.addGlobalData("site", () => model);
   // Folder data (content/<kind>/<kind>.json) sets permalink: "{{ page.inputPath | contentUrl(slug, date) }}".
