@@ -134,6 +134,7 @@
         api_host: origin + '/ingest', ui_host: {{ analytics.ui | dump | safe }},
         person_profiles: 'always',
         opt_out_useragent_filter: true,   // keep headless browsers and agents too, tagged $browser_type: bot
+        disable_surveys: true,
         persistence: eu ? 'sessionStorage' : 'localStorage+cookie',
         capture_pageview: true, capture_pageleave: true,
         autocapture: true, enable_heatmaps: true, capture_dead_clicks: true,
