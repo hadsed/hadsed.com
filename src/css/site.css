@@ -524,3 +524,11 @@ details.callout:not([open]) > summary { border-bottom: 0; }
 .appears-label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .reading .prose .appears a { color: var(--bright); text-decoration: none; }
 .reading .prose .appears a:hover { color: var(--glow); }
+
+/* Article images open full-screen on tap (script in post.njk); pinch zooms them natively. */
+.prose img:not(a img, .hero img) { cursor: zoom-in; }
+.lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem;
+  background: rgba(8, 11, 17, 0.94); cursor: zoom-out; }
+.lightbox[hidden] { display: none; }
+.lightbox img { width: calc(100vw - 2rem); height: calc(100vh - 2rem); height: calc(100dvh - 2rem); object-fit: contain; }
+.lightbox-open, .lightbox-open body { overflow: hidden; }

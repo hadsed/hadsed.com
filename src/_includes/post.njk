@@ -25,6 +25,40 @@ layout: base.njk
   {%- endif %}
   {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
+{#- Tap or click an image in the article to see it full-screen; pinch to zoom (the browser's own zoom),
+    tap again or press Escape to close. Built on first use, so nothing here weighs on first paint. #}
+<script>(function () {
+  var art = document.currentScript.previousElementSibling, box, big;
+  function pick(t) { return t.tagName === 'IMG' && !t.closest('a, .hero') ? t : null; }
+  // Closing undoes any pinch zoom: capping the (top) page's scale for a moment snaps it back to 1.
+  function unzoom() {
+    var d = document; try { if (parent !== window && parent.document) d = parent.document; } catch (e) {}
+    var m = d.querySelector('meta[name="viewport"]'); if (!m) return;
+    var was = m.content; m.content = was + ',maximum-scale=1';
+    setTimeout(function () { m.content = was; }, 300);
+  }
+  function close() {
+    if (!box || box.hidden) return;
+    box.hidden = true; big.removeAttribute('src');
+    document.documentElement.classList.remove('lightbox-open');
+    unzoom();
+  }
+  art.addEventListener('click', function (e) {
+    var img = pick(e.target); if (!img) return;
+    if (!box) {
+      box = document.createElement('div'); box.className = 'lightbox'; box.hidden = true;
+      box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+      big = document.createElement('img'); box.appendChild(big);
+      box.addEventListener('click', close);
+      document.body.appendChild(box);
+      addEventListener('keydown', function (k) { if (k.key === 'Escape') close(); });
+    }
+    big.src = img.currentSrc || img.src; big.alt = img.alt;
+    box.setAttribute('aria-label', img.alt || 'Image');
+    box.hidden = false;
+    document.documentElement.classList.add('lightbox-open');
+  });
+})();</script>
 {% include "backlinks.njk" %}
 </div>
 {%- if toc.length > 2 %}
