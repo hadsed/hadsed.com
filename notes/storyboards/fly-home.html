@@ -103,14 +103,14 @@ function decorateSite(doc = siteDoc()) {
     ul.appendChild(li);
   }
   for (const a of doc.querySelectorAll('a[href="#fly"]')) a.onclick = (e) => { e.preventDefault(); enter(); };
-  // Links to other sites leave the wrapper: GitHub, LinkedIn and most others refuse to be framed,
-  // so opened inside #site they left a blank page over the sky.
+  // Links to other sites open in a new tab (the build marks them; this catches any it missed). Inside #site
+  // they'd load in the frame, and GitHub, LinkedIn and most others refuse to be framed: a blank page over the sky.
   if (!doc.__outLinks) {
     doc.__outLinks = true;
     doc.addEventListener('click', (e) => {
       const a = e.target.closest && e.target.closest('a[href]');
       if (!a || a.target) return;
-      try { const u = new URL(a.href); if (/^https?:$/.test(u.protocol) && u.origin !== location.origin) a.target = '_top'; } catch {}
+      try { const u = new URL(a.href); if (/^https?:$/.test(u.protocol) && u.origin !== location.origin) { a.target = '_blank'; a.rel = 'noopener'; } } catch {}
     }, true);
   }
   // Keep the address bar in step with the page shown inside, so a reload lands on the same page.
