@@ -85,6 +85,10 @@ a:hover { text-decoration: underline; }
 .menu a[aria-current="page"] { color: var(--glow); font-weight: 700; }
 /* The name is set in Petrona, the home page's serif, at the nav items' size, so it reads apart from them. Desktop only. */
 .site-name { color: var(--accent); font-family: Petrona, Georgia, serif; font-weight: 400; font-size: 1em; }
+/* Boxed with a soft border across the menu column, the name centered in it. */
+.site-name { display: block; text-align: center; padding: 0.35rem 0; margin: 0 0.5rem 0 -0.65rem;
+  border: 1px solid color-mix(in srgb, var(--rule) 30%, transparent); border-radius: 4px; }
+.site-name:hover { text-decoration: none; border-color: color-mix(in srgb, var(--rule) 55%, transparent); }
 
 main { min-width: 0; }
 
@@ -114,6 +118,7 @@ footer {
   .menu .nav-scroll > ul {
     --fade: 2.75rem;
     flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    padding-left: 1ch; /* a character's worth of room before the first item */
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
     mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
   }
@@ -532,3 +537,5 @@ details.callout:not([open]) > summary { border-bottom: 0; }
 .lightbox[hidden] { display: none; }
 .lightbox img { width: calc(100vw - 2rem); height: calc(100vh - 2rem); height: calc(100dvh - 2rem); object-fit: contain; }
 .lightbox-open, .lightbox-open body { overflow: hidden; }
+.lightbox img { transition: transform 0.2s; }
+.lightbox { transition: background-color 0.2s; }

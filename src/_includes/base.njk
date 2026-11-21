@@ -113,7 +113,8 @@
       var box = ul.getBoundingClientRect(), right = cur.getBoundingClientRect().right;
       if (right > box.right) {
         var need = right - box.right + 4;
-        var starts = items().map(function (li) { return li.getBoundingClientRect().left - box.left + ul.scrollLeft; });
+        var pad = parseFloat(getComputedStyle(ul).paddingLeft) || 0;
+        var starts = items().map(function (li) { return li.getBoundingClientRect().left - box.left + ul.scrollLeft - pad; });
         var to = starts.filter(function (x) { return x >= need; })[0];
         if (to != null) {
           var room = ul.scrollWidth - ul.clientWidth;
