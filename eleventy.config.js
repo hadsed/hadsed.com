@@ -166,6 +166,15 @@ export default function (eleventyConfig) {
     if (!(this.page.outputPath || "").endsWith(".html")) return content;
     return resolveLinks(content, this.page.inputPath, this.page.url);
   });
+  // Links to other sites open in a new tab (LinkedIn, GitHub, Scholar, links in posts). Own-site links stay put.
+  eleventyConfig.addTransform("outsideLinks", function (content) {
+    if (!(this.page.outputPath || "").endsWith(".html")) return content;
+    return content.replace(/<a\s([^>]*?)>/g, (tag, attrs) => {
+      const href = /\bhref="(https?:\/\/[^"]*)"/.exec(attrs);
+      if (!href || /\btarget=/.test(attrs) || /^https?:\/\/(www\.)?hadsed\.com(\/|$)/.test(href[1])) return tag;
+      return `<a ${attrs} target="_blank" rel="noopener">`;
+    });
+  });
   // The feed carries a post's body before page transforms run: resolve its links here, and make
   // site-relative links absolute so they work in a feed reader.
   eleventyConfig.addFilter("feedHtml", (html, inputPath, url) =>

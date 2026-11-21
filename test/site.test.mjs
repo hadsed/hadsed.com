@@ -182,3 +182,10 @@ test("a long post gets a side table of contents and its callouts render", () => 
   assert.match(html, /<div class="callout callout-note">\s*<p class="callout-title">Why Astra\?<\/p>/);
   assert.doesNotMatch(html, /\[!note\]/);
 });
+
+test("links to other sites open in a new tab; own links don't", () => {
+  const html = read("index.html");
+  assert.match(html, /<a class="button" href="https:\/\/github\.com\/hadsed" target="_blank" rel="noopener">/);
+  assert.match(html, /<a class="button" href="https:\/\/linkedin\.com\/in\/hadsed" target="_blank" rel="noopener">/);
+  assert.doesNotMatch(html, /<a [^>]*href="\/[^"]*"[^>]*target=/);
+});
