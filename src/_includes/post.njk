@@ -25,6 +25,61 @@ layout: base.njk
   {%- endif %}
   {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
+{#- Tap or click an image in the article to see it full-screen; pinch to zoom (the browser's own zoom),
+    tap again or press Escape to close. Built on first use, so nothing here weighs on first paint. #}
+<script>(function () {
+  var art = document.currentScript.previousElementSibling, box, big, y0 = null, dy = 0, dragged = false;
+  // Pinch zoom happens on the top page (this one may sit in the home's frame).
+  function scale() { try { return (parent.visualViewport || visualViewport).scale; } catch (e) { return visualViewport ? visualViewport.scale : 1; } }
+  function settle() { big.style.transition = box.style.transition = big.style.transform = box.style.backgroundColor = ''; }
+  function pick(t) { return t.tagName === 'IMG' && !t.closest('a, .hero') ? t : null; }
+  // Closing undoes any pinch zoom: capping the (top) page's scale for a moment snaps it back to 1.
+  function unzoom() {
+    var d = document; try { if (parent !== window && parent.document) d = parent.document; } catch (e) {}
+    var m = d.querySelector('meta[name="viewport"]'); if (!m) return;
+    var was = m.content; m.content = was + ',maximum-scale=1';
+    setTimeout(function () { m.content = was; }, 300);
+  }
+  function close() {
+    if (!box || box.hidden) return;
+    box.hidden = true; big.removeAttribute('src'); settle();
+    document.documentElement.classList.remove('lightbox-open');
+    unzoom();
+  }
+  art.addEventListener('click', function (e) {
+    var img = pick(e.target); if (!img) return;
+    if (!box) {
+      box = document.createElement('div'); box.className = 'lightbox'; box.hidden = true;
+      box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+      big = document.createElement('img'); box.appendChild(big);
+      box.addEventListener('click', function () { if (!dragged) close(); });
+      // Drag down to dismiss, only at the base size: once pinched in, a drag pans the image instead.
+      box.addEventListener('touchstart', function (t) {
+        y0 = t.touches.length === 1 && scale() < 1.02 ? t.touches[0].clientY : null; dy = 0; dragged = false;
+      }, { passive: true });
+      box.addEventListener('touchmove', function (t) {
+        if (y0 == null) return;
+        if (t.touches.length !== 1 || scale() >= 1.02) { y0 = null; settle(); return; }
+        dy = Math.max(0, t.touches[0].clientY - y0);
+        if (dy > 8) { dragged = true; t.preventDefault(); }
+        big.style.transition = box.style.transition = 'none';
+        big.style.transform = 'translateY(' + dy + 'px)';
+        box.style.backgroundColor = 'rgba(8, 11, 17, ' + (0.94 * Math.max(0.2, 1 - dy / 400)) + ')';
+      }, { passive: false });
+      box.addEventListener('touchend', function () {
+        if (y0 == null) return;
+        y0 = null;
+        if (dy > 90) close(); else settle();
+      });
+      document.body.appendChild(box);
+      addEventListener('keydown', function (k) { if (k.key === 'Escape') close(); });
+    }
+    big.src = img.currentSrc || img.src; big.alt = img.alt;
+    box.setAttribute('aria-label', img.alt || 'Image');
+    box.hidden = false;
+    document.documentElement.classList.add('lightbox-open');
+  });
+})();</script>
 {% include "backlinks.njk" %}
 </div>
 {%- if toc.length > 2 %}

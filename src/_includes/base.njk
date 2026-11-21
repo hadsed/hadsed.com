@@ -70,7 +70,7 @@
 <body>
 <div class="page">
   <nav class="menu">
-    {#- On every page, the landing page included, so the menu sits at the same height everywhere. #}
+    {#- On every page, the landing page included, so the menu sits at the same height everywhere (hidden on phones). #}
     <a class="site-name" href="/">Had Seddiqi</a>
     {#- Two groups: who (About, Experience), then what (Projects, Blog, Notes). The items sit in
         their own list so the home's Fly button (added after it) stays put while, on phones,
@@ -94,19 +94,34 @@
 </div>
 <footer>© {{ buildYear }} Had Seddiqi</footer>
 <script>(function () {
-  // Phones: the menu row scrolls sideways. Fade its left edge once scrolled, drop the right fade
-  // at the end, and start with the current page's item in view.
+  // Phones: the menu row scrolls sideways. Fade its left edge only while an item is cut there, drop
+  // the right fade at the end, and start with the current page's item in view.
   var ul = document.querySelector('.nav-scroll > ul'); if (!ul) return;
+  function items() { return [].filter.call(ul.children, function (li) { return li.offsetWidth; }); }
   function mark() {
-    ul.classList.toggle('scrolled', ul.scrollLeft > 2);
+    var left = ul.getBoundingClientRect().left;
+    ul.classList.toggle('scrolled', items().some(function (li) {
+      var r = li.getBoundingClientRect(); return r.left < left - 1 && r.right > left + 1;
+    }));
     ul.classList.toggle('at-end', ul.scrollLeft + ul.clientWidth >= ul.scrollWidth - 2);
   }
   ul.addEventListener('scroll', mark, { passive: true });
   addEventListener('load', function () {
     var cur = ul.querySelector('[aria-current="page"]');
     if (cur && ul.scrollWidth > ul.clientWidth) {
-      var over = cur.getBoundingClientRect().right - (ul.getBoundingClientRect().right - 48);
-      if (over > 0) ul.scrollLeft += over;
+      // Scroll only when the current item is cut off, and then so the row starts on a whole item.
+      var box = ul.getBoundingClientRect(), right = cur.getBoundingClientRect().right;
+      if (right > box.right) {
+        var need = right - box.right + 4;
+        var pad = parseFloat(getComputedStyle(ul).paddingLeft) || 0;
+        var starts = items().map(function (li) { return li.getBoundingClientRect().left - box.left + ul.scrollLeft - pad; });
+        var to = starts.filter(function (x) { return x >= need; })[0];
+        if (to != null) {
+          var room = ul.scrollWidth - ul.clientWidth;
+          if (to > room) ul.style.paddingRight = (to - room) + 'px';
+          ul.scrollLeft = to;
+        }
+      }
     }
     mark();
   });

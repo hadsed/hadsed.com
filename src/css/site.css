@@ -83,7 +83,12 @@ a:hover { text-decoration: underline; }
 .site-name + ul { margin-top: 1.5rem; }
 .menu li { margin: 0 0 0.35rem; }
 .menu a[aria-current="page"] { color: var(--glow); font-weight: 700; }
-.site-name { color: var(--accent); }
+/* The name is set in Petrona, the home page's serif, at the nav items' size or a touch larger, so it reads apart from them. Desktop only. */
+.site-name { color: var(--accent); font-family: Petrona, Georgia, serif; font-weight: 400; font-size: 1.1em; }
+/* Boxed with a soft border across the menu column, the name centered in it. */
+.site-name { display: block; text-align: center; padding: 0.35rem 0; margin: 0 0.5rem 0 -0.65rem;
+  border: 1px solid color-mix(in srgb, var(--rule) 30%, transparent); border-radius: 4px; }
+.site-name:hover { text-decoration: none; border-color: color-mix(in srgb, var(--rule) 55%, transparent); }
 
 main { min-width: 0; }
 
@@ -102,7 +107,7 @@ footer {
 @media (max-width: 640px) {
   .page { grid-template-columns: minmax(0, 1fr); row-gap: 2.25rem; padding: 1.5rem 1rem 0; }
   .menu ul { display: flex; flex-wrap: wrap; gap: 1.25rem; }
-  .site-name + ul { margin-top: 0.75rem; }
+  .site-name { display: none; }
   .menu li { margin: 0; }
   footer { margin-top: 3rem; }
   /* One row that scrolls sideways. The home's Fly button sits after the scroller, and the item
@@ -113,6 +118,7 @@ footer {
   .menu .nav-scroll > ul {
     --fade: 2.75rem;
     flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    padding-left: 1ch; /* a character's worth of room before the first item */
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
     mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade)), transparent);
   }
@@ -541,3 +547,13 @@ details.callout:not([open]) > summary { border-bottom: 0; }
 .appears-label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .reading .prose .appears a { color: var(--bright); text-decoration: none; }
 .reading .prose .appears a:hover { color: var(--glow); }
+
+/* Article images open full-screen on tap (script in post.njk); pinch zooms them natively. */
+.prose img:not(a img, .hero img) { cursor: zoom-in; }
+.lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem;
+  background: rgba(8, 11, 17, 0.94); cursor: zoom-out; }
+.lightbox[hidden] { display: none; }
+.lightbox img { width: calc(100vw - 2rem); height: calc(100vh - 2rem); height: calc(100dvh - 2rem); object-fit: contain; }
+.lightbox-open, .lightbox-open body { overflow: hidden; }
+.lightbox img { transition: transform 0.2s; }
+.lightbox { transition: background-color 0.2s; }
