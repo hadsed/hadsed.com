@@ -277,11 +277,23 @@ if (!reduceMotion) setTimeout(function blink() {
   setTimeout(blink, EVERY * 1000);
 }, 3000);   // first blink ~3s after load
 
+// ---------- analytics: the game joins this visitor's session ----------
+// The site page in the frame runs PostHog (base.njk). Mach 20 sits on another domain and can't read
+// its ids, so they go over with Fly; the game records its flight against the same visitor and
+// session. The backdrop itself sends nothing.
+const ph = () => { try { const p = site.contentWindow.posthog; return p && p.__loaded ? p : null; } catch { return null; } };
+let flewAt = 0;
+function track(event, props) { try { ph()?.capture(event, props); } catch {} }
+
 // ---------- enter / leave: one camera move in one scene ----------
 function enter() {
   if (state !== 'site' || !sky.hello) return;
   state = 'flying';
   document.body.classList.add('flying');
+  const p = ph();
+  if (p) tell('ids', { distinctId: p.get_distinct_id(), sessionId: p.get_session_id() });
+  flewAt = performance.now();
+  track('fly_start');
   tell('fly');
   skyFrame.classList.add('on');
   skyFrame.tabIndex = 0;
@@ -291,6 +303,7 @@ function leave() {
   if (state !== 'flying') return;
   state = 'site';
   document.body.classList.remove('flying');
+  track('fly_end', { seconds: Math.round((performance.now() - flewAt) / 1000) });
   tell('land');
   skyFrame.tabIndex = -1;
   site.focus();
