@@ -12,6 +12,9 @@ export default function (eleventyConfig) {
     eleventyConfig.ignores.add(path);
   }
 
+  // src/lab/: option pages for branch previews (SITE_URL set). Production builds never include them.
+  if (!(process.env.SITE_URL || process.env.LAB)) eleventyConfig.ignores.add("src/lab/**");
+
   eleventyConfig.addPassthroughCopy({ "src/css": "css", "src/fonts": "fonts", "src/assets": "assets", "content/assets": "assets", "src/root": "/" });
 
   // Flight (multiplayer jets) and the home that wraps the site over its live sky ship everywhere,
@@ -272,6 +275,10 @@ export default function (eleventyConfig) {
   // Landing page panels keep their hand-set order; projects without one go last.
   eleventyConfig.addCollection("projects", (api) =>
     api.getFilteredByTag("projects").sort((a, b) => (a.data.order ?? 999) - (b.data.order ?? 999))
+  );
+  // About page: the projects named in about.md's selected_projects, in that order; all of them if none are.
+  eleventyConfig.addFilter("selectedProjects", (items) =>
+    model.selectedProjects ? model.selectedProjects.map((url) => items.find((item) => item.url === url)).filter(Boolean) : items
   );
   eleventyConfig.addCollection("blog", (api) => api.getFilteredByTag("blog").sort((a, b) => b.date - a.date));
 
