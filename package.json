@@ -5,7 +5,8 @@
   "scripts": {
     "build": "eleventy",
     "dev": "eleventy --serve",
-    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "drafts": "sh -c 'node scripts/draft-preview.mjs --watch \"$@\" & eleventy --serve' --"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.7",

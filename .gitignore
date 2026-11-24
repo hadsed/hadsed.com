@@ -4,3 +4,6 @@ _site-test/
 .superpowers/
 .wrangler/
 flight/test/out/
+
+# vault drafts copied in by scripts/draft-preview.mjs
+.draft-preview.json
