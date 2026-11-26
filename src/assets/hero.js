@@ -6,6 +6,20 @@
   var canHover = matchMedia("(hover: hover)").matches;
   var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // Some browsers refuse muted autoplay (Safari in Low Power Mode, some battery savers). Then the
+  // first tap, click, key or scroll on the page counts as a gesture, and every refused hero retries.
+  var refused = [];
+  function blocked() {
+    if (!refused.length) ["pointerdown", "keydown", "touchstart", "wheel"].forEach(function (t) {
+      addEventListener(t, retry, { once: true, passive: true });
+    });
+    refused.push(this);
+  }
+  function retry() {
+    var list = refused; refused = [];
+    list.forEach(function (c) { if (c.wanted()) c.play(); });
+  }
+
   function control(el) {
     var motion = null;
     var wanted = false;
@@ -27,12 +41,13 @@
       motion.src = src;
       el.appendChild(motion);
     }
-    return {
+    var api = {
+      wanted: function () { return wanted; },
       preload: function () { if (!motion) make(); },
       play: function () {
         wanted = true;
         if (!motion) make();
-        if (motion.tagName === "VIDEO") { var p = motion.play(); if (p && p.catch) p.catch(function () {}); }
+        if (motion.tagName === "VIDEO") { var p = motion.play(); if (p && p.catch) p.catch(blocked.bind(api)); }
         else if (motion.complete) el.classList.add("playing");
       },
       stop: function () {
@@ -41,14 +56,16 @@
         if (motion && motion.tagName === "VIDEO") { motion.pause(); motion.currentTime = 0; }
       },
     };
+    return api;
   }
 
   // One switch (heroMotion in eleventy.config.js, on <html data-hero-motion>): "auto" plays every
   // hero while it is on screen; "hover" keeps the still until the card or image is hovered.
-  // Either way the still paints first and the motion loads after the page is idle. Reduced motion,
-  // Save-Data and 2G/3G-class connections never autoplay; there, hovering still plays.
+  // Either way the still paints first and the motion loads after the page is idle. Reduced motion
+  // and Save-Data never autoplay; there, hovering still plays. (Chrome's effectiveType is not used:
+  // it reports "3g" on ordinary Wi-Fi with a slow moment, which turned autoplay off for real visitors.)
   var net = navigator.connection || {};
-  var light = !!net.saveData || /(^|-)(2g|3g)$/.test(net.effectiveType || "");
+  var light = !!net.saveData;
   var auto = document.documentElement.dataset.heroMotion !== "hover" && !reduced && !light;
   var onScreen = !("IntersectionObserver" in window) ? null :
     new IntersectionObserver(function (entries) {
