@@ -23,6 +23,7 @@ layout: base.njk
     {% include "toc.njk" %}
   </details>
   {%- endif %}
+  {%- if 'class="katex' in content %}<link rel="stylesheet" href="/css/katex/katex.min.css">{% endif %}
   {{ (content | dropLeadFigure if lead else content) | safe }}
 </article>
 {#- Tap or click an image in the article to see it full-screen; pinch to zoom (the browser's own zoom),

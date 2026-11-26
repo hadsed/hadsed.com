@@ -2,6 +2,7 @@ import { basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import matter from "gray-matter";
+import markdownKatex from "@vscode/markdown-it-katex";
 import { buildModel, urlFor, roleSlug, slugify, uniqueId, isoDate } from "./lib/content.mjs";
 import { markdownCallouts, tocFrom } from "./lib/article.mjs";
 import { prepareHeroes, heroHtml, heroShareUrl } from "./lib/hero.mjs";
@@ -122,6 +123,10 @@ export default function (eleventyConfig) {
 
   // Obsidian callouts (> [!note] Title) and the reading pages' table of contents (lib/article.mjs).
   eleventyConfig.amendLibrary("md", markdownCallouts);
+  // LaTeX the way Obsidian writes it: $inline$ and $$display$$, typeset at build time by KaTeX,
+  // so a page with math needs only katex.min.css and its fonts, no script.
+  eleventyConfig.amendLibrary("md", (md) => md.use(markdownKatex.default || markdownKatex, { throwOnError: false, enableMathBlockInHtml: false, enableMathInlineInHtml: false }));
+  eleventyConfig.addPassthroughCopy({ "node_modules/katex/dist/katex.min.css": "css/katex/katex.min.css", "node_modules/katex/dist/fonts": "css/katex/fonts" });
   eleventyConfig.addFilter("toc", tocFrom);
 
   // Obsidian links: [[page]], [[page|text]], [[page#Heading]], [[#Heading]] (this page).

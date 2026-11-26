@@ -26,9 +26,6 @@ For benchmarking VLM pointing capability, I chose a set of parts from [BenchCAD]
 This can be a little too hard of a task. Many mechanical parts have symmetries or smooth surfaces that can be hard even for humans to track. It's also not clear from a visual standpoint if a part rotated somehow or the camera did. To suss out those confounders I also tested on a workbench scene where parts sit on a table and shadows, bench features, and other parts give helpful landmarks to suggest a simple perspective shift in a static scene.
 ![[home-from-an-address/plan/pointing-grease-nipple-all.png|Pointing benchmark example]]
 # Losses and error
-![[CleanShot 2026-11-23 at 17.55.03@2x.png]]
-
-> Claude: LaTeX of the three losses from the lab page (source: `benchmarks/point_correspond/lab/home.html` on the vision-agents branch `claude/fable-handoff-simplify-6b38a3`). Symbol lists copied from the lab page; edit or drop.
 
 **Pixel loss** (conditions that stay in the image plane)
 
@@ -72,38 +69,24 @@ $$
 \text{wrong object} & \text{the ray lands on another object in the scene}
 \end{cases}
 $$
-![[CleanShot 2026-11-23 at 17.55.35@2x.png]]
-reproduce in latex and as nice diagrams (altho those are pretty nice they just need formatting for here. taken from https://hadsed--point-correspond-v2-lab-lab.modal.run/. you should look up in vision-agents repo where it comes from since it'll help with some other stuff too more efficiently)
 
 ![[pointing-grading-classes.png]]
-> Claude: grading-class diagram built from the study's own answers, styled for the site. One real answer per class, classes by the r = 6.7 px rule above.
 
 # Results
 ## Qualitative understanding
 I've put a small explorer here to review individual samples easily. It's helpful to flip through this before trying to look at the aggregate results.
-![[CleanShot 2026-11-23 at 17.57.12@2x.png]]
-i like this thing from the existing site, wondering if we can embed along with a single-shot vs harness switcher, and a single-part vs workbench switcher. all precomputed of course
 
 ![[pointing-figures/widgets.js|explorer]]
-> Claude: Obsidian does not render the interactive figures (the `widgets.js` embeds), so each one has a static PNG preview under it. The site renders them in the page itself; drop the `preview-*.png` lines when publishing. The hero GIF is now the body's first line, which the site uses as the hero.
-> Claude: explorer embed. Switches: single-shot (test half) or harness (mini dev set), single part or workbench. Arrow keys step through answers; click an image for the full-size pair.
 ## Single-shot single-part
-![[CleanShot 2026-11-23 at 18.02.11@2x.png]]
-it would be cool to replicate this table, though have ability to toggle between pix and surf losses so there's only one number to look at (mean)
-
-then clicking into any cell highlights that cell while popping open a little drawer/row 2.5 rows worth right underneath with a scrollable grid. clicking any of those grid images does a modal where they can see it in full. just like that site.
 
 ![[pointing-figures/widgets.js|results-single-part]]
-> Claude: test half, pixel/surface switch at the top.
 ## Single-shot workbench scene
-same as above
 
 ![[pointing-figures/widgets.js|results-workbench]]
 
 ## Harness workbench scene
-same as above
 
 ![[pointing-figures/widgets.js|results-harness-workbench]]
-> Claude: harness runs exist only for the mini dev set: five workbench questions, Small view change, one answer each. Rows sorted by loss, with precise count, mean $ per question and median time. The plan 41 runs (Opus 5.5, GPT-6 Sol, pi) are not in the lab index, so they are not here.
+> Claude: harness runs exist only for the mini dev set: five workbench questions, Small view change, one answer each. Rows sorted by loss, with precise count, mean dollars per question and median time. The plan 41 runs (Opus 5.5, GPT-6 Sol, pi) are not in the lab index, so they are not here.
 
 # Discussion
