@@ -29,7 +29,7 @@ test("landing page shows about, timeline, and projects", () => {
   assert.equal((html.match(/class="timeline-entry/g) || []).length, 8);
   assert.equal((html.match(/class="timeline-entry is-upcoming"/g) || []).length, 1);
   assert.match(html, /is-upcoming"[\s\S]*?class="dates">2026 – \?</);
-  assert.equal((html.match(/class="panel"/g) || []).length, 3);
+  assert.equal((html.match(/class="panel"/g) || []).length, 4);
   assert.match(html, /2025 – now/);
   assert.match(html, /2012 – 2015/);
   assert.match(html, /class="dates">2013</);
@@ -54,7 +54,7 @@ test("landing page shows about, timeline, and projects", () => {
 });
 
 test("projects page and project pages; portfolio redirects there", () => {
-  assert.equal((read("projects/index.html").match(/class="panel"/g) || []).length, 3);
+  assert.equal((read("projects/index.html").match(/class="panel"/g) || []).length, 4);
   assert.match(read("projects/subassembler/index.html"), /<h1>Subassembler<\/h1>/);
   assert.equal(existsSync(new URL("../_site/portfolio", import.meta.url)), false);
   assert.match(read("_redirects"), /^\/portfolio\/\* \/projects\/:splat 301$/m);
