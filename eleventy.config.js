@@ -131,7 +131,11 @@ export default function (eleventyConfig) {
   // own DOM (and inherits the page's styles). The module finds its mounts by data-widget-src; the text
   // after the | is handed to it as the widget's name. The same module on one page runs once.
   const embedWidget = (file, alias) => {
-    const src = `/assets/${encodeURI(file)}`;
+    // the asset cache keeps a script for a day, so its URL carries a hash of its contents:
+    // a changed script is a new URL and a reload picks it up at once
+    const disk = `content/assets/${file}`;
+    const v = existsSync(disk) ? createHash("md5").update(readFileSync(disk)).digest("hex").slice(0, 10) : "";
+    const src = `/assets/${encodeURI(file)}${v ? `?v=${v}` : ""}`;
     return `<figure class="widget"><div class="widget-mount" data-widget-src="${src}" data-widget="${(alias || "").trim()}"></div></figure><script type="module" src="${src}"></script>`;
   };
   const embedFrame = (file) =>

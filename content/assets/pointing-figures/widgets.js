@@ -4,6 +4,8 @@
 // The site turns each embed into <div class="widget-mount" data-widget="<name>"> and loads this module once.
 // Data and images sit next to this file: data-<slice>.json and img/*.webp (built by figure-build/).
 const BASE = new URL(".", import.meta.url);
+// the page loads this script as widgets.js?v=<hash>; data files get the same tag so a new build skips stale caches
+const VER = new URL(import.meta.url).search;
 const SLICES = {explorer: ["zs_v1", "zs_wb", "h_v1", "h_wb"], "results-single-part": ["zs_v1"],
                 "results-workbench": ["zs_wb"], "results-harness-workbench": ["h_wb"]};
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
@@ -88,12 +90,12 @@ const cache = {};
 // a flaky connection (plane wifi) gets four tries with backoff before the figure gives up
 async function getJSON(url, tries = 4) {
   for (let i = 0; ; i++) {
-    try { const r = await fetch(url); if (!r.ok) throw new Error(`HTTP ${r.status}`); return await r.json(); }
+    try { const r = await fetch(url, i ? { cache: "reload" } : undefined); if (!r.ok) throw new Error(`HTTP ${r.status}`); return await r.json(); }
     catch (e) { if (i + 1 >= tries) throw e; await new Promise((ok) => setTimeout(ok, 800 * 2 ** i)); }
   }
 }
 async function slice(k) {
-  if (!cache[k]) cache[k] = getJSON(new URL(`data-${k}.json`, BASE)).then((d) => {
+  if (!cache[k]) cache[k] = getJSON(new URL(`data-${k}.json${VER}`, BASE)).then((d) => {
     const R = d.rows.map((a) => { const o = {}; d.cols.forEach((c, i) => { o[c] = a[i]; }); return o; });
     for (const r of R) { r.sysA = d.systems[r.sys].alias; r.condK = d.conds[r.cond]; r.stemK = d.stems[r.stem]; r.key = k; }
     return Object.assign(d, {R, key: k});
