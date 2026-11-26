@@ -146,9 +146,9 @@ function openModal(list, i) {
       step(Number(m.dataset.m));
     });
   }
-  mList = list; mIdx = i; drawModal(); modal.classList.add("on"); document.documentElement.style.overflow = "hidden";
+  mList = list; mIdx = i; drawModal(); modal.classList.add("on"); document.documentElement.classList.add("lightbox-open");
 }
-function closeModal() { modal.classList.remove("on"); document.documentElement.style.overflow = ""; }
+function closeModal() { modal.classList.remove("on"); document.documentElement.classList.remove("lightbox-open"); }
 function step(d) { mIdx = (mIdx + d + mList.length) % mList.length; drawModal(); }
 async function drawModal() {
   const r = mList[mIdx], sl = await slice(r.key), b = sl.bundles[r.stemK], cv = b.conds[r.condK], sys = sl.systems[r.sys];
@@ -274,7 +274,9 @@ async function explorer(root) {
 // ---------- mount ----------
 const style = document.createElement("style"); style.textContent = CSS; document.head.appendChild(style);
 for (const el of document.querySelectorAll(".widget-mount[data-widget-src]")) {
-  if (new URL(el.dataset.widgetSrc, location.href).href !== new URL(import.meta.url).href || el.dataset.mounted) continue;
+  // resolved against this module's own URL: the first page of a visit is served inside the sky wrapper as
+  // about:srcdoc, where location.href is no base for a relative path
+  if (new URL(el.dataset.widgetSrc, import.meta.url).pathname !== new URL(import.meta.url).pathname || el.dataset.mounted) continue;
   el.dataset.mounted = "1"; el.classList.add("ptw");
   const name = el.dataset.widget;
   const run = name === "explorer" ? explorer(el) : name === "results-harness-workbench" ? table(el, "h_wb", true)
