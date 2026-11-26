@@ -84,8 +84,8 @@ I've put a small explorer here to review individual samples easily. It's helpful
 ![[CleanShot 2026-11-23 at 17.57.12@2x.png]]
 i like this thing from the existing site, wondering if we can embed along with a single-shot vs harness switcher, and a single-part vs workbench switcher. all precomputed of course
 
-![[pointing-figures/explorer.html]]
-> Claude: Obsidian does not render the HTML embeds, so each one has a static PNG preview under it. The site shows the HTML; drop the `preview-*.png` lines when publishing. The hero GIF is now the body's first line, which the site uses as the hero.
+![[pointing-figures/widgets.js|explorer]]
+> Claude: Obsidian does not render the interactive figures (the `widgets.js` embeds), so each one has a static PNG preview under it. The site renders them in the page itself; drop the `preview-*.png` lines when publishing. The hero GIF is now the body's first line, which the site uses as the hero.
 > Claude: explorer embed. Switches: single-shot (test half) or harness (mini dev set), single part or workbench. Arrow keys step through answers; click an image for the full-size pair.
 ## Single-shot single-part
 ![[CleanShot 2026-11-23 at 18.02.11@2x.png]]
@@ -93,17 +93,17 @@ it would be cool to replicate this table, though have ability to toggle between 
 
 then clicking into any cell highlights that cell while popping open a little drawer/row 2.5 rows worth right underneath with a scrollable grid. clicking any of those grid images does a modal where they can see it in full. just like that site.
 
-![[pointing-figures/results-single-part.html]]
-> Claude: test half, pixel/surface switch at the top. The site's embed frame is a fixed 16:9 box, so the table scrolls inside it; the ⤢ button opens it full screen.
+![[pointing-figures/widgets.js|results-single-part]]
+> Claude: test half, pixel/surface switch at the top.
 ## Single-shot workbench scene
 same as above
 
-![[pointing-figures/results-workbench.html]]
+![[pointing-figures/widgets.js|results-workbench]]
 
 ## Harness workbench scene
 same as above
 
-![[pointing-figures/results-harness-workbench.html]]
+![[pointing-figures/widgets.js|results-harness-workbench]]
 > Claude: harness runs exist only for the mini dev set: five workbench questions, Small view change, one answer each. Rows sorted by loss, with precise count, mean $ per question and median time. The plan 41 runs (Opus 5.5, GPT-6 Sol, pi) are not in the lab index, so they are not here.
 
 # Discussion

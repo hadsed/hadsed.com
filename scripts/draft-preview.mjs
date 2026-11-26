@@ -52,20 +52,28 @@ function find(files, link, near) {
   return hits.find((f) => f.startsWith(near)) || hits[0];
 }
 
-function frontMatter(text, name) {
+// a draft without a date keeps the one its last preview got, so the preview URL stays put
+function previousDate(name) {
+  const p = join(ROOT, "content", "blog", `draft-${name}.md`);
+  const m = existsSync(p) && readFileSync(p, "utf8").match(/^date:\s*(\d{4}-\d{2}-\d{2})/m);
+  return m ? m[1] : null;
+}
+
+function frontMatter(text, name, keepDate) {
   const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
   const fm = m ? m[1] : "";
   const body = m ? text.slice(m[0].length) : text;
   const has = (k) => new RegExp(`^${k}:[ \\t]*\\S`, "m").test(fm);
   const keep = fm.split("\n").filter((l) => !/^(date|slug|summary):\s*$/.test(l));
   if (!has("title")) keep.push(`title: ${name}`);
-  if (!has("date")) keep.push(`date: ${new Date().toISOString().slice(0, 10)}`);
+  if (!has("date")) keep.push(`date: ${keepDate || new Date().toISOString().slice(0, 10)}`);
   if (!has("slug")) keep.push(`slug: draft-${name}`);
   if (!has("summary")) keep.push("summary: Draft preview");
   return `---\n${keep.filter(Boolean).join("\n")}\n---\n${body}`;
 }
 
 function sync() {
+  const dates = Object.fromEntries(names.map((n) => [n, previousDate(n)]));
   const old = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, "utf8")) : [];
   for (const p of old) rmSync(join(ROOT, p), { recursive: true, force: true });
   const written = [], files = vaultFiles(), missing = [];
@@ -80,7 +88,7 @@ function sync() {
       const hit = find(files, link, near);
       if (!hit) { missing.push(link); continue; }
       let from = join(VAULT, hit), to = join("content", "assets", link);
-      if (link.endsWith(".html") && link.includes("/")) {           // a widget folder: bring its images too
+      if (/\.(html|js)$/.test(link) && link.includes("/")) {        // a widget folder: bring its data and images too
         from = dirname(from); to = dirname(to);
       }
       if (existsSync(join(ROOT, to)) && !old.includes(to)) continue;  // a real site asset: leave it alone
@@ -89,7 +97,7 @@ function sync() {
       if (!written.includes(to)) written.push(to);
     }
     const out = join("content", "blog", `draft-${name}.md`);
-    writeFileSync(join(ROOT, out), frontMatter(text, name));
+    writeFileSync(join(ROOT, out), frontMatter(text, name, dates[name]));
     written.push(out);
   }
   writeFileSync(MANIFEST, JSON.stringify(written, null, 1) + "\n");

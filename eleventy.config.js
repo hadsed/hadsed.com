@@ -127,6 +127,13 @@ export default function (eleventyConfig) {
   // Obsidian links: [[page]], [[page|text]], [[page#Heading]], [[#Heading]] (this page).
   // Embeds: ![[image.png]] becomes an image; ![[viz.html]], a self-contained page from content/assets,
   // runs in its own frame inside the page (its CSS and JS can't touch the site's).
+  // ![[widgets.js|name]] is a native figure: an ES module from content/assets that renders into the page's
+  // own DOM (and inherits the page's styles). The module finds its mounts by data-widget-src; the text
+  // after the | is handed to it as the widget's name. The same module on one page runs once.
+  const embedWidget = (file, alias) => {
+    const src = `/assets/${encodeURI(file)}`;
+    return `<figure class="widget"><div class="widget-mount" data-widget-src="${src}" data-widget="${(alias || "").trim()}"></div></figure><script type="module" src="${src}"></script>`;
+  };
   const embedFrame = (file) =>
     `<iframe class="embed-frame" src="/assets/${encodeURI(file)}" title="${file.replace(/\.html$/, "")}" loading="lazy" allow="fullscreen; xr-spatial-tracking"></iframe>`;
   // ![[pic.png|600]] sets a width, as in Obsidian; any other text after the | is the alt text,
@@ -141,13 +148,14 @@ export default function (eleventyConfig) {
     return content
       .replace(/<p>\s*!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*<\/p>/g, (m, file, alias) => {
         file = file.trim();
+        if (file.endsWith(".js")) return embedWidget(file, alias);
         if (file.endsWith(".html")) return `<figure class="embed">${embedFrame(file)}${alias ? `<figcaption>${alias.trim()}</figcaption>` : ""}</figure>`;
         const caption = alias && !/^\d+(x\d+)?$/.test(alias.trim()) ? `<figcaption>${alias.trim()}</figcaption>` : "";
         return `<figure class="figure">${embedImage(file, alias)}${caption}</figure>`;
       })
       .replace(/(!?)\[\[([^\]|#]*)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]/g, (match, embed, name, heading, alias) => {
         name = name.trim();
-        if (embed) return name.endsWith(".html") ? embedFrame(name) : embedImage(name, alias);
+        if (embed) return name.endsWith(".js") ? embedWidget(name, alias) : name.endsWith(".html") ? embedFrame(name) : embedImage(name, alias);
         const hit = name ? model.targets.get(name) : self;
         if (!hit) throw new Error(`Unresolved wikilink ${match} in ${where}`);
         let href = hit.url;

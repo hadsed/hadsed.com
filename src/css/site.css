@@ -388,6 +388,7 @@ h1 .status { margin-left: 0.6rem; }
 
 /* ![[viz.html]]: a self-contained page in its own frame */
 .embed { margin: 1.25rem 0 1.5rem; }
+.widget { margin: 1.25rem 0 1.5rem; }
 .embed-frame { display: block; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--rule); border-radius: 3px; background: #0f1520; }
 .embed figcaption { color: var(--muted); font-size: 0.8rem; margin-top: 0.4rem; }
 
