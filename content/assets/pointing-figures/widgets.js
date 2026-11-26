@@ -85,8 +85,15 @@ const CSS = `
 
 // ---------- data ----------
 const cache = {};
+// a flaky connection (plane wifi) gets four tries with backoff before the figure gives up
+async function getJSON(url, tries = 4) {
+  for (let i = 0; ; i++) {
+    try { const r = await fetch(url); if (!r.ok) throw new Error(`HTTP ${r.status}`); return await r.json(); }
+    catch (e) { if (i + 1 >= tries) throw e; await new Promise((ok) => setTimeout(ok, 800 * 2 ** i)); }
+  }
+}
 async function slice(k) {
-  if (!cache[k]) cache[k] = fetch(new URL(`data-${k}.json`, BASE)).then((r) => r.json()).then((d) => {
+  if (!cache[k]) cache[k] = getJSON(new URL(`data-${k}.json`, BASE)).then((d) => {
     const R = d.rows.map((a) => { const o = {}; d.cols.forEach((c, i) => { o[c] = a[i]; }); return o; });
     for (const r of R) { r.sysA = d.systems[r.sys].alias; r.condK = d.conds[r.cond]; r.stemK = d.stems[r.stem]; r.key = k; }
     return Object.assign(d, {R, key: k});
@@ -273,6 +280,7 @@ async function explorer(root) {
 
 // ---------- mount ----------
 const style = document.createElement("style"); style.textContent = CSS; document.head.appendChild(style);
+function mountAll() {
 for (const el of document.querySelectorAll(".widget-mount[data-widget-src]")) {
   // resolved against this module's own URL: the first page of a visit is served inside the sky wrapper as
   // about:srcdoc, where location.href is no base for a relative path
@@ -281,5 +289,12 @@ for (const el of document.querySelectorAll(".widget-mount[data-widget-src]")) {
   const name = el.dataset.widget;
   const run = name === "explorer" ? explorer(el) : name === "results-harness-workbench" ? table(el, "h_wb", true)
     : SLICES[name] ? table(el, SLICES[name][0], false) : Promise.reject(new Error(`no widget named "${name}"`));
-  run.catch((e) => { el.innerHTML = `<p class="muted">Figure failed to load: ${esc(e.message)}</p>`; });
+  el.innerHTML = `<p class="muted">Loading the figure…</p>`;
+  run.catch((e) => {
+    for (const k of SLICES[name] || []) delete cache[k];
+    el.innerHTML = `<p class="muted">The figure's data did not load (${esc(e.message)}). <button class="ptw-retry" style="background:none;border:0;color:var(--glow);cursor:pointer;padding:0">Try again</button></p>`;
+    el.querySelector(".ptw-retry").addEventListener("click", () => { delete el.dataset.mounted; mountAll(); });
+  });
 }
+}
+mountAll();
