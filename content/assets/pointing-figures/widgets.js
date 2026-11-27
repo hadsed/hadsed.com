@@ -207,7 +207,7 @@ async function explorer(root) {
     if (!r) { body.innerHTML = `<div class="ui-state">No answers stored for this system here.</div>`; return; }
     const b = sl.bundles[r.stemK], cv = b.conds[r.condK];
     const pane = (h, inner, kv) => `<div><p class="ui-eyebrow">${h}</p><div class="ui-tile" data-modal="" data-slide="${ex.idx}" role="button" tabindex="0" aria-label="open full size">${inner}</div><div class="ui-kv">${kv}</div></div>`;
-    body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:0.9rem;overflow-wrap:anywhere">
+    body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:0.9rem;overflow-wrap:break-word">
       ${pane("source, marked", fullSvg(b.src), `<div><span>sample</span><span class="ui-mono">${esc(short(r.stemK))}</span></div><div><span>${ex.mode === "zs" ? "answer" : "run"}</span>${ex.mode === "zs" ? `${r.rep + 1} of this question` : "one per question"}</div>`)}
       ${pane("target", fullSvg(cv.img), `<div><span>view</span>${esc(LABEL[r.condK])}</div><div><span>half</span>${esc(sl.half)}</div>`)}
       ${pane("answer vs truth", zoomSvg(cv.img, cv.tgt, r.pred, 150), `<div><span>off by</span><span class="ui-mono">${offBy(r)}</span></div><div>${badge(r.cls)}</div>`)}</div>`;
