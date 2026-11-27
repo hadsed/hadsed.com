@@ -2,6 +2,9 @@
 // Embedded from the draft as ![[pointing-figures/widgets.js|<name>]], where <name> is one of
 //   explorer · results-single-part · results-workbench · results-harness-workbench
 // The site turns each embed into <div class="widget-mount" data-widget="<name>"> and loads this module once.
+// Everything is drawn with the figure kit (hadsed.com/design-system: ui.css + ui.js), which the page loads:
+// .ui-fig frame, .ui-bar / .ui-seg / .ui-select / .ui-step controls, .ui-table with sort and column details,
+// .ui-drawer rows, .ui-tiles, a .ui-modal <dialog>, .ui-badge for the grading classes, .ui-state for loading and failure.
 // Data and images sit next to this file: data-<slice>.json and img/*.webp (built by figure-build/).
 const BASE = new URL(".", import.meta.url);
 // the page loads this script as widgets.js?v=<hash>; data files get the same tag so a new build skips stale caches
@@ -13,77 +16,21 @@ const R6 = 6.7, RINGS = [R6, 2 * R6, 3 * R6], RING_COL = ["#22c55e", "#eab308", 
 const PIXEL = new Set(["same_image", "exact_2d", "view_roll"]);
 const LABEL = {same_image: "Same image", exact_2d: "Exact 2D transform", view20: "Small view change", view60: "Large view change",
                view_roll: "Camera roll", view_small: "Small view change", view_large: "Large view change"};
+// table heads stay short; the column details card (data-info) carries the full name
+const SHORT = {same_image: "Same image", exact_2d: "Exact 2D", view20: "Small view", view60: "Large view", view_roll: "Roll", view_small: "Small view", view_large: "Large view"};
 const CLS_NAME = {precise: "precise", near: "near", mid: "mid", wrong_region: "wrong place", background: "off the part",
                   wrong_part: "wrong object", off_canvas: "off canvas", undecodable: "no answer"};
 const CLS_COL = {precise: "#2a9d8f", near: "#8bbf5a", mid: "#5b8fb9", wrong_region: "#d08a2e", background: "#d9534f",
                  wrong_part: "#c0397a", off_canvas: "#a33", undecodable: "#7d8590"};
 const CLS_ORDER = Object.keys(CLS_COL);
 const DS_NAME = {v1: "single part", workbench: "workbench"};
-const dot = (c) => `<i class="ptw-dot" style="background:${CLS_COL[c]}"></i>`;
-const chip = (c) => `<span class="ptw-chip">${dot(c)}${esc(CLS_NAME[c] || c)}</span>`;
+// grading class -> the kit's badge tone (ui.css .ui-badge[data-tone])
+const TONE = {precise: "precise", near: "near", mid: "mid", wrong_region: "wrong", background: "off", wrong_part: "object", off_canvas: "off", undecodable: "none"};
+const badge = (c, n) => `<span class="ui-badge" data-tone="${TONE[c] || "none"}">${esc(CLS_NAME[c] || c)}${n != null ? ` <b>${n}</b>` : ""}</span>`;
 const img = (p) => new URL("img/" + p.replace(/\//g, "-").replace(/\.png$/, ".webp"), BASE).href;
 const fmt = (x, d) => x == null || isNaN(x) ? "—" : Number(x).toFixed(d);
 const short = (stem) => stem.replace(/_s\d+$/, "").replace(/^workbench_/, "");
 const median = (a) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-
-const CSS = `
-.ptw{font-size:.86rem;line-height:1.45;color:var(--text)}
-.ptw .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
-.ptw .muted{color:var(--muted)}
-.ptw button{font:inherit;color:inherit}
-.ptw-bar{display:flex;flex-wrap:wrap;gap:.4rem .8rem;align-items:center;margin:0 0 .6rem}
-.ptw-seg{display:inline-flex;gap:.9rem}
-.ptw-seg button{background:none;border:0;padding:0 0 2px;cursor:pointer;color:var(--muted);border-bottom:1px solid transparent}
-.ptw-seg button:hover{color:var(--accent)}
-.ptw-seg button.on{color:var(--glow);border-bottom-color:var(--glow)}
-.ptw select{font:inherit;background:transparent;color:var(--text);border:0;border-bottom:1px solid color-mix(in srgb,var(--rule) 60%,transparent);padding:1px 0;max-width:100%;cursor:pointer}
-.ptw select option{background:var(--bg)}
-.ptw-step{display:inline-flex;align-items:center;gap:.35rem}
-.ptw-step button{background:none;border:0;cursor:pointer;color:var(--muted);padding:0 .2rem;font-size:1.05em}
-.ptw-step button:hover{color:var(--accent)}
-.ptw-dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;margin-right:.35em;vertical-align:.05em}
-.ptw-chip{white-space:nowrap}
-.ptw-wrap{overflow-x:auto}
-.ptw table{border-collapse:collapse;width:100%;font-size:.82rem}
-.ptw th,.ptw td{padding:.45rem .5rem .45rem 0;text-align:left;vertical-align:top;border-bottom:1px solid color-mix(in srgb,var(--rule) 22%,transparent)}
-.ptw thead th{color:var(--muted);font-weight:normal;font-size:.76rem;white-space:nowrap;border-bottom-color:color-mix(in srgb,var(--rule) 55%,transparent)}
-.ptw thead th b{display:block;white-space:normal;color:var(--accent);font-weight:normal;font-size:.82rem}
-.ptw td.sys{color:var(--text);min-width:8rem;max-width:12rem}
-.ptw td.c{cursor:pointer;padding-left:.4rem;border-radius:3px}
-.ptw td.c:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
-.ptw td.c.sel{background:color-mix(in srgb,var(--glow) 10%,transparent);box-shadow:inset 0 -2px 0 var(--glow)}
-.ptw td.c .v{color:var(--accent)}
-.ptw td.na{color:var(--muted);padding-left:.4rem}
-.ptw .spark{display:block;margin-top:.2rem}
-.ptw tr.drawer td{padding:.5rem 0 .7rem;border-bottom-color:color-mix(in srgb,var(--rule) 55%,transparent)}
-.ptw .dhead{display:flex;gap:.7rem;align-items:baseline;flex-wrap:wrap;margin:0 0 .5rem}
-.ptw .dhead .x{margin-left:auto;cursor:pointer;background:none;border:0;color:var(--muted)}
-.ptw .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:5px;max-height:258px;overflow-y:auto;padding-right:2px}
-.ptw .tile{position:relative;cursor:zoom-in;border-radius:3px;overflow:hidden;outline:1px solid transparent}
-.ptw .tile:hover{outline-color:var(--glow)}
-.ptw .tile svg{display:block;width:100%;aspect-ratio:1}
-.ptw .tile .cap{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:0 4px;font-size:.66rem;background:rgba(15,20,28,.72);color:#e6e9ed}
-.ptw .note{color:var(--muted);font-size:.76rem;margin:.5rem 0 0}
-.ptw-io{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem}
-.ptw-io .h{color:var(--muted);font-size:.76rem;margin:0 0 .25rem}
-.ptw-io svg{display:block;width:100%;aspect-ratio:1;border-radius:3px;cursor:zoom-in}
-.ptw dl{display:grid;grid-template-columns:max-content 1fr;gap:0 .7rem;margin:.4rem 0 0;font-size:.78rem}
-.ptw dt{color:var(--muted)} .ptw dd{margin:0}
-.ptw-modal{position:fixed;inset:0;z-index:1000;background:rgba(14,19,28,.97);display:none;overflow:auto;padding:2rem 1rem;color:var(--text);font:14px/1.5 var(--font)}
-.ptw-modal.on{display:block}
-.ptw-modal .box{max-width:1000px;margin:0 auto}
-.ptw-modal .top{display:flex;gap:.8rem;align-items:baseline;flex-wrap:wrap;margin:0 0 .6rem}
-.ptw-modal .top b{color:var(--accent);font-weight:normal}
-.ptw-modal .top .sp{margin-left:auto}
-.ptw-modal .top button{background:none;border:0;cursor:pointer;color:var(--muted);font:inherit;font-size:1.1em;padding:0 .3rem}
-.ptw-modal .top button:hover{color:var(--accent)}
-.ptw-modal .pair{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
-.ptw-modal .pair .h{color:var(--muted);font-size:.8rem;margin:0 0 .25rem}
-.ptw-modal .pair svg{display:block;width:100%;aspect-ratio:1;max-height:calc(100vh - 12rem);border-radius:3px}
-.ptw-modal .kv{display:flex;flex-wrap:wrap;gap:.2rem 1.3rem;margin:.7rem 0 0;font-size:.85rem}
-.ptw-modal .kv span{color:var(--muted)}
-@media (max-width:600px){.ptw-io{grid-template-columns:1fr 1fr}.ptw-io>div:first-child{grid-column:1/3}.ptw-modal .pair{grid-template-columns:1fr}}
-`;
 
 // ---------- data ----------
 const cache = {};
@@ -127,6 +74,9 @@ function zoomSvg(path, tgt, pred, win) {
   const x0 = Math.max(0, Math.min(512 - s, cx - s / 2)), y0 = Math.max(0, Math.min(512 - s, cy - s / 2));
   return `<svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${s.toFixed(1)} ${s.toFixed(1)}"><image href="${esc(img(path))}" width="512" height="512"/>${marks(tgt, pred, s / 200)}</svg>`;
 }
+// A full 512 view as a lazy <img> with the marks drawn over it, so a modal's hidden slides fetch nothing until shown.
+const fullView = (path, tgt, pred) => `<div style="position:relative"><img src="${esc(img(path))}" alt="" loading="lazy" width="512" height="512">${tgt
+  ? `<svg viewBox="0 0 512 512" aria-hidden="true" style="position:absolute;inset:0;background:none">${marks(tgt, pred, 1.6)}</svg>` : ""}</div>`;
 const fullSvg = (path, tgt, pred) => `<svg viewBox="0 0 512 512"><image href="${esc(img(path))}" width="512" height="512"/>${tgt ? marks(tgt, pred, 1.6) : ""}</svg>`;
 function spark(values) {
   if (values.length < 3) return "";
@@ -139,100 +89,92 @@ function spark(values) {
     return `<rect x="${(i * bw).toFixed(1)}" y="${h - bh}" width="${(bw - 0.8).toFixed(1)}" height="${bh}" fill="${col}"/>`;
   }).join("") + `</svg>`;
 }
-function classCounts(rs) {
-  const n = {}; for (const r of rs) n[r.cls] = (n[r.cls] || 0) + 1;
-  return CLS_ORDER.filter((c) => n[c]).map((c) => `${chip(c)} <span class="mono muted">${n[c]}</span>`).join("&ensp;");
-}
 
-// ---------- one modal for the page ----------
-let modal, mList = [], mIdx = 0;
-function openModal(list, i) {
-  if (!modal) { modal = document.createElement("div"); modal.className = "ptw-modal"; modal.setAttribute("role", "dialog"); document.body.appendChild(modal);
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) return closeModal();
-      const m = e.target.closest("[data-m]"); if (!m) return;
-      if (m.dataset.m === "x") return closeModal();
-      step(Number(m.dataset.m));
-    });
+const counts = (rs) => { const n = {}; for (const r of rs) n[r.cls] = (n[r.cls] || 0) + 1; return CLS_ORDER.filter((c) => n[c]).map((c) => badge(c, n[c])).join(" "); };
+const offBy = (r) => r.err == null ? "no answer" : fmt(r.err, 1) + " px";
+
+// ---------- modal: one kit <dialog> per figure, its slides written just before it opens ----------
+function dialogFor(root) {
+  let dlg = root.querySelector("dialog.ui-modal");
+  if (!dlg) {
+    dlg = document.createElement("dialog"); dlg.className = "ui-modal"; dlg.id = `ptw-m-${root.dataset.n}`; dlg.setAttribute("aria-label", "answers");
+    dlg.innerHTML = `<div class="ui-modal-head"><span class="t"></span><span class="ui-muted" data-sub></span>
+      <span class="ctl"><span class="ui-modal-count"></span><button class="ui-icon" data-modal-step="-1" aria-label="previous">←</button><button class="ui-icon" data-modal-step="1" aria-label="next">→</button><button class="ui-icon" data-modal-close aria-label="close">✕</button></span></div>
+      <div class="ui-modal-body"></div><p class="ui-modal-foot">Rings at r, 2r and 3r, r = 6.7 px; the cross is the answer. ← → step, Esc closes.</p>`;
+    root.append(dlg);
   }
-  mList = list; mIdx = i; drawModal(); modal.classList.add("on"); document.documentElement.classList.add("lightbox-open");
+  return dlg;
 }
-function closeModal() { modal.classList.remove("on"); document.documentElement.classList.remove("lightbox-open"); }
-function step(d) { mIdx = (mIdx + d + mList.length) % mList.length; drawModal(); }
-async function drawModal() {
-  const r = mList[mIdx], sl = await slice(r.key), b = sl.bundles[r.stemK], cv = b.conds[r.condK], sys = sl.systems[r.sys];
-  modal.innerHTML = `<div class="box"><div class="top"><b>${esc(sys.label)}</b><span class="muted">${esc(LABEL[r.condK])} · ${esc(short(r.stemK))}</span>
-    <span class="sp mono muted">${mIdx + 1} / ${mList.length}</span><button data-m="-1" aria-label="previous">←</button><button data-m="1" aria-label="next">→</button><button data-m="x" aria-label="close">✕</button></div>
-    <div class="pair"><div><p class="h">given: the source, marked</p>${fullSvg(b.src)}</div><div><p class="h">returned: answer against truth</p>${fullSvg(cv.img, cv.tgt, r.pred)}</div></div>
-    <div class="kv"><div><span>answer</span> <span class="mono" style="color:var(--text)">${r.pred ? r.pred.map(Math.round).join(", ") : "none"}</span></div>
-      <div><span>truth</span> <span class="mono" style="color:var(--text)">${cv.tgt.map(Math.round).join(", ")}</span></div>
-      <div><span>off by</span> <span class="mono" style="color:var(--text)">${r.err == null ? "—" : fmt(r.err, 1) + " px"}</span></div>
-      <div>${chip(r.cls)}</div>
-      <div><span>loss</span> <span class="mono" style="color:var(--text)">pixel ${fmt(r.lpx, 4)}${r.lsurf != null ? ` · surface ${fmt(r.lsurf, 4)}` : ""}</span></div>
-      <div><span>family</span> ${esc(b.family)}</div></div>
-    <p class="muted" style="font-size:.78rem;margin:.4rem 0 0">Rings at r, 2r and 3r, r = 6.7 px; the cross is the answer. ← → step, Esc closes.</p></div>`;
+function fillModal(root, sl, list, sub) {
+  const dlg = dialogFor(root);
+  dlg.querySelector("[data-sub]").textContent = sub;
+  dlg.querySelector(".ui-modal-body").innerHTML = list.map((r) => {
+    const b = sl.bundles[r.stemK], cv = b.conds[r.condK];
+    return `<div class="ui-slide" data-title="${esc(short(r.stemK))}" hidden>
+      <div class="ui-pair"><div><p class="h">given: the source, marked</p>${fullView(b.src)}</div><div><p class="h">returned: answer against truth</p>${fullView(cv.img, cv.tgt, r.pred)}</div></div>
+      <div class="ui-kv"><div><span>answer</span><span class="ui-mono">${r.pred ? r.pred.map(Math.round).join(", ") : "none"}</span></div>
+        <div><span>truth</span><span class="ui-mono">${cv.tgt.map(Math.round).join(", ")}</span></div>
+        <div><span>off by</span><span class="ui-mono">${offBy(r)}</span></div><div>${badge(r.cls)}</div>
+        <div><span>loss</span><span class="ui-mono">pixel ${fmt(r.lpx, 4)}${r.lsurf != null ? ` · surface ${fmt(r.lsurf, 4)}` : ""}</span></div>
+        <div><span>family</span>${esc(b.family.replace(/_/g, " "))}</div></div></div>`;
+  }).join("");
+  return dlg.id;
 }
-document.addEventListener("keydown", (e) => {
-  if (modal && modal.classList.contains("on")) {
-    if (e.key === "Escape") closeModal();
-    if (e.key === "ArrowRight") step(1);
-    if (e.key === "ArrowLeft") step(-1);
-    return;
-  }
-  if (activeExplorer && (e.key === "ArrowRight" || e.key === "ArrowLeft") && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || "")) {
-    activeExplorer.move(e.key === "ArrowRight" ? 1 : -1);
-  }
-});
-let activeExplorer = null;
 
 // ---------- results table ----------
 async function table(root, key, harness) {
-  const sl = await slice(key), conds = sl.conds;
-  let mode = "surf", sel = null, drawer = [];
+  const sl = await slice(key), conds = sl.conds, n = root.dataset.n;
   const nOf = (c) => new Set(sl.R.filter((r) => r.condK === c).map((r) => r.stemK)).size;
-  function draw() {
-    const systems = sl.systems.slice();
-    if (harness) systems.sort((a, b) => famMean(cellRows(sl, a.alias, conds[0]), mode) - famMean(cellRows(sl, b.alias, conds[0]), mode));
-    const ncol = 1 + conds.length + (harness ? 3 : 0);
-    let h = `<table><thead><tr><th>system</th>` + conds.map((c) =>
-      `<th><b>${esc(LABEL[c])}</b>${PIXEL.has(c) || mode === "px" ? "pixel" : "surface"} loss<br><span class="mono">N = ${nOf(c)}</span></th>`).join("")
-      + (harness ? `<th><b>precise</b>within r</th><th><b>$ / question</b>mean</th><th><b>time</b>median</th>` : "") + `</tr></thead><tbody>`;
-    for (const s of systems) {
-      h += `<tr><td class="sys"><i class="ptw-dot" style="background:${esc(s.colour)};border-radius:2px"></i>${esc(s.label)}</td>`;
-      for (const c of conds) {
-        const rs = cellRows(sl, s.alias, c);
-        if (!rs.length) { h += `<td class="na">—</td>`; continue; }
-        const on = sel && sel.alias === s.alias && sel.cond === c;
-        h += `<td class="c${on ? " sel" : ""}" data-a="${esc(s.alias)}" data-c="${c}" tabindex="0"><span class="v mono">${fmt(famMean(rs, mode), 4)}</span>${spark(rs.map((r) => lossOf(r, mode)).filter((x) => x != null))}</td>`;
-      }
-      if (harness) {
-        const rs = cellRows(sl, s.alias, conds[0]);
-        const cost = rs.map((r) => r.cost).filter((x) => x != null), wall = rs.map((r) => r.wall).filter((x) => x != null);
-        h += `<td class="mono">${rs.filter((r) => r.cls === "precise").length} / ${rs.length}</td><td class="mono">${cost.length ? "$" + fmt(cost.reduce((a, b) => a + b, 0) / cost.length, 2) : "—"}</td><td class="mono">${wall.length ? Math.round(median(wall)) + " s" : "—"}</td>`;
-      }
-      h += `</tr>`;
-      if (sel && sel.alias === s.alias) {
-        drawer = cellRows(sl, sel.alias, sel.cond).slice().sort((a, b) => (lossOf(a, mode) ?? 2) - (lossOf(b, mode) ?? 2) || (a.err ?? 1e9) - (b.err ?? 1e9));
-        const tiles = drawer.map((r, i) => { const cv = sl.bundles[r.stemK].conds[r.condK];
-          return `<div class="tile" data-t="${i}">${zoomSvg(cv.img, cv.tgt, r.pred, 110)}<div class="cap"><span style="color:${CLS_COL[r.cls]}">●</span><span class="mono">${r.err == null ? "—" : fmt(r.err, 1) + " px"}</span></div></div>`; }).join("");
-        h += `<tr class="drawer"><td colspan="${ncol}"><div class="dhead"><span style="color:var(--accent)">${esc(s.label)}</span><span class="muted">${esc(LABEL[sel.cond])} · ${drawer.length} answers, best first</span>
-          <span>${classCounts(drawer)}</span><button class="x" data-close aria-label="close">✕</button></div><div class="grid">${tiles}</div></td></tr>`;
-      }
+  const hasSurf = conds.some((c) => !PIXEL.has(c));
+  const best = {};
+  for (const m of ["px", "surf"]) for (const c of conds) best[m + c] = Math.min(...sl.systems.map((s) => famMean(cellRows(sl, s.alias, c), m) ?? Infinity));
+  const val = (rs, m, c) => { const v = famMean(rs, m); return `<span class="v${Math.abs(v - best[m + c]) < 1e-12 ? " best" : ""}">${fmt(v, 4)}</span>${spark(rs.map((r) => lossOf(r, m)).filter((x) => x != null))}`; };
+  const info = (c) => `${LABEL[c]} · ${PIXEL.has(c) ? "Pixel loss, since the view does not change" : "Surface loss, or pixel loss with the toggle above"} · Mean over part families; lower is better · N = ${nOf(c)} questions, ${sl.half} half`;
+  const head = `<tr><th data-sort>system</th>` + conds.map((c) => `<th class="num" data-sort data-info="${esc(info(c))}">${esc(SHORT[c] || LABEL[c])}</th>`).join("")
+    + (harness ? `<th class="num" data-sort data-info="Precise · Answers within r = 6.7 px · one answer per question">precise</th><th class="num" data-sort data-info="Cost · Mean dollars per question">$ / question</th><th class="num" data-sort data-info="Time · Median wall time per question">time</th>` : "") + `</tr>`;
+  const ncol = 1 + conds.length + (harness ? 3 : 0);
+  let systems = sl.systems.slice();
+  if (harness) systems.sort((a, b) => famMean(cellRows(sl, a.alias, conds[0]), "surf") - famMean(cellRows(sl, b.alias, conds[0]), "surf"));
+  const rows = systems.map((s, si) => {
+    let h = `<tr data-s="${si}"><td class="key"><i class="ui-swatch" style="--c:${esc(s.colour)}"></i>${esc(s.label)}</td>`;
+    for (const c of conds) {
+      const rs = cellRows(sl, s.alias, c);
+      if (!rs.length) { h += `<td class="num na">—</td>`; continue; }
+      const inner = PIXEL.has(c) ? val(rs, "px", c) : `<span data-for="loss" data-when="surf">${val(rs, "surf", c)}</span><span data-for="loss" data-when="px" hidden>${val(rs, "px", c)}</span>`;
+      h += `<td class="num" data-drawer="ptw-${n}-${si}-${c}" data-a="${esc(s.alias)}" data-c="${c}">${inner}</td>`;
     }
-    const toggle = conds.some((c) => !PIXEL.has(c)) ? `<span class="muted">loss</span><span class="ptw-seg"><button data-mode="px" class="${mode === "px" ? "on" : ""}">pixel</button><button data-mode="surf" class="${mode === "surf" ? "on" : ""}">surface</button></span>` : "";
-    root.innerHTML = `<div class="ptw-bar">${toggle}<span class="muted">${esc(sl.half)} half, ${esc(DS_NAME[sl.dataset])}${harness ? ", five bench questions from the mini dev set" : ""}</span></div>
-      <div class="ptw-wrap">${h}</tbody></table></div>
-      <p class="note">Mean loss over part families, lower is better; the spread of single answers from 0 to 1 beneath. Click a cell for its answers.</p>`;
-  }
+    if (harness) {
+      const rs = cellRows(sl, s.alias, conds[0]);
+      const cost = rs.map((r) => r.cost).filter((x) => x != null), wall = rs.map((r) => r.wall).filter((x) => x != null);
+      const p = rs.filter((r) => r.cls === "precise").length;
+      h += `<td class="num" data-v="${p}">${p} / ${rs.length}</td><td class="num" data-v="${cost.length ? cost.reduce((a, b) => a + b, 0) / cost.length : ""}">${cost.length ? "$" + fmt(cost.reduce((a, b) => a + b, 0) / cost.length, 2) : "—"}</td><td class="num" data-v="${wall.length ? median(wall) : ""}">${wall.length ? Math.round(median(wall)) + " s" : "—"}</td>`;
+    }
+    return h + `</tr>`;
+  }).join("");
+  const toggle = hasSurf ? `<span class="ui-field"><span class="ui-label">loss</span><span class="ui-seg sm" data-name="loss"><button value="px">pixel</button><button value="surf" aria-pressed="true">surface</button></span></span>` : "";
+  root.innerHTML = `<figure class="ui-fig" data-ui-scope>
+    <div class="ui-bar">${toggle}<span class="ui-muted">${esc(sl.half)} half, ${esc(DS_NAME[sl.dataset])}, ${harness ? "harness, five bench questions from the mini dev set" : "single-shot"}</span></div>
+    <div class="ui-table"><table><thead>${head}</thead><tbody>${rows}</tbody></table></div>
+    <figcaption>Mean loss over part families, <em>lower is better</em>; the bars under each number are the spread of single answers from 0 to 1. Click a cell for its answers.</figcaption></figure>`;
+  const mode = () => root.querySelector('.ui-seg[data-name="loss"]')?.dataset.value || "surf";
+  // A cell's drawer row is written on its first click, just before ui.js opens it (this listener runs first).
   root.addEventListener("click", (e) => {
-    const md = e.target.closest("[data-mode]"); if (md) { mode = md.dataset.mode; return draw(); }
-    if (e.target.closest("[data-close]")) { sel = null; return draw(); }
-    const t = e.target.closest(".tile"); if (t) return openModal(drawer, Number(t.dataset.t));
-    const c = e.target.closest("td.c");
-    if (c) { sel = sel && sel.alias === c.dataset.a && sel.cond === c.dataset.c ? null : {alias: c.dataset.a, cond: c.dataset.c}; draw(); }
+    const td = e.target.closest("td[data-drawer]");
+    if (td && !document.getElementById(td.dataset.drawer)) {
+      const m = mode(), s = sl.systems.find((x) => x.alias === td.dataset.a), c = td.dataset.c;
+      const list = cellRows(sl, s.alias, c).slice().sort((a, b) => (lossOf(a, m) ?? 2) - (lossOf(b, m) ?? 2) || (a.err ?? 1e9) - (b.err ?? 1e9));
+      const tr = document.createElement("tr"); tr.className = "ui-drawer"; tr.id = td.dataset.drawer; tr.hidden = true;
+      tr._list = list; tr._sub = `${s.label} · ${LABEL[c]}`;
+      tr.innerHTML = `<td class="ui-drawer-cell" colspan="${ncol}"><div class="ui-drawer-in">
+        <div class="ui-drawer-head"><span class="t">${esc(s.label)}</span><span class="ui-muted">${esc(LABEL[c])} · ${list.length} answers, best first</span><span>${counts(list)}</span>
+        <button class="ui-icon" data-drawer-close aria-label="close">✕</button></div>
+        <div class="ui-tiles scroll">${list.map((r, i) => { const cv = sl.bundles[r.stemK].conds[r.condK];
+          return `<button class="ui-tile" data-modal="" data-slide="${i}" aria-label="answer ${i + 1}, ${esc(CLS_NAME[r.cls])}">${zoomSvg(cv.img, cv.tgt, r.pred, 110)}<span class="cap"><span style="color:var(--tone-${TONE[r.cls]})">●</span><span>${r.err == null ? "—" : fmt(r.err, 1) + " px"}</span></span></button>`; }).join("")}</div></div></td>`;
+      td.parentNode.after(tr);
+    }
+    const tile = e.target.closest(".ui-tile[data-modal]");
+    if (tile) { const tr = tile.closest("tr.ui-drawer"); tile.dataset.modal = fillModal(root, sl, tr._list, tr._sub); }
   });
-  root.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("td.c")) e.target.click(); });
-  draw();
 }
 
 // ---------- explorer ----------
@@ -241,62 +183,79 @@ async function explorer(root) {
   for (const k of SLICES.explorer) S[k] = await slice(k);
   const ex = {mode: "zs", ds: "v1", sys: null, cond: null, idx: 0, list: []};
   const cur = () => S[(ex.mode === "zs" ? "zs_" : "h_") + (ex.ds === "v1" ? "v1" : "wb")];
-  function draw() {
+  root.innerHTML = `<figure class="ui-fig" data-ui-scope>
+    <div class="ui-bar"><span class="ui-seg" data-name="xm"><button value="zs" aria-pressed="true">single-shot</button><button value="h">harness</button></span>
+      <span class="ui-seg" data-name="xd"><button value="v1" aria-pressed="true">single part</button><button value="wb">workbench</button></span></div>
+    <div class="ui-bar" data-pick></div><div data-body></div></figure>`;
+  const pick = root.querySelector("[data-pick]"), body = root.querySelector("[data-body]");
+  function controls() {
     const sl = cur();
     if (!sl.systems.some((s) => s.alias === ex.sys)) ex.sys = (sl.systems.find((s) => s.alias === (ex.mode === "zs" ? "claude-fable-5" : "codex-astra-low")) || sl.systems[0]).alias;
     if (!sl.conds.includes(ex.cond)) ex.cond = sl.conds[Math.min(2, sl.conds.length - 1)];
-    const list = ex.list = cellRows(sl, ex.sys, ex.cond).slice().sort((a, b) => a.stem - b.stem || a.rep - b.rep);
-    const n = list.length; ex.idx = n ? ((ex.idx % n) + n) % n : 0;
-    const r = list[ex.idx];
-    const bar = `<div class="ptw-bar"><span class="ptw-seg"><button data-xm="zs" class="${ex.mode === "zs" ? "on" : ""}">single-shot</button><button data-xm="h" class="${ex.mode === "h" ? "on" : ""}">harness</button></span>
-      <span class="ptw-seg"><button data-xd="v1" class="${ex.ds === "v1" ? "on" : ""}">single part</button><button data-xd="wb" class="${ex.ds === "wb" ? "on" : ""}">workbench</button></span></div>
-      <div class="ptw-bar"><select data-x="sys" aria-label="system">${sl.systems.map((s) => `<option value="${esc(s.alias)}"${s.alias === ex.sys ? " selected" : ""}>${esc(s.label)}</option>`).join("")}</select>
-      <select data-x="cond" aria-label="condition"${sl.conds.length < 2 ? " disabled" : ""}>${sl.conds.map((c) => `<option value="${c}"${c === ex.cond ? " selected" : ""}>${esc(LABEL[c])}</option>`).join("")}</select>
-      <span class="ptw-step"><button data-xs="-1" aria-label="previous answer">←</button><span class="mono muted">${n ? ex.idx + 1 : 0} / ${n}</span><button data-xs="1" aria-label="next answer">→</button></span></div>`;
-    if (!r) { root.innerHTML = bar + `<p class="muted">No answers stored for this system here.</p>`; return; }
-    const b = sl.bundles[r.stemK], cv = b.conds[r.condK];
-    root.innerHTML = bar + `<div class="ptw-io">
-      <div><p class="h">given: the source, marked</p><div data-open>${fullSvg(b.src)}</div>
-        <dl><dt>sample</dt><dd class="mono">${esc(short(r.stemK))}</dd><dt>${ex.mode === "zs" ? "answer" : "run"}</dt><dd>${ex.mode === "zs" ? `${r.rep + 1} of this question` : "one per question"}</dd></dl></div>
-      <div><p class="h">given: the target</p><div data-open>${fullSvg(cv.img)}</div>
-        <dl><dt>condition</dt><dd>${esc(LABEL[r.condK])}</dd><dt>half</dt><dd>${esc(sl.half)}</dd></dl></div>
-      <div><p class="h">returned: answer against truth</p><div data-open>${zoomSvg(cv.img, cv.tgt, r.pred, 150)}</div>
-        <dl><dt>off by</dt><dd class="mono">${r.err == null ? "no answer" : fmt(r.err, 1) + " px"}</dd><dt>class</dt><dd>${chip(r.cls)}</dd></dl></div></div>`;
+    ex.list = cellRows(sl, ex.sys, ex.cond).slice().sort((a, b) => a.stem - b.stem || a.rep - b.rep);
+    ex.idx = 0;
+    const nn = Math.max(1, ex.list.length);
+    pick.innerHTML = `<span class="ui-field"><span class="ui-label">system</span><span class="ui-select"><select name="xsys" aria-label="system">${sl.systems.map((s) => `<option value="${esc(s.alias)}"${s.alias === ex.sys ? " selected" : ""}>${esc(s.label)}</option>`).join("")}</select></span></span>
+      <span class="ui-field"><span class="ui-label">view</span><span class="ui-select"><select name="xcond" aria-label="condition"${sl.conds.length < 2 ? " disabled" : ""}>${sl.conds.map((c) => `<option value="${c}"${c === ex.cond ? " selected" : ""}>${esc(LABEL[c])}</option>`).join("")}</select></span></span>
+      <span class="ui-gap"></span>
+      <span class="ui-step" data-name="answer" data-total="${nn}"><button class="ui-icon" data-step="-1" aria-label="previous answer">←</button><output>1 / ${nn}</output><button class="ui-icon" data-step="1" aria-label="next answer">→</button></span>`;
+    window.ui.init(pick);
+    draw();
   }
-  const api = {move(d) { ex.idx += d; draw(); }};
-  root.addEventListener("pointerenter", () => { activeExplorer = api; });
-  root.addEventListener("focusin", () => { activeExplorer = api; });
+  function draw() {
+    const sl = cur(), r = ex.list[ex.idx];
+    if (!r) { body.innerHTML = `<div class="ui-state">No answers stored for this system here.</div>`; return; }
+    const b = sl.bundles[r.stemK], cv = b.conds[r.condK];
+    const pane = (h, inner, kv) => `<div><p class="ui-eyebrow">${h}</p><div class="ui-tile" data-modal="" data-slide="${ex.idx}" role="button" tabindex="0" aria-label="open full size">${inner}</div><div class="ui-kv">${kv}</div></div>`;
+    body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:0.9rem">
+      ${pane("source, marked", fullSvg(b.src), `<div><span>sample</span><span class="ui-mono">${esc(short(r.stemK))}</span></div><div><span>${ex.mode === "zs" ? "answer" : "run"}</span>${ex.mode === "zs" ? `${r.rep + 1} of this question` : "one per question"}</div>`)}
+      ${pane("target", fullSvg(cv.img), `<div><span>view</span>${esc(LABEL[r.condK])}</div><div><span>half</span>${esc(sl.half)}</div>`)}
+      ${pane("answer vs truth", zoomSvg(cv.img, cv.tgt, r.pred, 150), `<div><span>off by</span><span class="ui-mono">${offBy(r)}</span></div><div>${badge(r.cls)}</div>`)}</div>`;
+  }
+  root.addEventListener("ui:change", (e) => {
+    const {name, value} = e.detail;
+    // ui.init repeats each control's current value; only a real change redraws (else init -> redraw -> init loops)
+    if (name === "xm" && value !== ex.mode) { ex.mode = value; controls(); }
+    else if (name === "xd" && value !== ex.ds) { ex.ds = value; ex.cond = null; controls(); }
+    else if (name === "xsys" && value !== ex.sys) { ex.sys = value; controls(); }
+    else if (name === "xcond" && value !== ex.cond) { ex.cond = value; controls(); }
+    else if (name === "answer") { ex.idx = Number(value) - 1; draw(); }
+  });
   root.addEventListener("click", (e) => {
-    const m = e.target.closest("[data-xm]"); if (m) { ex.mode = m.dataset.xm; ex.idx = 0; activeExplorer = api; return draw(); }
-    const d = e.target.closest("[data-xd]"); if (d) { ex.ds = d.dataset.xd; ex.idx = 0; ex.cond = null; activeExplorer = api; return draw(); }
-    const s = e.target.closest("[data-xs]"); if (s) { activeExplorer = api; return api.move(Number(s.dataset.xs)); }
-    if (e.target.closest("[data-open]")) openModal(ex.list, ex.idx);
+    const t = e.target.closest(".ui-tile[data-modal]");
+    if (t) { const sl = cur(); t.dataset.modal = fillModal(root, sl, ex.list, `${sl.systems.find((s) => s.alias === ex.sys).label} · ${LABEL[ex.cond]}`); }
   });
-  root.addEventListener("change", (e) => {
-    if (e.target.dataset.x === "sys") ex.sys = e.target.value;
-    if (e.target.dataset.x === "cond") ex.cond = e.target.value;
-    ex.idx = 0; draw();
-  });
-  draw();
+  // ← → step the explorer under the pointer, unless a menu or the modal has the keys
+  root.addEventListener("pointerenter", () => { activeExplorer = root; });
+  root.addEventListener("focusin", () => { activeExplorer = root; });
+  controls();
 }
+let activeExplorer = null;
+document.addEventListener("keydown", (e) => {
+  if (!activeExplorer || (e.key !== "ArrowRight" && e.key !== "ArrowLeft") || document.querySelector("dialog.ui-modal[open]")) return;
+  if (e.target.closest && e.target.closest(".ui-seg, .ui-select, input, textarea")) return;
+  activeExplorer.querySelector(`.ui-step [data-step="${e.key === "ArrowRight" ? 1 : -1}"]`)?.click();
+});
 
 // ---------- mount ----------
-const style = document.createElement("style"); style.textContent = CSS; document.head.appendChild(style);
+let count = 0;
 function mountAll() {
-for (const el of document.querySelectorAll(".widget-mount[data-widget-src]")) {
-  // resolved against this module's own URL: the first page of a visit is served inside the sky wrapper as
-  // about:srcdoc, where location.href is no base for a relative path
-  if (new URL(el.dataset.widgetSrc, import.meta.url).pathname !== new URL(import.meta.url).pathname || el.dataset.mounted) continue;
-  el.dataset.mounted = "1"; el.classList.add("ptw");
-  const name = el.dataset.widget;
-  const run = name === "explorer" ? explorer(el) : name === "results-harness-workbench" ? table(el, "h_wb", true)
-    : SLICES[name] ? table(el, SLICES[name][0], false) : Promise.reject(new Error(`no widget named "${name}"`));
-  el.innerHTML = `<p class="muted">Loading the figure…</p>`;
-  run.catch((e) => {
-    for (const k of SLICES[name] || []) delete cache[k];
-    el.innerHTML = `<p class="muted">The figure's data did not load (${esc(e.message)}). <button class="ptw-retry" style="background:none;border:0;color:var(--glow);cursor:pointer;padding:0">Try again</button></p>`;
-    el.querySelector(".ptw-retry").addEventListener("click", () => { delete el.dataset.mounted; mountAll(); });
-  });
+  for (const el of document.querySelectorAll(".widget-mount[data-widget-src]")) {
+    // resolved against this module's own URL: the first page of a visit is served inside the sky wrapper as
+    // about:srcdoc, where location.href is no base for a relative path
+    if (new URL(el.dataset.widgetSrc, import.meta.url).pathname !== new URL(import.meta.url).pathname || el.dataset.mounted) continue;
+    el.dataset.mounted = "1"; el.dataset.n = el.dataset.n || String(++count);
+    const name = el.dataset.widget;
+    el.innerHTML = `<div class="ui-state" role="status"><span class="ui-loader" data-kind="rings"></span>Loading the figure…</div>`;
+    const run = !window.ui ? Promise.reject(new Error("the figure kit (ui.js) is not on this page"))
+      : name === "explorer" ? explorer(el) : name === "results-harness-workbench" ? table(el, "h_wb", true)
+      : SLICES[name] ? table(el, SLICES[name][0], false) : Promise.reject(new Error(`no widget named "${name}"`));
+    run.then(() => window.ui.init(el)).catch((e) => {
+      for (const k of SLICES[name] || []) delete cache[k];
+      el.innerHTML = `<div class="ui-state error" role="alert"><span>The figure's data did not load.</span><span class="why">${esc(e.message)}</span><button class="ui-btn glow">Try again</button></div>`;
+      el.querySelector(".ui-btn").addEventListener("click", () => { delete el.dataset.mounted; mountAll(); });
+    });
+  }
 }
-}
-mountAll();
+// ui.js is a classic deferred script and this a module: both run after parsing, ui.js first, but wait for it to be safe
+if (window.ui) mountAll(); else addEventListener("DOMContentLoaded", mountAll);

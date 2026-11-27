@@ -96,6 +96,13 @@ function sync() {
       cpSync(from, join(ROOT, to), { recursive: true });
       if (!written.includes(to)) written.push(to);
     }
+    // a draft with figure scripts also gets the figure kit (ui.css, ui.js) from the vault's design-system folder
+    const KIT = join(VAULT, "hadsed.com", "design-system"), kitTo = join("content", "assets", "kit");
+    if (/!\[\[[^\]|]+\.js(\|[^\]]*)?\]\]/.test(text) && existsSync(join(KIT, "ui.css")) && !written.includes(kitTo)) {
+      mkdirSync(join(ROOT, kitTo), { recursive: true });
+      for (const f of ["ui.css", "ui.js"]) cpSync(join(KIT, f), join(ROOT, kitTo, f));
+      written.push(kitTo);
+    }
     const out = join("content", "blog", `draft-${name}.md`);
     writeFileSync(join(ROOT, out), frontMatter(text, name, dates[name]));
     written.push(out);

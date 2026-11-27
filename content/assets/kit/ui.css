@@ -1,0 +1,365 @@
+/* hadsed.com UI primitives.
+   Plain HTML with a class; every color and font comes from the site's tokens in src/css/site.css
+   (--bg, --text, --muted, --accent, --bright, --rule, --glow, --pink, --font). ui.js adds behavior.
+   Components: .ui-seg (segmented toggle), .ui-select, .ui-step, .ui-bar, .ui-table, .ui-drawer,
+   .ui-tiles, .ui-modal, .ui-badge, .ui-fig. See index.html for every one in its states. */
+
+:root {
+  /* Surfaces: the site's boxed look (tables, callouts) — mostly solid, a little sky through. */
+  --ui-panel: rgba(15, 21, 32, 0.88);
+  --ui-sunk: rgba(8, 12, 19, 0.55);
+  --ui-line: color-mix(in srgb, var(--rule) 28%, transparent);
+  --ui-line-strong: color-mix(in srgb, var(--rule) 55%, transparent);
+  --ui-hover: color-mix(in srgb, var(--accent) 7%, transparent);
+  --ui-on: color-mix(in srgb, var(--glow) 13%, transparent);
+  --ui-on-line: color-mix(in srgb, var(--glow) 55%, transparent);
+  --ui-radius: 4px;
+  --ui-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ui-serif: Petrona, Georgia, serif;
+  /* Semantic tones. The grading classes keep the hues the pointing figures already use. */
+  --tone-precise: #2a9d8f;
+  --tone-near: #8bbf5a;
+  --tone-mid: #5b8fb9;
+  --tone-wrong: #d08a2e;
+  --tone-off: #d9534f;
+  --tone-object: #c0397a;
+  --tone-none: #7d8590;
+}
+
+.ui-mono, .ui-num { font-family: var(--ui-mono); font-variant-numeric: tabular-nums; }
+.ui-muted { color: var(--muted); }
+
+/* ---------- Buttons: ghost by default, glow for the one action that matters ---------- */
+.ui-btn {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font: inherit; font-size: 0.8rem; line-height: 1.4; color: var(--text);
+  padding: 0.2rem 0.65rem; border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius);
+  background: transparent; cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.ui-btn:hover { color: var(--bright); border-color: var(--accent); }
+.ui-btn.glow { color: var(--glow); border-color: var(--ui-on-line); background: var(--ui-on); }
+.ui-btn.glow:hover { border-color: var(--glow); }
+.ui-btn[disabled] { opacity: 0.4; cursor: default; pointer-events: none; }
+/* Square icon button: arrows, close. */
+.ui-icon {
+  display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0;
+  font: inherit; font-size: 0.95rem; line-height: 1; color: var(--muted);
+  border: 1px solid transparent; border-radius: var(--ui-radius); background: none; cursor: pointer;
+}
+.ui-icon:hover { color: var(--bright); background: var(--ui-hover); }
+:is(.ui-btn, .ui-icon, .ui-seg button, .ui-select select, .ui-select-btn, .ui-th-sort, .ui-tile, .ui-table [data-drawer]):focus-visible,
+.ui-seg button.is-focus {
+  outline: 2px solid var(--glow); outline-offset: 1px;
+}
+
+/* ---------- Segmented toggle: one choice out of two to five ----------
+   A thumb slides under the chosen option (ui.js adds it); text color changes at once, no fade. */
+.ui-seg {
+  position: relative; display: inline-flex; gap: 2px; padding: 2px; vertical-align: middle;
+  border: 1px solid var(--ui-line-strong); border-radius: calc(var(--ui-radius) + 2px);
+  background: var(--ui-sunk); isolation: isolate;
+}
+.ui-seg button {
+  position: relative; z-index: 1;
+  font: inherit; font-size: 0.8rem; line-height: 1.35; color: var(--muted);
+  padding: 0.22rem 0.7rem; border: 1px solid transparent; border-radius: var(--ui-radius);
+  background: none; cursor: pointer; white-space: nowrap;
+}
+.ui-seg button:hover { color: var(--bright); }
+.ui-seg button[aria-pressed="true"], .ui-seg button[aria-checked="true"] { color: var(--glow); }
+/* Before the script runs (or without it), the chosen option carries the fill itself. */
+.ui-seg:not(.has-thumb) button:is([aria-pressed="true"], [aria-checked="true"]) { background: var(--ui-on); border-color: var(--ui-on-line); }
+.ui-seg-thumb {
+  position: absolute; z-index: 0; top: 2px; bottom: 2px; left: 0; width: var(--w, 0px); box-sizing: border-box;
+  transform: translateX(var(--x, 0px)); border-radius: var(--ui-radius);
+  background: var(--ui-on); border: 1px solid var(--ui-on-line); pointer-events: none;
+}
+.ui-seg.is-ready .ui-seg-thumb { transition: transform 170ms cubic-bezier(0.3, 0.7, 0.2, 1), width 170ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+.ui-seg button[disabled] { opacity: 0.35; cursor: default; }
+.ui-seg.sm button { font-size: 0.72rem; padding: 0.1rem 0.5rem; }
+@media (prefers-reduced-motion: reduce) { .ui-seg.is-ready .ui-seg-thumb { transition: none; } }
+
+/* ---------- Select: a themed menu ----------
+   Write a plain <select> inside .ui-select; ui.js puts a button and a menu in front of it and keeps
+   the select's value in step, so forms and "change" listeners still work. */
+.ui-select { position: relative; display: inline-flex; vertical-align: middle; max-width: 100%; }
+.ui-select select, .ui-select-btn {
+  appearance: none; -webkit-appearance: none; max-width: 100%;
+  font: inherit; font-size: 0.8rem; line-height: 1.35; color: var(--text); text-align: left;
+  padding: 0.26rem 1.8rem 0.26rem 0.65rem; border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius);
+  background: var(--ui-sunk); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ui-select.is-menu select { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.ui-select :is(select, .ui-select-btn):hover { border-color: var(--accent); color: var(--bright); }
+.ui-select-btn[aria-expanded="true"] { border-color: var(--ui-on-line); color: var(--bright); }
+.ui-select::after {
+  content: ""; position: absolute; right: 0.7rem; top: 50%; width: 0.34rem; height: 0.34rem; margin-top: -0.26rem;
+  border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); pointer-events: none;
+  transition: transform 160ms ease, margin-top 160ms ease;
+}
+.ui-select:has(.ui-select-btn[aria-expanded="true"])::after { transform: rotate(225deg); margin-top: -0.08rem; border-color: var(--glow); }
+.ui-select :is(select, .ui-select-btn)[disabled] { opacity: 0.4; cursor: default; pointer-events: none; }
+.ui-menu {
+  position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; min-width: 100%; max-width: min(22rem, 90vw);
+  max-height: 16rem; overflow-y: auto; padding: 4px; margin: 0; list-style: none;
+  border: 1px solid var(--ui-line-strong); border-radius: 6px; background: #141b27;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45); font-size: 0.8rem; transform-origin: 1.2rem 0;
+}
+.ui-menu.up { top: auto; bottom: calc(100% + 4px); transform-origin: 1.2rem 100%; }
+.ui-menu[hidden] { display: none; }
+.ui-menu [role="option"] {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.6rem 0.3rem 0.5rem; border-radius: var(--ui-radius);
+  color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.ui-menu [role="option"]::before { content: ""; width: 0.8rem; flex: none; text-align: center; color: var(--glow); }
+.ui-menu [role="option"][aria-selected="true"] { color: var(--glow); }
+.ui-menu [role="option"][aria-selected="true"]::before { content: "✓"; }
+.ui-menu [role="option"].is-active { background: var(--ui-hover); color: var(--bright); }
+.ui-menu [role="option"][aria-disabled="true"] { opacity: 0.4; cursor: default; }
+
+/* ---------- Stepper: previous / count / next ---------- */
+.ui-step { display: inline-flex; align-items: center; gap: 0.15rem; vertical-align: middle; }
+.ui-step output { min-width: 4.2em; text-align: center; color: var(--muted); font-family: var(--ui-mono); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+
+/* ---------- Control bar: a figure's controls, one row that wraps ---------- */
+.ui-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; margin: 0 0 0.8rem; font-size: 0.8rem; }
+.ui-bar .ui-label { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; }
+/* A label and its control stay together when the bar wraps: <span class="ui-field"><span class="ui-label">…</span>control</span> */
+.ui-field { display: inline-flex; align-items: center; gap: 0.5rem; max-width: 100%; }
+.ui-bar .ui-gap { flex: 1 1 auto; }
+
+/* ---------- Data table: numbers in columns, cells you can open ---------- */
+.ui-table {
+  overflow-x: auto; margin: 0; padding: 0.3rem 1rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--rule) 45%, transparent); border-radius: 6px;
+  background: var(--ui-panel); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.ui-table table { border-collapse: collapse; width: 100%; font-size: 0.82rem; display: table; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.ui-table th, .ui-table td { text-align: left; vertical-align: top; padding: 0.5rem 0.75rem 0.5rem 0; border-bottom: 1px solid var(--ui-line); }
+.ui-table tbody tr:last-child > td { border-bottom: 0; }
+.ui-table thead th {
+  color: var(--accent); font-weight: 400; font-size: 0.8rem; white-space: nowrap;
+  border-bottom-color: var(--ui-line-strong); vertical-align: bottom;
+}
+.ui-table thead th:first-child { color: var(--muted); }
+/* Two-line head, for a column whose unit must always show: <th><b>Small view change</b>surface loss</th> */
+.ui-table thead th b { display: block; color: var(--accent); font-weight: 400; font-size: 0.8rem; white-space: normal; }
+.ui-table td.num { font-family: var(--ui-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.ui-table th.num { text-align: right; }
+.ui-table th .ui-mono { font-size: 0.7rem; }
+.ui-table .key { color: var(--text); white-space: nowrap; }
+.ui-table .best { color: var(--bright); }
+.ui-table .na { color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.ui-table tbody tr:hover > td:not(.ui-drawer-cell) { background: color-mix(in srgb, var(--accent) 2.5%, transparent); }
+/* Header tools (ui.js): <th data-sort data-info="Surface loss · N = 31 · …">. The title becomes a sort
+   button; an (i) shows on hover and opens the column's details. */
+.ui-th { display: inline-flex; align-items: center; gap: 0.3rem; }
+th.num .ui-th { flex-direction: row-reverse; }
+.ui-th-sort {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.25rem; margin: -0.1rem -0.25rem;
+  font: inherit; color: inherit; background: none; border: 0; border-radius: var(--ui-radius); cursor: pointer;
+}
+.ui-th-sort:hover { color: var(--bright); background: var(--ui-hover); }
+.ui-th-sort::after {
+  content: ""; width: 0.55rem; height: 0.55rem; flex: none; opacity: 0; background: currentColor;
+  -webkit-mask: var(--ui-arrow) center / contain no-repeat; mask: var(--ui-arrow) center / contain no-repeat;
+}
+th.num .ui-th-sort::after { order: -1; }
+.ui-th-sort:hover::after { opacity: 0.45; }
+th[aria-sort] .ui-th-sort { color: var(--glow); }
+th[aria-sort] .ui-th-sort::after { opacity: 1; }
+th[aria-sort="descending"] .ui-th-sort::after { transform: rotate(180deg); }
+:root { --ui-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 1 9 7H1z'/%3E%3C/svg%3E"); }
+/* Column hover: the column lights up and its details float above the head. */
+.ui-table .ui-col-hot { background: color-mix(in srgb, var(--accent) 4.5%, transparent); }
+.ui-table thead th.ui-col-hot { color: var(--bright); box-shadow: inset 0 -1px 0 var(--ui-on-line); }
+/* The column details: a small card above the column head, its notch pointing at the head. */
+.ui-pop {
+  position: absolute; z-index: 70; max-width: 20rem; padding: 0.6rem 0.75rem; text-align: left; white-space: normal;
+  font: 0.76rem/1.5 var(--font); color: var(--text);
+  border: 1px solid var(--ui-line-strong); border-radius: 6px; background: #141b27; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.ui-pop[hidden] { display: none; }
+.ui-pop::after {
+  content: ""; position: absolute; left: calc(var(--ax, 50%) - 5px); width: 8px; height: 8px; background: #141b27;
+  border: 1px solid var(--ui-line-strong); transform: rotate(45deg);
+}
+.ui-pop.above::after { bottom: -5px; border-top: 0; border-left: 0; }
+.ui-pop:not(.above)::after { top: -5px; border-bottom: 0; border-right: 0; }
+.ui-pop b { display: block; color: var(--bright); font-weight: 400; margin-bottom: 0.15rem; }
+.ui-pop span { display: block; color: var(--muted); }
+.ui-pop .hint { margin-top: 0.35rem; font-size: 0.7rem; color: color-mix(in srgb, var(--muted) 80%, transparent); }
+/* A cell that opens a drawer: <td class="num" data-drawer="id"> */
+.ui-table td[data-drawer] { cursor: pointer; border-radius: 3px; padding-left: 0.4rem; }
+.ui-table td[data-drawer]:hover { background: var(--ui-hover); box-shadow: inset 0 -1px 0 var(--ui-line-strong); }
+.ui-table td[data-drawer].is-open { background: var(--ui-on); box-shadow: inset 0 -2px 0 var(--glow); color: var(--bright); }
+.ui-table .spark { display: block; margin: 0.25rem 0 0 auto; }
+.ui-table.compact th, .ui-table.compact td { padding-top: 0.28rem; padding-bottom: 0.28rem; }
+/* Long tables keep the head in view inside their own scroll box. */
+.ui-table.scroll { max-height: 26rem; overflow-y: auto; }
+.ui-table.scroll thead th { position: sticky; top: 0; background: var(--ui-panel); z-index: 1; }
+
+/* ---------- Drawer: detail that grows out of the thing that opened it ----------
+   ui.js wraps the content in .ui-drawer-box, points its notch at the trigger (--ox) and animates
+   the height and scale both ways, from and back into that point. */
+.ui-drawer[hidden] { display: none; }
+div.ui-drawer, .ui-drawer-in { overflow: hidden; padding-top: 7px; }
+div.ui-drawer { margin: 0.35rem 0 0; }
+tr.ui-drawer { border: 0; background: none; }
+tr.ui-drawer > td, .ui-drawer-cell { padding: 0 0 0.6rem !important; border-bottom: 1px solid var(--ui-line-strong) !important; background: none !important; }
+.ui-drawer-box {
+  position: relative; padding: 0.75rem 0.9rem 0.9rem; border: 1px solid var(--ui-on-line); border-radius: 6px;
+  background: #131a26; transform-origin: var(--ox, 2rem) 0;
+}
+/* the notch: a small square turned 45°, sitting on the top edge under the trigger */
+.ui-drawer-box::before {
+  content: ""; position: absolute; top: -6px; left: calc(var(--ox, 2rem) - 5px); width: 10px; height: 10px;
+  background: #131a26; border-left: 1px solid var(--ui-on-line); border-top: 1px solid var(--ui-on-line); transform: rotate(45deg);
+}
+.ui-drawer-head { position: relative; padding-right: 2.2rem; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.8rem; margin: 0 0 0.65rem; font-size: 0.8rem; }
+.ui-drawer-head .t { color: var(--bright); }
+.ui-drawer-head .ui-icon { position: absolute; right: -0.35rem; top: -0.3rem; }
+[data-drawer].is-open:not(td) { color: var(--glow); border-color: var(--ui-on-line); background: var(--ui-on); }
+
+/* ---------- Tiles: a grid of small images that open in the modal ---------- */
+.ui-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.ui-tile {
+  position: relative; display: block; padding: 0; border: 0; border-radius: 3px; overflow: hidden; cursor: zoom-in;
+  background: #0f1520; outline: 1px solid transparent; outline-offset: 0; transition: outline-color 0.15s;
+}
+.ui-tile:hover { outline-color: var(--glow); }
+/* A long set scrolls inside about two and a half rows, so the drawer stays short: <div class="ui-tiles scroll"> */
+.ui-tiles.scroll { max-height: 15.5rem; overflow-y: auto; padding: 1px; overscroll-behavior: contain; }
+.ui-tile img, .ui-tile svg { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.ui-tile .cap {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center;
+  padding: 1px 5px; font-size: 0.66rem; color: #e6e9ed; background: rgba(12, 17, 25, 0.78); font-family: var(--ui-mono);
+}
+
+/* ---------- Modal: one thing large, with previous / next. A native <dialog>. ---------- */
+.ui-modal {
+  width: min(1000px, calc(100vw - 2rem)); max-width: none; max-height: calc(100dvh - 2rem); padding: 0;
+  color: var(--text); font: 14px/1.5 var(--font);
+  border: 1px solid var(--ui-line-strong); border-radius: 8px; background: #141b27;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.ui-modal::backdrop { background: rgba(8, 11, 17, 0.86); }
+.ui-modal-head {
+  position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.8rem;
+  padding: 0.7rem 0.8rem 0.7rem 1.1rem; background: #141b27; border-bottom: 1px solid var(--ui-line);
+}
+.ui-modal-head .t { color: var(--bright); font-family: var(--ui-serif); font-size: 1.15rem; }
+.ui-modal-head .ctl { margin-left: auto; display: flex; align-items: center; gap: 0.15rem; }
+.ui-modal-head .ui-modal-count { font-family: var(--ui-mono); font-size: 0.78rem; color: var(--muted); margin-right: 0.4rem; font-variant-numeric: tabular-nums; }
+.ui-modal-body { padding: 1rem 1.1rem 1.1rem; }
+.ui-modal-foot { padding: 0 1.1rem 0.9rem; color: var(--muted); font-size: 0.75rem; }
+.ui-slide[hidden] { display: none; }
+.ui-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+.ui-pair .h, .ui-eyebrow { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 0.35rem; }
+.ui-pair img, .ui-pair svg { display: block; width: 100%; aspect-ratio: 1; border-radius: 3px; max-height: calc(100dvh - 14rem); object-fit: contain; background: #0f1520; }
+.ui-kv { display: flex; flex-wrap: wrap; gap: 0.3rem 1.4rem; margin: 0.85rem 0 0; font-size: 0.82rem; }
+.ui-kv > div > span:first-child { color: var(--muted); margin-right: 0.35rem; }
+html:has(.ui-modal[open]) { overflow: hidden; }
+
+/* ---------- Badge: a short label with a tone ----------
+   Every badge is a bordered box with the same small corner as the site's buttons; the fill
+   says how loud it is. Default: dot + word on a faint tint. .tag: a status word, caps, no dot.
+   .solid: filled, for a label that sits on an image. */
+.ui-badge {
+  --tone: var(--muted);
+  display: inline-flex; align-items: center; gap: 0.38em; white-space: nowrap; vertical-align: 0.05em;
+  padding: 0.05em 0.5em; font-size: 0.85em; line-height: 1.5; color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--tone) 50%, transparent); border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--tone) 10%, transparent);
+}
+/* In running text a badge keeps a gap from the words around it and a lighter line height,
+   so it does not crowd the words beside it or the lines above and below. */
+:is(p, li, dd, figcaption) > .ui-badge:not(.solid, .tag), span[data-for] > .ui-badge:not(.solid, .tag) { margin: 0 0.22em; line-height: 1.35; }
+.ui-badge::before { content: ""; width: 0.5em; height: 0.5em; border-radius: 50%; background: var(--tone); flex: none; }
+.ui-badge b { font-weight: 400; font-family: var(--ui-mono); color: var(--muted); font-variant-numeric: tabular-nums; padding-left: 0.1em; }
+.ui-badge.tag {
+  font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 0 0.5em;
+  color: color-mix(in srgb, var(--tone) 75%, white); background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.ui-badge.tag::before { display: none; }
+.ui-badge.solid { color: #0e131b; background: var(--tone); border-color: var(--tone); }
+.ui-badge.solid::before { background: rgba(14, 19, 27, 0.55); }
+.ui-badge.solid b { color: rgba(14, 19, 27, 0.7); }
+.ui-badge[data-tone="precise"] { --tone: var(--tone-precise); }
+.ui-badge[data-tone="near"] { --tone: var(--tone-near); }
+.ui-badge[data-tone="mid"] { --tone: var(--tone-mid); }
+.ui-badge[data-tone="wrong"] { --tone: var(--tone-wrong); }
+.ui-badge[data-tone="off"] { --tone: var(--tone-off); }
+.ui-badge[data-tone="object"] { --tone: var(--tone-object); }
+.ui-badge[data-tone="none"] { --tone: var(--tone-none); }
+.ui-badge[data-tone="glow"] { --tone: var(--glow); }
+.ui-badge[data-tone="pink"] { --tone: var(--pink); }
+/* Series key in a table: a square swatch with a free color */
+.ui-swatch { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 2px; margin-right: 0.45em; vertical-align: 0.02em; background: var(--c, var(--muted)); }
+.ui-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; margin: 0.5rem 0 0; }
+
+/* ---------- Figure: the frame for every chart, table or widget in an article ---------- */
+.ui-fig { margin: 1.75rem 0 2rem; }
+.ui-fig > figcaption, .ui-fig .ui-cap { margin: 0.65rem 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.55; max-width: var(--measure, 42rem); }
+.ui-fig .ui-fig-n { color: var(--accent); margin-right: 0.35rem; }
+.ui-fig .ui-fig-n::after { content: "."; }
+.ui-fig figcaption .src { display: block; margin-top: 0.25rem; font-size: 0.72rem; color: color-mix(in srgb, var(--muted) 80%, transparent); }
+.ui-fig figcaption em { color: var(--text); font-style: italic; }
+/* Wider than the text column when the figure needs it (desktop only). */
+@media (min-width: 900px) { .ui-fig.wide { margin-right: -8rem; } }
+/* Waiting and failure states take the figure's place at a steady height. */
+.ui-state {
+  position: relative; overflow: hidden; display: grid; place-items: center; align-content: center; gap: 0.7rem;
+  min-height: 11rem; padding: 1.5rem; text-align: center;
+  border: 1px dashed var(--ui-line-strong); border-radius: 6px; color: var(--muted); font-size: 0.82rem;
+}
+.ui-state.error { border-color: color-mix(in srgb, var(--tone-off) 55%, transparent); color: var(--text); }
+.ui-state.error .why { color: var(--muted); font-family: var(--ui-mono); font-size: 0.72rem; }
+/* Loaders. Put one inside a .ui-state: <span class="ui-loader" data-kind="rings"></span>
+   kinds: shimmer (a sweep over the whole box), bar (a line along the top), dots, rings (the
+   pointing figures' r / 2r / 3r tolerance rings), arc. A .ui-skeleton stands in for a table. */
+.ui-loader { display: block; position: relative; color: var(--glow); }
+.ui-loader[data-kind="dots"] { width: 6px; height: 6px; border-radius: 50%; margin: 0 14px; background: currentColor; box-shadow: -14px 0 currentColor, 14px 0 currentColor; }
+.ui-loader[data-kind="rings"] { width: 52px; height: 52px; }
+.ui-loader[data-kind="rings"]::before, .ui-loader[data-kind="rings"]::after, .ui-loader[data-kind="rings"] { border-radius: 50%; }
+.ui-loader[data-kind="rings"]::before, .ui-loader[data-kind="rings"]::after { content: ""; position: absolute; border: 1.5px dashed; }
+.ui-loader[data-kind="rings"]::before { inset: 17px; border-color: var(--tone-precise); }
+.ui-loader[data-kind="rings"]::after { inset: 8px; border-color: #eab308; }
+.ui-loader[data-kind="rings"] { border: 1.5px dashed #ef4444; box-sizing: border-box; }
+.ui-loader[data-kind="arc"] { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ui-line); border-top-color: currentColor; }
+.ui-loader[data-kind="bar"] { position: absolute; top: 0; left: 0; right: 0; height: 2px; overflow: hidden; background: var(--ui-line); }
+.ui-loader[data-kind="bar"]::before { content: ""; position: absolute; top: 0; bottom: 0; width: 35%; background: currentColor; left: -35%; }
+.ui-state:has(.ui-loader[data-kind="shimmer"]), .ui-skeleton {
+  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--accent) 6%, transparent) 50%, transparent 70%) 0 0 / 250% 100%;
+}
+.ui-skeleton { display: grid; gap: 0.7rem; padding: 1rem; border: 1px solid var(--ui-line); border-radius: 6px; }
+.ui-skeleton i { display: block; height: 0.7rem; border-radius: 3px; background: color-mix(in srgb, var(--rule) 16%, transparent); }
+.ui-skeleton i:nth-child(5n+1) { width: 92%; } .ui-skeleton i:nth-child(5n+2) { width: 78%; }
+.ui-skeleton i:nth-child(5n+3) { width: 85%; } .ui-skeleton i:nth-child(5n+4) { width: 64%; } .ui-skeleton i:nth-child(5n) { width: 72%; }
+.ui-skeleton i:first-child { width: 40%; height: 0.8rem; margin-bottom: 0.3rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .ui-state:has(.ui-loader[data-kind="shimmer"]), .ui-skeleton { animation: ui-shimmer 1.6s linear infinite; }
+  @keyframes ui-shimmer { to { background-position: -250% 0; } }
+  .ui-loader[data-kind="dots"] { animation: ui-dots 1.1s ease-in-out infinite; }
+  @keyframes ui-dots {
+    0%, 100% { box-shadow: -14px 0 currentColor, 14px 0 color-mix(in srgb, currentColor 25%, transparent); background: color-mix(in srgb, currentColor 55%, transparent); }
+    33% { box-shadow: -14px 0 color-mix(in srgb, currentColor 25%, transparent), 14px 0 color-mix(in srgb, currentColor 55%, transparent); background: currentColor; }
+    66% { box-shadow: -14px 0 color-mix(in srgb, currentColor 55%, transparent), 14px 0 currentColor; background: color-mix(in srgb, currentColor 25%, transparent); }
+  }
+  .ui-loader[data-kind="rings"] { animation: ui-spin 9s linear infinite; }
+  .ui-loader[data-kind="rings"]::after { animation: ui-spin 5s linear infinite reverse; }
+  .ui-loader[data-kind="rings"]::before { animation: ui-pulse 1.4s ease-in-out infinite; }
+  @keyframes ui-pulse { 50% { transform: scale(0.6); opacity: 0.5; } }
+  .ui-loader[data-kind="arc"] { animation: ui-spin 0.8s linear infinite; }
+  @keyframes ui-spin { to { transform: rotate(360deg); } }
+  .ui-loader[data-kind="bar"]::before { animation: ui-bar 1.3s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite; }
+  @keyframes ui-bar { to { left: 100%; } }
+}
+
+/* Panels switched by a control: <div data-for="loss" data-when="px">. ui.js sets [hidden]. */
+[data-for][hidden] { display: none !important; }
+
+@media (max-width: 600px) {
+  .ui-table { padding: 0.25rem 0.7rem 0.35rem; }
+  .ui-bar { gap: 0.5rem 0.7rem; }
+}
