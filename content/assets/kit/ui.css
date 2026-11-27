@@ -305,6 +305,14 @@ html:has(.ui-modal[open]) { overflow: hidden; }
 .ui-fig .ui-fig-n::after { content: "."; }
 .ui-fig figcaption .src { display: block; margin-top: 0.25rem; font-size: 0.72rem; color: color-mix(in srgb, var(--muted) 80%, transparent); }
 .ui-fig figcaption em { color: var(--text); font-style: italic; }
+/* Boxed: the figure's controls and content on one panel, the same surface as tables and math,
+   for a figure that is a loose set of parts (the explorer). <figure class="ui-fig boxed"> */
+.ui-fig.boxed {
+  padding: 0.9rem 1.1rem 1rem; border: 1px solid color-mix(in srgb, var(--rule) 45%, transparent); border-radius: 6px;
+  background: var(--ui-panel); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.ui-fig.boxed > figcaption { margin-top: 0.8rem; }
+@media (max-width: 600px) { .ui-fig.boxed { padding: 0.7rem 0.75rem 0.8rem; } }
 /* Wider than the text column when the figure needs it (desktop only). */
 @media (min-width: 900px) { .ui-fig.wide { margin-right: -8rem; } }
 /* Waiting and failure states take the figure's place at a steady height. */
@@ -355,6 +363,18 @@ html:has(.ui-modal[open]) { overflow: hidden; }
   .ui-loader[data-kind="bar"]::before { animation: ui-bar 1.3s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite; }
   @keyframes ui-bar { to { left: 100%; } }
 }
+
+/* ---------- Math: a display equation on a panel ----------
+   KaTeX writes $$…$$ as <p class="katex-block"><span class="katex-display">. The panel is the callouts'
+   and tables' surface: mostly solid so the symbols read, with a little of the sky showing through.
+   A wide equation scrolls inside its panel on a phone. Write <div class="ui-math"> for the same look by hand. */
+.katex-block, .ui-math {
+  margin: 1.25rem 0 1.4rem; padding: 0.15rem 1.1rem; overflow-x: auto; overflow-y: hidden;
+  border: 1px solid color-mix(in srgb, var(--rule) 45%, transparent); border-radius: 6px;
+  background: var(--ui-panel); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+.katex-block .katex-display { margin: 0.85rem 0; overflow: visible; padding: 0; }
+.katex-block .katex { color: var(--bright); }
 
 /* Panels switched by a control: <div data-for="loss" data-when="px">. ui.js sets [hidden]. */
 [data-for][hidden] { display: none !important; }

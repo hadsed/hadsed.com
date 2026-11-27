@@ -145,11 +145,11 @@ export default function (eleventyConfig) {
   };
   // The figure kit (vault hadsed.com/design-system, copied to content/assets/kit): the wikilinks transform
   // puts it once ahead of the first widget embed on a page. Hashed URLs, like the scripts above.
-  const kitTags = () => {
+  const kitTags = (withScript = true) => {
     const tag = (f) => { const disk = `content/assets/kit/${f}`; if (!existsSync(disk)) return null;
       return `/assets/kit/${f}?v=${createHash("md5").update(readFileSync(disk)).digest("hex").slice(0, 10)}`; };
     const css = tag("ui.css"), js = tag("ui.js");
-    return (css ? `<link rel="stylesheet" href="${css}">` : "") + (js ? `<script src="${js}" defer></script>` : "");
+    return (css ? `<link rel="stylesheet" href="${css}">` : "") + (js && withScript ? `<script src="${js}" defer></script>` : "");
   };
   const embedFrame = (file) =>
     `<iframe class="embed-frame" src="/assets/${encodeURI(file)}" title="${file.replace(/\.html$/, "")}" loading="lazy" allow="fullscreen; xr-spatial-tracking"></iframe>`;
@@ -191,8 +191,11 @@ export default function (eleventyConfig) {
     if (!(this.page.outputPath || "").endsWith(".html")) return content;
     const out = resolveLinks(content, this.page.inputPath, this.page.url);
     // a page with figure scripts gets the figure kit once, ahead of the first figure
+    // (display math needs only the stylesheet: its panel is a kit component)
     const at = out.indexOf('<div class="widget-mount"');
-    return at < 0 ? out : out.slice(0, at) + kitTags() + out.slice(at);
+    if (at >= 0) return out.slice(0, at) + kitTags() + out.slice(at);
+    const m = out.indexOf('<p class="katex-block"');
+    return m < 0 ? out : out.slice(0, m) + kitTags(false) + out.slice(m);
   });
   // Links to other sites open in a new tab (LinkedIn, GitHub, Scholar, links in posts). Own-site links stay put.
   eleventyConfig.addTransform("outsideLinks", function (content) {

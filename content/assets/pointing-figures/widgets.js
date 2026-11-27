@@ -183,7 +183,7 @@ async function explorer(root) {
   for (const k of SLICES.explorer) S[k] = await slice(k);
   const ex = {mode: "zs", ds: "v1", sys: null, cond: null, idx: 0, list: []};
   const cur = () => S[(ex.mode === "zs" ? "zs_" : "h_") + (ex.ds === "v1" ? "v1" : "wb")];
-  root.innerHTML = `<figure class="ui-fig" data-ui-scope>
+  root.innerHTML = `<figure class="ui-fig boxed" data-ui-scope>
     <div class="ui-bar"><span class="ui-seg" data-name="xm"><button value="zs" aria-pressed="true">single-shot</button><button value="h">harness</button></span>
       <span class="ui-seg" data-name="xd"><button value="v1" aria-pressed="true">single part</button><button value="wb">workbench</button></span></div>
     <div class="ui-bar" data-pick></div><div data-body></div></figure>`;
