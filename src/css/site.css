@@ -554,3 +554,6 @@ details.callout:not([open]) > summary { border-bottom: 0; }
 .lightbox-open, .lightbox-open body { overflow: hidden; }
 .lightbox img { transition: transform 0.2s; }
 .lightbox { transition: background-color 0.2s; }
+
+/* Display math scrolls on its own when it is wider than the column (a phone), instead of widening the page. */
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.15rem 0; }
