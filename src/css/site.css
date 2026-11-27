@@ -162,6 +162,22 @@ footer {
 .role { color: var(--muted); font-size: 0.9rem; }
 .role a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .role a:hover { color: var(--accent); }
+/* Landing timeline: the org name's link stretches over the whole entry, with no link styling.
+   Hovering an entry lights its orb. Subtitle links sit above and keep working. */
+.timeline-entry .entry-link { color: var(--accent); text-decoration: none; }
+.timeline-entry .entry-link::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+.timeline-entry .entry-link:focus-visible { outline: none; }
+.timeline-entry:has(.entry-link:focus-visible) { outline: 1px solid var(--glow); outline-offset: 0.3rem; }
+.timeline-entry .role a { position: relative; z-index: 2; }
+.timeline-entry:has(.entry-link:hover) .orb { background: var(--accent); }
+/* Experience page: a # after the name (on hover; always faint on touch screens), and the entry a
+   link points at lands a little below the top edge with its orb lit. */
+.timeline-entry[id] { scroll-margin-top: 1.5rem; }
+.timeline-entry .anchor { color: var(--muted); text-decoration: none; margin-left: 0.45rem; opacity: 0; transition: opacity 0.15s; }
+.timeline-entry:hover .anchor, .timeline-entry .anchor:focus-visible { opacity: 1; }
+.timeline-entry .anchor:hover { color: var(--accent); }
+@media (hover: none) { .timeline-entry .anchor { opacity: 0.5; } }
+.timeline-entry:target .orb { background: var(--glow); box-shadow: 0 0 6px 1px color-mix(in srgb, var(--glow) 55%, transparent); }
 .entry-body { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; }
 .entry-body ul { margin: 0; padding-left: 1.1rem; }
 .entry-body li { margin: 0 0 0.25rem; }
