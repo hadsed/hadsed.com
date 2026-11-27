@@ -219,6 +219,14 @@ footer {
 .t-title a { color: inherit; text-decoration: none; }
 .t-title a:hover { color: var(--glow); }
 .t-sum { color: var(--muted); font-size: 0.88rem; line-height: 1.5; margin: 0.35rem 0 0; }
+/* Whole card is the link: the title link stretches over the card, so a click anywhere opens it.
+   Screen readers and keyboards still meet one link per card. Any other link inside sits above. */
+.panel, .posts li { position: relative; }
+.panel .t-title a::after, .posts li > a:first-child::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+.panel .t-sum a, .posts li .summary a { position: relative; z-index: 2; }
+.panel .t-title a:focus-visible, .posts li > a:first-child:focus-visible { outline: none; }
+.panel:has(.t-title a:focus-visible) { border-color: var(--glow); outline: 1px solid var(--glow); }
+.posts li:has(> a:first-child:focus-visible) { outline: 1px solid var(--glow); outline-offset: 0.4rem; }
 
 @media (max-width: 40rem) {
   /* Projects page: two narrow columns, summaries cut at three lines */
