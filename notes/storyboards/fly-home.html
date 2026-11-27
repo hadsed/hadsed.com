@@ -117,7 +117,16 @@ function decorateSite(doc = siteDoc()) {
       const a = e.target.closest && e.target.closest('a[href]');
       if (!a || a.target) return;
       try { const u = new URL(a.href); if (/^https?:$/.test(u.protocol) && u.origin !== location.origin) { a.target = '_blank'; a.rel = 'noopener'; } } catch {}
+      // A #link inside a page served as srcdoc would reload the frame (its links resolve against this
+      // wrapper's URL). Scroll to the spot instead and put the #link in the address bar.
+      const h = a.getAttribute('href');
+      if (doc.location.href === 'about:srcdoc' && h.length > 1 && h[0] === '#' && h !== '#fly') {
+        const el = doc.getElementById(decodeURIComponent(h.slice(1)));
+        if (el) { e.preventDefault(); el.scrollIntoView(); history.replaceState(null, '', location.pathname + location.search + h); }
+      }
     }, true);
+    // A #link followed inside a normal frame changes only the frame's hash: keep the address bar in step.
+    try { doc.defaultView.addEventListener('hashchange', () => { const l = doc.location; if (!l.pathname.startsWith('/lab/')) history.replaceState(null, '', l.pathname + l.search + l.hash); }); } catch {}
   }
   // Keep the address bar in step with the page shown inside, so a reload lands on the same page.
   // The address bar shows the page's own URL, so it can be copied and shared; loading that URL
