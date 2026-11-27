@@ -100,7 +100,7 @@ function dialogFor(root) {
     dlg = document.createElement("dialog"); dlg.className = "ui-modal"; dlg.id = `ptw-m-${root.dataset.n}`; dlg.setAttribute("aria-label", "answers");
     dlg.innerHTML = `<div class="ui-modal-head"><span class="t"></span><span class="ui-muted" data-sub></span>
       <span class="ctl"><span class="ui-modal-count"></span><button class="ui-icon" data-modal-step="-1" aria-label="previous">←</button><button class="ui-icon" data-modal-step="1" aria-label="next">→</button><button class="ui-icon" data-modal-close aria-label="close">✕</button></span></div>
-      <div class="ui-modal-body"></div><p class="ui-modal-foot">Rings at r, 2r and 3r, r = 6.7 px; the cross is the answer. ← → step, Esc closes.</p>`;
+      <div class="ui-modal-body"></div><p class="ui-modal-foot">Rings at r, 2r and 3r, r = 6.7 px; each cross is an answer. ← → step, Esc closes.</p>`;
     root.append(dlg);
   }
   return dlg;
@@ -178,52 +178,120 @@ async function table(root, key, harness) {
 }
 
 // ---------- explorer ----------
+// One question at a time: every answer the chosen models gave to it sits on the same target image,
+// each model's crosses in its own color. The model filter (.ui-filter) picks the models.
+const DEFAULT_SYS = {zs: ["claude-fable-5", "gpt", "gemini"], h: ["codex-astra-low", "claude-code-fable-high", "codex-gpt-low"]};
+function crosses(sets, k) {
+  // sets: [{p:[x,y], c:"#hex"}]; a dark halo under each so light colors read on the grey renders
+  const a = 6 * k;
+  return sets.map(({p, c}) => { const d = `M${p[0] - a} ${p[1] - a}L${p[0] + a} ${p[1] + a}M${p[0] - a} ${p[1] + a}L${p[0] + a} ${p[1] - a}`;
+    return `<g opacity="0.78"><path d="${d}" stroke="rgba(6,12,8,.6)" stroke-width="${4.2 * k}" fill="none"/><path d="${d}" stroke="${c}" stroke-width="${2.3 * k}" fill="none"/></g>`; }).join("");
+}
+function ringsAt(tgt, k) {
+  return RINGS.map((rr, i) => `<circle cx="${tgt[0]}" cy="${tgt[1]}" r="${rr}" fill="none" stroke="${RING_COL[i]}" stroke-width="${1.3 * k}" stroke-dasharray="${3 * k},${3 * k}"/>`).join("")
+    + `<circle cx="${tgt[0]}" cy="${tgt[1]}" r="${1.6 * k}" fill="#22c55e"/>`;
+}
+// zoomed on the truth, wide enough to hold every answer (up to the whole image)
+function zoomMany(path, tgt, sets) {
+  const xs = [tgt[0], ...sets.map((s) => s.p[0])], ys = [tgt[1], ...sets.map((s) => s.p[1])];
+  const x0b = Math.min(...xs), x1b = Math.max(...xs), y0b = Math.min(...ys), y1b = Math.max(...ys);
+  const s = Math.min(512, Math.max(150, 1.25 * Math.max(x1b - x0b, y1b - y0b) + 40));
+  const cx = (x0b + x1b) / 2, cy = (y0b + y1b) / 2;
+  const x0 = Math.max(0, Math.min(512 - s, cx - s / 2)), y0 = Math.max(0, Math.min(512 - s, cy - s / 2));
+  return `<svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${s.toFixed(1)} ${s.toFixed(1)}"><image href="${esc(img(path))}" width="512" height="512"/>${ringsAt(tgt, s / 200)}${crosses(sets, s / 200)}</svg>`;
+}
+const fullMany = (path, tgt, sets) => `<div style="position:relative"><img src="${esc(img(path))}" alt="" loading="lazy" width="512" height="512"><svg viewBox="0 0 512 512" aria-hidden="true" style="position:absolute;inset:0;background:none">${ringsAt(tgt, 1.6)}${crosses(sets, 1.6)}</svg></div>`;
+const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+
 async function explorer(root) {
   const S = {};
   for (const k of SLICES.explorer) S[k] = await slice(k);
-  const ex = {mode: "zs", ds: "v1", sys: null, cond: null, idx: 0, list: []};
+  const ex = {mode: "zs", ds: "v1", cond: null, qi: 0, qs: [], sel: new Set()};
   const cur = () => S[(ex.mode === "zs" ? "zs_" : "h_") + (ex.ds === "v1" ? "v1" : "wb")];
   root.innerHTML = `<figure class="ui-fig boxed" data-ui-scope>
     <div class="ui-bar"><span class="ui-seg" data-name="xm"><button value="zs" aria-pressed="true">single-shot</button><button value="h">harness</button></span>
       <span class="ui-seg" data-name="xd"><button value="v1" aria-pressed="true">single part</button><button value="wb">workbench</button></span></div>
-    <div class="ui-bar" data-pick></div><div data-body></div></figure>`;
+    <div data-pick></div><div data-body></div></figure>`;
   const pick = root.querySelector("[data-pick]"), body = root.querySelector("[data-body]");
+  const sysOf = (sl, a) => sl.systems.find((s) => s.alias === a);
+  // the chosen models' answers to the current question, grouped by model in the filter's order
+  const answers = () => {
+    const sl = cur(), stem = ex.qs[ex.qi];
+    return sl.systems.filter((s) => ex.sel.has(s.alias)).map((s) => ({s, rs: sl.R.filter((r) => r.sysA === s.alias && r.condK === ex.cond && r.stem === stem)}));
+  };
   function controls() {
     const sl = cur();
-    if (!sl.systems.some((s) => s.alias === ex.sys)) ex.sys = (sl.systems.find((s) => s.alias === (ex.mode === "zs" ? "claude-fable-5" : "codex-astra-low")) || sl.systems[0]).alias;
+    const keep = sl.systems.filter((s) => ex.sel.has(s.alias)).map((s) => s.alias);
+    if (!keep.length) {
+      const want = DEFAULT_SYS[ex.mode].filter((a) => sysOf(sl, a));
+      (want.length ? want : sl.systems.slice(0, 3).map((s) => s.alias)).forEach((a) => keep.push(a));
+    }
+    ex.sel = new Set(keep);
     if (!sl.conds.includes(ex.cond)) ex.cond = sl.conds[Math.min(2, sl.conds.length - 1)];
-    ex.list = cellRows(sl, ex.sys, ex.cond).slice().sort((a, b) => a.stem - b.stem || a.rep - b.rep);
-    ex.idx = 0;
-    const nn = Math.max(1, ex.list.length);
-    pick.innerHTML = `<span class="ui-field"><span class="ui-label">system</span><span class="ui-select"><select name="xsys" aria-label="system">${sl.systems.map((s) => `<option value="${esc(s.alias)}"${s.alias === ex.sys ? " selected" : ""}>${esc(s.label)}</option>`).join("")}</select></span></span>
-      <span class="ui-field"><span class="ui-label">view</span><span class="ui-select"><select name="xcond" aria-label="condition"${sl.conds.length < 2 ? " disabled" : ""}>${sl.conds.map((c) => `<option value="${c}"${c === ex.cond ? " selected" : ""}>${esc(LABEL[c])}</option>`).join("")}</select></span></span>
-      <span class="ui-gap"></span>
-      <span class="ui-step" data-name="answer" data-total="${nn}"><button class="ui-icon" data-step="-1" aria-label="previous answer">←</button><output>1 / ${nn}</output><button class="ui-icon" data-step="1" aria-label="next answer">→</button></span>`;
+    ex.qs = [...new Set(sl.R.filter((r) => r.condK === ex.cond).map((r) => r.stem))].sort((a, b) => a - b);
+    ex.qi = 0;
+    const nn = Math.max(1, ex.qs.length);
+    pick.innerHTML = `<div class="ui-bar">
+        <span class="ui-field"><span class="ui-label">view</span><span class="ui-select"><select name="xcond" aria-label="view change"${sl.conds.length < 2 ? " disabled" : ""}>${sl.conds.map((c) => `<option value="${c}"${c === ex.cond ? " selected" : ""}>${esc(LABEL[c])}</option>`).join("")}</select></span></span>
+        <span class="ui-gap"></span>
+        <span class="ui-step" data-name="q" data-total="${nn}"><button class="ui-icon" data-step="-1" aria-label="previous question">←</button><output>1 / ${nn}</output><button class="ui-icon" data-step="1" aria-label="next question">→</button></span></div>
+      <div class="ui-filter" data-name="xsys" data-max="4">
+        <div class="ui-filter-head"><span class="ui-label">models</span><span class="ui-filter-count"></span>
+          <button class="ui-btn" data-filter-toggle aria-expanded="false">Choose</button><button class="ui-btn" data-filter-all>All</button><button class="ui-btn" data-filter-none>None</button></div>
+        <div class="ui-filter-list">${sl.systems.map((s) => `<button class="ui-chip" value="${esc(s.alias)}" style="--c:${esc(s.colour)}" aria-pressed="${ex.sel.has(s.alias)}"><span class="nm">${esc(s.label)}</span><b></b></button>`).join("")}</div></div>`;
     window.ui.init(pick);
     draw();
   }
   function draw() {
-    const sl = cur(), r = ex.list[ex.idx];
-    if (!r) { body.innerHTML = `<div class="ui-state">No answers stored for this system here.</div>`; return; }
-    const b = sl.bundles[r.stemK], cv = b.conds[r.condK];
-    const pane = (h, inner, kv) => `<div><p class="ui-eyebrow">${h}</p><div class="ui-tile" data-modal="" data-slide="${ex.idx}" role="button" tabindex="0" aria-label="open full size">${inner}</div><div class="ui-kv">${kv}</div></div>`;
-    body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:0.9rem;overflow-wrap:break-word">
-      ${pane("source, marked", fullSvg(b.src), `<div><span>sample</span><span class="ui-mono">${esc(short(r.stemK))}</span></div><div><span>${ex.mode === "zs" ? "answer" : "run"}</span>${ex.mode === "zs" ? `${r.rep + 1} of this question` : "one per question"}</div>`)}
-      ${pane("target", fullSvg(cv.img), `<div><span>view</span>${esc(LABEL[r.condK])}</div><div><span>half</span>${esc(sl.half)}</div>`)}
-      ${pane("answer vs truth", zoomSvg(cv.img, cv.tgt, r.pred, 150), `<div><span>off by</span><span class="ui-mono">${offBy(r)}</span></div><div>${badge(r.cls)}</div>`)}</div>`;
+    const sl = cur(), stem = ex.qs[ex.qi];
+    // each chip notes that model's error on this question: its answers' mean pixel distance
+    for (const chip of pick.querySelectorAll(".ui-filter-list > .ui-chip:not(.more)")) {
+      const rs = sl.R.filter((r) => r.sysA === chip.value && r.condK === ex.cond && r.stem === stem), e = rs.map((r) => r.err).filter((x) => x != null);
+      chip.querySelector("b").textContent = !rs.length ? "—" : e.length ? fmt(mean(e), 1) + " px" : "no answer";
+    }
+    if (stem == null) { body.innerHTML = `<div class="ui-state">No questions stored here.</div>`; return; }
+    const b = sl.bundles[sl.stems[stem]], cv = b.conds[ex.cond], groups = answers();
+    const sets = groups.flatMap(({s, rs}) => rs.filter((r) => r.pred).map((r) => ({p: r.pred, c: s.colour})));
+    const pane = (h, inner) => `<div><p class="ui-eyebrow">${h}</p><div class="ui-tile" data-modal="" data-slide="${ex.qi}" role="button" tabindex="0" aria-label="open full size">${inner}</div></div>`;
+    const rows = groups.map(({s, rs}) => {
+      if (!rs.length) return `<tr><td class="key"><i class="ui-swatch" style="--c:${esc(s.colour)}"></i>${esc(s.label)}</td><td class="num na" colspan="2">not run here</td><td></td></tr>`;
+      const e = rs.map((r) => r.err).filter((x) => x != null), ls = rs.map((r) => r.lsurf).filter((x) => x != null);
+      const n = {}; for (const r of rs) n[r.cls] = (n[r.cls] || 0) + 1;
+      const tags = CLS_ORDER.filter((c) => n[c]).map((c) => badge(c, rs.length > 1 ? n[c] : null)).join(" ");
+      return `<tr><td class="key"><i class="ui-swatch" style="--c:${esc(s.colour)}"></i>${esc(s.label)}</td>
+        <td class="num" data-v="${e.length ? mean(e) : ""}">${e.length ? fmt(mean(e), 1) + " px" : "—"}</td>
+        <td class="num" data-v="${ls.length ? mean(ls) : ""}">${ls.length ? fmt(mean(ls), 4) : "—"}</td><td>${tags}</td></tr>`;
+    }).join("");
+    const reps = Math.max(0, ...groups.map((g) => g.rs.length));
+    body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:0.9rem">
+      ${pane("source image", fullSvg(b.src))}${pane("target image", fullSvg(cv.img))}${pane("answers vs truth", zoomMany(cv.img, cv.tgt, sets))}</div>
+      ${groups.length ? `<p class="ui-eyebrow" style="margin:1rem 0 0.35rem">error</p><div class="ui-table compact" style="box-shadow:none"><table><thead><tr><th data-sort>model</th>
+        <th class="num" data-sort data-info="Pixel error · Distance from the answer to the truth in the target image${reps > 1 ? " · Mean over this model's answers" : ""}">pixel</th>
+        <th class="num" data-sort data-info="Surface loss · Distance along the part's surface over its geodesic diameter, capped at 1${reps > 1 ? " · Mean over this model's answers" : ""}">surface</th>
+        <th>class</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="ui-state" style="min-height:4rem;margin-top:0.9rem">Choose a model to see its answers.</div>`}`;
+    window.ui.init(body);
   }
   root.addEventListener("ui:change", (e) => {
     const {name, value} = e.detail;
     // ui.init repeats each control's current value; only a real change redraws (else init -> redraw -> init loops)
     if (name === "xm" && value !== ex.mode) { ex.mode = value; controls(); }
     else if (name === "xd" && value !== ex.ds) { ex.ds = value; ex.cond = null; controls(); }
-    else if (name === "xsys" && value !== ex.sys) { ex.sys = value; controls(); }
     else if (name === "xcond" && value !== ex.cond) { ex.cond = value; controls(); }
-    else if (name === "answer") { ex.idx = Number(value) - 1; draw(); }
+    else if (name === "xsys") { ex.sel = new Set(value ? value.split(",") : []); draw(); }
+    else if (name === "q" && Number(value) - 1 !== ex.qi) { ex.qi = Number(value) - 1; draw(); }
   });
   root.addEventListener("click", (e) => {
     const t = e.target.closest(".ui-tile[data-modal]");
-    if (t) { const sl = cur(); t.dataset.modal = fillModal(root, sl, ex.list, `${sl.systems.find((s) => s.alias === ex.sys).label} · ${LABEL[ex.cond]}`); }
+    if (!t) return;
+    const sl = cur(), dlg = dialogFor(root), groups = answers();
+    dlg.querySelector("[data-sub]").textContent = `${LABEL[ex.cond]} · ${groups.length} model${groups.length === 1 ? "" : "s"}`;
+    // one slide per question, each with every chosen model's answers
+    dlg.querySelector(".ui-modal-body").innerHTML = ex.qs.map((stem, i) => {
+      const b = sl.bundles[sl.stems[stem]], cv = b.conds[ex.cond];
+      const sets = sl.systems.filter((s) => ex.sel.has(s.alias)).flatMap((s) => sl.R.filter((r) => r.sysA === s.alias && r.condK === ex.cond && r.stem === stem && r.pred).map((r) => ({p: r.pred, c: s.colour})));
+      return `<div class="ui-slide" data-title="Question ${i + 1}" hidden><div class="ui-pair"><div><p class="h">source image</p>${fullView(b.src)}</div><div><p class="h">target image, answers vs truth</p>${fullMany(cv.img, cv.tgt, sets)}</div></div></div>`;
+    }).join("");
+    t.dataset.modal = dlg.id;
   });
   // ← → step the explorer under the pointer, unless a menu or the modal has the keys
   root.addEventListener("pointerenter", () => { activeExplorer = root; });
@@ -233,7 +301,7 @@ async function explorer(root) {
 let activeExplorer = null;
 document.addEventListener("keydown", (e) => {
   if (!activeExplorer || (e.key !== "ArrowRight" && e.key !== "ArrowLeft") || document.querySelector("dialog.ui-modal[open]")) return;
-  if (e.target.closest && e.target.closest(".ui-seg, .ui-select, input, textarea")) return;
+  if (e.target.closest && e.target.closest(".ui-seg, .ui-select, .ui-filter, input, textarea")) return;
   activeExplorer.querySelector(`.ui-step [data-step="${e.key === "ArrowRight" ? 1 : -1}"]`)?.click();
 });
 

@@ -1,7 +1,7 @@
 /* hadsed.com UI primitives.
    Plain HTML with a class; every color and font comes from the site's tokens in src/css/site.css
    (--bg, --text, --muted, --accent, --bright, --rule, --glow, --pink, --font). ui.js adds behavior.
-   Components: .ui-seg (segmented toggle), .ui-select, .ui-step, .ui-bar, .ui-table, .ui-drawer,
+   Components: .ui-seg (segmented toggle), .ui-select, .ui-step, .ui-bar, .ui-filter, .ui-table, .ui-drawer,
    .ui-tiles, .ui-modal, .ui-badge, .ui-fig. See index.html for every one in its states. */
 
 :root {
@@ -128,6 +128,41 @@
 .ui-field { display: inline-flex; align-items: center; gap: 0.5rem; max-width: 100%; }
 .ui-bar .ui-gap { flex: 1 1 auto; }
 
+/* ---------- Filter: pick several out of many, folded to a short line ----------
+   Each choice is a chip with its own color (--c) and an optional value (<b>). Folded, the filter shows only
+   the chosen chips, at most data-max of them, then "+N more"; unfolded, every chip, with All and None.
+   ui.js keeps the count and fires ui:change with the chosen values, comma-separated. */
+.ui-filter { display: grid; gap: 0.45rem; margin: 0 0 0.8rem; font-size: 0.8rem; }
+.ui-filter-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.ui-filter-head .ui-label { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.ui-filter-count { color: var(--muted); font-family: var(--ui-mono); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+.ui-filter-head .ui-btn { font-size: 0.72rem; padding: 0.05rem 0.5rem; }
+.ui-filter:not(.is-open) [data-filter-all], .ui-filter:not(.is-open) [data-filter-none] { display: none; }
+.ui-filter-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.ui-filter.is-open .ui-filter-list {
+  max-height: 14rem; overflow-y: auto; padding: 0.45rem; overscroll-behavior: contain;
+  border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: var(--ui-sunk);
+}
+.ui-chip {
+  --c: var(--muted);
+  display: inline-flex; align-items: center; gap: 0.4em; max-width: 100%;
+  font: inherit; font-size: 0.76rem; line-height: 1.45; color: var(--muted); white-space: nowrap;
+  padding: 0.12rem 0.55rem 0.12rem 0.45rem; border: 1px solid var(--ui-line); border-radius: var(--ui-radius);
+  background: none; cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.ui-chip::before { content: ""; width: 0.62em; height: 0.62em; border-radius: 50%; flex: none; border: 1.5px solid var(--c); box-sizing: border-box; }
+.ui-chip:hover { color: var(--bright); border-color: var(--ui-line-strong); }
+.ui-chip[aria-pressed="true"] { color: var(--text); border-color: color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.ui-chip[aria-pressed="true"]::before { background: var(--c); }
+.ui-chip b { font-weight: 400; font-family: var(--ui-mono); font-size: 0.92em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ui-chip .nm { overflow: hidden; text-overflow: ellipsis; }
+.ui-chip.more { color: var(--glow); border-style: dashed; }
+.ui-chip.more::before { display: none; }
+.ui-chip:focus-visible { outline: 2px solid var(--glow); outline-offset: 1px; }
+/* folded: only chosen chips show, and ui.js hides those past data-max */
+.ui-filter:not(.is-open) .ui-chip:not([aria-pressed="true"]):not(.more), .ui-filter .ui-chip.is-over { display: none; }
+.ui-filter.is-open .ui-chip.more, .ui-chip[hidden] { display: none; }
+
 /* ---------- Data table: numbers in columns, cells you can open ---------- */
 .ui-table {
   overflow-x: auto; margin: 0; padding: 0.3rem 1rem 0.4rem;
@@ -144,7 +179,7 @@
 .ui-table thead th:first-child { color: var(--muted); }
 /* Two-line head, for a column whose unit must always show: <th><b>Small view change</b>surface loss</th> */
 .ui-table thead th b { display: block; color: var(--accent); font-weight: 400; font-size: 0.8rem; white-space: normal; }
-.ui-table td.num { font-family: var(--ui-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.ui-table td.num { font-family: var(--ui-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .ui-table th.num { text-align: right; }
 .ui-table th .ui-mono { font-size: 0.7rem; }
 .ui-table .key { color: var(--text); white-space: nowrap; }

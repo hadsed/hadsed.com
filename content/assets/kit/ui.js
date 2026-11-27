@@ -3,6 +3,7 @@
 //   .ui-seg[data-name]        segmented toggle; buttons carry value="…", the chosen one aria-pressed="true"
 //   .ui-select > select       becomes a themed menu; the select keeps the value and fires "change"
 //   .ui-step[data-name]       previous / next over 1..data-total; <output> shows "i / n"
+//   .ui-filter[data-name]     several chips (.ui-chip value=… aria-pressed) folded to the chosen ones; value is "a,b,c"
 //   [data-for=name][data-when=value]   a panel shown only while control <name> holds <value>
 //   th[data-sort]             click the title to sort the column (numbers if th.num, else text)
 //   th[data-info="A · B · C"] hovering the head shows its details above it, one line per " · " part; the column lights up
@@ -57,6 +58,31 @@
   const reThumb = () => $$(".ui-seg.has-thumb").forEach(segThumb);
   addEventListener("resize", reThumb);
   if (document.fonts) document.fonts.ready.then(reThumb);
+
+  // ---------- filter: many chips, folded to the chosen few ----------
+  function filterSync(f, fire) {
+    const chips = $$(".ui-filter-list > .ui-chip:not(.more)", f), on = chips.filter((c) => c.getAttribute("aria-pressed") === "true");
+    const max = Number(f.dataset.max) || 4, open = f.classList.contains("is-open");
+    let n = 0;
+    for (const c of chips) { const pressed = c.getAttribute("aria-pressed") === "true"; c.classList.toggle("is-over", !open && pressed && ++n > max); }
+    const list = f.querySelector(".ui-filter-list");
+    let more = list.querySelector(":scope > .ui-chip.more");
+    if (!more) { more = document.createElement("button"); more.type = "button"; more.className = "ui-chip more"; list.append(more); }
+    const extra = on.length - max;
+    more.hidden = open || extra <= 0;
+    more.textContent = `+${Math.max(0, extra)} more`;
+    const count = f.querySelector(".ui-filter-count"); if (count) count.textContent = `${on.length} of ${chips.length}`;
+    const tog = f.querySelector("[data-filter-toggle]");
+    if (tog) { tog.textContent = open ? "Done" : "Choose"; tog.setAttribute("aria-expanded", open); }
+    f.dataset.value = on.map((c) => c.value).join(",");
+    if (fire) show(f, f.dataset.name, f.dataset.value);
+  }
+  function filterOpen(f, open) {
+    f.classList.toggle("is-open", open);
+    filterSync(f, false);
+    const list = f.querySelector(".ui-filter-list");
+    if (open && !calm()) list.animate([{ opacity: 0, transform: "translateY(-3px)" }, { opacity: 1, transform: "none" }], { duration: 150, easing: EASE_OUT });
+  }
 
   // ---------- select: a themed menu in front of the native select ----------
   let menuOpen = null; // {wrap, sel, btn, menu}
@@ -291,6 +317,20 @@
       // first click: low to high (lower loss is better); second: high to low; third: the original order
       return sortBy(th, !cur ? "ascending" : cur === "ascending" ? "descending" : null);
     }
+    const chip = t.closest(".ui-filter .ui-chip");
+    if (chip) {
+      const f = chip.closest(".ui-filter");
+      if (chip.classList.contains("more")) return filterOpen(f, true);
+      chip.setAttribute("aria-pressed", chip.getAttribute("aria-pressed") !== "true");
+      return filterSync(f, true);
+    }
+    const fb = t.closest(".ui-filter [data-filter-toggle], .ui-filter [data-filter-all], .ui-filter [data-filter-none]");
+    if (fb) {
+      const f = fb.closest(".ui-filter");
+      if (fb.hasAttribute("data-filter-toggle")) return filterOpen(f, !f.classList.contains("is-open"));
+      for (const c of $$(".ui-filter-list > .ui-chip:not(.more)", f)) c.setAttribute("aria-pressed", fb.hasAttribute("data-filter-all"));
+      return filterSync(f, true);
+    }
     const segBtn = t.closest(".ui-seg > button"); if (segBtn) return segPick(segBtn, false);
     const st = t.closest(".ui-step [data-step]");
     if (st) { const s = st.closest(".ui-step"); return stepSet(s, Number(s.dataset.value || 1) + Number(st.dataset.step)); }
@@ -387,6 +427,7 @@
   function init(root = document) {
     $$(".ui-seg", root).forEach(segInit);
     $$(".ui-select", root).forEach(selInit);
+    $$(".ui-filter", root).forEach((f) => { $$(".ui-chip", f).forEach((c) => { c.type = "button"; if (!c.hasAttribute("aria-pressed")) c.setAttribute("aria-pressed", "false"); }); filterSync(f, false); });
     $$(".ui-step", root).forEach((s) => stepSet(s, Number(s.dataset.value || 1)));
     $$(".ui-select select", root).forEach((s) => { if (s.name || s.dataset.name) show(s, s.name || s.dataset.name, s.value); });
     $$("th[data-sort], th[data-info]", root).forEach(thInit);
